@@ -464,9 +464,12 @@
   final: 0x320270
   kind: function
   name: Player_Resources
-  semantics: "Callers the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua IsResourceExtractableAt 0x4ac120: takes the plot's improvement (+0x44, none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0) is complete (+0xb08) and not pillaged (0x24c3a0), that district's type; then 0x4aaa70. A district on the resource accrues once complete (the plot's district complete 0x811b0, not pillaged)."
+  semantics: "Callers the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua IsResourceExtractableAt 0x4ac120: takes the plot's improvement (+0x44, none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0) is complete (+0xb08) and not pillaged (0x24c3a0), that district's type; then 0x4aaa70. A district still building answers nothing here (0x811b0 reads its +0xb08), though the holdings step 0x4ab6e0 pays it the turn's income."
   status: READ
   cases:
+    - recording: h1_duels1128
+      turn: 14
+      value: "city-state 4 completes Animal Husbandry with its Holy Site still building on 33:10's Horses: no PlayerResourceChanged at ResearchCompleted, Equestrian Orders 5.0 at t15 on the 4 Horses of two turns' income"
     - recording: h1_duelw1116
       turn: 193
       value: China's Coal under a Campus (plot 411) powers Beijing's Coal Power Plant from t193
@@ -477,12 +480,16 @@
       value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
-  impl: [gpu/core/sim_seats.py:_res_extracting, cpu/core/stockpile.ts:revealPass]
+  impl:
+    - world/resources.ts:handsResource
+    - gpu/core/sim_seats.py:_res_handing
+    - cpu/core/stockpile.ts:revealPass
   readings:
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourc..."
   review: reviewed
@@ -507,6 +514,7 @@
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...ct:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner is the pl..."
   review: reviewed
@@ -570,7 +578,9 @@
       value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
-  readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
+  readings:
+    - "H-1: a plot's resource for its owner (strategic access) — READ"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's im..."
   review: reviewed
@@ -680,9 +690,12 @@
 - addr: 0x4ab6e0
   final: 0x320ec0
   kind: function
-  semantics: recomputes the player's resource holdings.
+  semantics: "recomputes the player's resource holdings. Its plot walk (0x4ab97e..0x4abea5, per city) pays an accumulating resource the player sees (0x4ac140) the base rate plus the improved rate where the plot's improvement stands unpillaged and lists the resource (0x4aba6c..0x4abadb), else where the city holds a district on the plot (0x1ae690) that is not pillaged (0x4abadd..0x4abb0f): the district's completion is never read."
   status: READ
   cases:
+    - recording: h1_duels1128
+      turn: 14
+      value: "city-state 4's Holy Site still building on 33:10's Horses (27 of 34 in record t15): m_aAccumulatedResourcePerTurn 2.0 in records t15-t24, none from t25 after the district's pillage in t23"
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
@@ -693,12 +706,16 @@
       value: "0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's   owned-resource change to its suzerain — an accumulated resource as owned   (+n to the suzerain, -n to the city-state), any oth"
     - recording: 1117
       value: 1117's eight (Antananarivo's Sugar, Caguana) and 1127's   Hattusa show no such amount in the records.
-  impl: [cpu/harness/checks.ts:foundedUnallocated]
+  impl:
+    - cpu/harness/checks.ts:foundedUnallocated
+    - world/resources.ts:extractsResource
+    - gpu/core/sim_seats.py:_res_extracting
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...vic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df),..."
     - ...rs. Its only caller is the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0, the allocation 0x4a6110, then the parks), reached from Player DoTurn 0x4e46c0 alone;...
@@ -772,6 +789,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140, the revealing tech), and EITHER a district stands there — any type, the city centre incl..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then —..."
@@ -785,6 +803,46 @@
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's...
+  review: reviewed
+- addr: 0x4ac6e0
+  final: 0x321990
+  kind: function
+  semantics: "Player_Resources' handler of a district's change (placed, completed, pillaged or removed): asks 0x4aaa70 of the district's plot with the district's own type and passes the change to 0x4ab4d0. Its test of a district still building is unread."
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+  context:
+    - "- Open: the handlers of a district placed, completed and pillaged (0x4ac6e0, 0x4ac8d0, 0x4acaa0, 0x4acc50 -> 0x4aaa70 with their own district argument, 0x4ac8d0 re..."
+  review: reviewed
+- addr: 0x4ac8d0
+  final: 0x321b00
+  kind: function
+  semantics: "Player_Resources' handler of a district's change (placed, completed, pillaged or removed): asks 0x4aaa70 of the district's plot with the district's own type and passes the change to 0x4ab4d0. Its test of a district still building is unread."
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+  context:
+    - "- Open: the handlers of a district placed, completed and pillaged (0x4ac6e0, 0x4ac8d0, 0x4acaa0, 0x4acc50 -> 0x4aaa70 with their own district argument, 0x4ac8d0 reading +0xb..."
+  review: reviewed
+- addr: 0x4acaa0
+  final: 0x321c40
+  kind: function
+  semantics: "Player_Resources' handler of a district's change (placed, completed, pillaged or removed): asks 0x4aaa70 of the district's plot with the district's own type and passes the change to 0x4ab4d0. Its test of a district still building is unread."
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+  context:
+    - "- Open: the handlers of a district placed, completed and pillaged (0x4ac6e0, 0x4ac8d0, 0x4acaa0, 0x4acc50 -> 0x4aaa70 with their own district argument, 0x4ac8d0 reading +0xb08) for a..."
+  review: reviewed
+- addr: 0x4acc50
+  final: 0x321d70
+  kind: function
+  semantics: "Player_Resources' handler of a district's change (placed, completed, pillaged or removed): asks 0x4aaa70 of the district's plot with the district's own type and passes the change to 0x4ab4d0. Its test of a district still building is unread."
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+  context:
+    - ...he handlers of a district placed, completed and pillaged (0x4ac6e0, 0x4ac8d0, 0x4acaa0, 0x4acc50 -> 0x4aaa70 with their own district argument, 0x4ac8d0 reading +0xb08) for a luxury or...
   review: reviewed
 - addr: 0x4ad1c0
   kind: function
@@ -856,6 +914,9 @@
       value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
+    - recording: h1_duels1128
+      turn: 14
+      value: "city-state 4 completes Animal Husbandry with a Holy Site still building on 33:10's Horses: the pass pays nothing (Equestrian Orders 5.0 at t15, 4 Horses), where city-state 2's Mine of runs/h1_duels1171 t33 is paid its copy"
   impl:
     - cpu/core/stockpile.ts:revealPass
     - gpu/core/sim_seats.py:_reveal_pass
@@ -866,6 +927,7 @@
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
     - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...layer_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's improvement (+0x44, read as non..."
   review: reviewed

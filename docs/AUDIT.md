@@ -407,7 +407,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (picks): 1128 Nazca t27-32 the idle store ~9 over the idle Production (Shrine T 6..2, ours 8..4)
   - LAB (1128 nazca and hong kong): 1128 Nazca t77 / t84 Shipping for the game's Trader
   - LAB (1128 nazca and hong kong): 1128 Nazca t59 / t69 / t90 / t119 the game's SHIPPING (34.0 at t59)
-  - LAB (1128 nazca and hong kong): 1128 Nazca t15 Equestrian Orders unscored in ours
   - LAB (1128 nazca and hong kong): 1128 Nazca t32 the plain pick with the pillaged Holy Site's Shrine refused (0x170450 at 0x17071d; the queue's refusal unported)
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)

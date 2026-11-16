@@ -11079,6 +11079,16 @@ class SimSeats:
         district = (self.centre_slot_at >= 0) | (self.built_wonder >= 0) | ((self.district >= 0) & ~self.district_pillaged)
         return (self.res_id >= 0) & (district | ((self.improvement == self.res_imp) & ~self.pillaged))
 
+    def _res_handing(self) -> torch.Tensor:
+        """[B, T] — does the plot hand its resource over at the plot test
+        (`handsResource`, 0x4aa8e0)? A complete, unpillaged district on it —
+        a city centre and a finished wonder's plot included — or else the
+        resource's own unpillaged improvement; a district still building
+        answers nothing."""
+        district = ((self.centre_slot_at >= 0) | ((self.built_wonder >= 0) & self.built_wonder_complete)
+                    | ((self.district >= 0) & self.district_complete & ~self.district_pillaged))
+        return (self.res_id >= 0) & (district | ((self.improvement == self.res_imp) & ~self.pillaged))
+
     def _seat_accrue_stockpile(self, row: int) -> None:
         """One turn's resource income (`accrueStockpiles`): every tile this seat
         owns that hands it its strategic resource (`_res_extracting`) pays that
@@ -11095,7 +11105,7 @@ class SimSeats:
     def _reveal_pass(self, row: int, on: torch.Tensor, k: int) -> None:
         """`revealPass`: A REVEAL'S OWNERSHIP PASS (0x4ae4e0) for seat row
         `row` on strategic slot `k` in the games `on` [B] — every plot
-        holding the resource that hands it to the seat (`_res_extracting` on
+        holding the resource that hands it to the seat (`_res_handing` on
         its own ground) pays its one copy into the bank at once, the
         allocation rebuilt; a city-state's under a suzerain passes to the
         suzerain (0x44eff0)."""
@@ -11103,7 +11113,7 @@ class SimSeats:
         if not (row < self.n_majors or minor):
             return
         rid = self._strat_rid[k]
-        n = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_live() & self._res_extracting()
+        n = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_live() & self._res_handing()
              & (self.res_id == rid)).sum(dim=1)
         pay = on & (n > 0)
         if not bool(pay.count_nonzero()):

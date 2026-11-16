@@ -138,12 +138,13 @@ export function resourceImprovement(tile: Tile): ImprovementId | null {
  * Does this plot hand its resource to its owner? An unpillaged district on
  * the plot — any district, placed or complete, the city centre (never
  * pillaged) included — or else an unpillaged improvement whose valid
- * resources hold it (Player_Resources 0x4aa8e0 / 0x4aaa70); 0x4aafd0 pays
- * an accumulating resource its ImprovedExtractionRate through either. A
- * district still building pays (a fit: runs/h1_duely1128 Nazca's Holy Site
- * on its Horses, placed t14, complete t16 — its Horses 4 at t15, 6 at t16
- * by AI_GovtPolicies.csv's Equestrian Orders 5.0 / 7.0, every turn to t31 as
- * logged; the DLL's 0x811b0 reads +0xb08 there, its meaning open). A
+ * resources hold it: the holdings step's plot walk (Player_Resources
+ * 0x4ab6e0 at 0x4aba6c..0x4abb0f), which finds the district among its
+ * city's by the plot alone (0x1ae690) and asks IsPillaged of it, never its
+ * completion. So a district still building pays (runs/h1_duels1128 Nazca's
+ * Holy Site on its Horses, placed t13, complete t15 — the player's
+ * m_aAccumulatedResourcePerTurn 2.0 in record t15 with the district at 27
+ * of 34, Equestrian Orders 5.0 / 7.0 at t15 / t16 on 4 and 6 Horses). A
  * wonder's plot holds its DISTRICT_WONDER, a district like any other
  * (runs/h1_duels1164 t160-t178: player 1's Oil 3 a turn in its
  * m_aAccumulatedResourcePerTurn, its one Oil source under the wonder on
@@ -154,6 +155,21 @@ export function extractsResource(tile: Tile): boolean {
   if (!tile.resource) return false;
   if (tile.district === 'CITY_CENTER' || tile.builtWonder) return true;
   if (tile.district && !tile.districtPillaged) return true;
+  return !tile.pillaged && tile.improvement === resourceImprovement(tile);
+}
+
+/**
+ * Does this plot hand its resource over at the plot test (Player_Resources
+ * 0x4aa8e0 -> 0x4aaa70)? A COMPLETE, unpillaged district on it (0x811b0, the
+ * district's +0xb08, then IsPillaged) — the city centre, a finished wonder's
+ * plot — or else an unpillaged improvement whose valid resources hold it. A
+ * district still building answers nothing here, though the holdings step
+ * pays it (`extractsResource`).
+ */
+export function handsResource(tile: Tile): boolean {
+  if (!tile.resource) return false;
+  if (tile.district === 'CITY_CENTER' || (tile.builtWonder && tile.builtWonderComplete)) return true;
+  if (tile.district && tile.districtComplete && !tile.districtPillaged) return true;
   return !tile.pillaged && tile.improvement === resourceImprovement(tile);
 }
 

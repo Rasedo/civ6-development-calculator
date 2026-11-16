@@ -16,7 +16,7 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
-import { RESOURCES, extractsResource, resourceImprovement } from '../../world/resources';
+import { RESOURCES, extractsResource, handsResource, resourceImprovement } from '../../world/resources';
 import { engineId } from '../data/aliases';
 import { citiesOf, civOf, isCiv, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
 import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats, suzerainOf } from './cityStates';
@@ -242,11 +242,13 @@ export function accumulatedPerTurn(state: GameState, seat: number): number[] {
  * A REVEAL'S OWNERSHIP PASS (0x4ae4e0; from the technology handler 0x4ad2f0
  * on the player's own completion and from a free visibility's grant
  * 0x4ae870): every plot holding `resource` that hands it to the seat
- * (0x4aa8e0: a plot it owns, `extractsResource`) pays the plot's one copy
+ * (0x4aa8e0: a plot it owns, `handsResource`) pays the plot's one copy
  * into its bank at once through ChangeResourceAmount, with no test of the
  * resource's Accumulate — a source standing before the reveal starts the
  * bank one copy up, one laid after it pays none (0x4ab4d0 skips an
- * accumulating resource). The change rebuilds the luxury allocation; a
+ * accumulating resource), and a district still building on the plot pays
+ * none either, the turn's income alone. The change rebuilds the luxury
+ * allocation; a
  * city-state's under a suzerain passes to the suzerain (0x44eff0).
  */
 export function revealPass(state: GameState, seat: number, resource: string): void {
@@ -254,7 +256,7 @@ export function revealPass(state: GameState, seat: number, resource: string): vo
   const s = seatOf(state, seat);
   if (k < 0 || !s || !(isCiv(seat) || isCityStateSeat(seat))) return;
   let n = 0;
-  for (const t of state.map.tiles) if (t.resource === resource && tileOwnedByCiv(t, seat) && extractsResource(t)) n += 1;
+  for (const t of state.map.tiles) if (t.resource === resource && tileOwnedByCiv(t, seat) && handsResource(t)) n += 1;
   if (!n) return;
   const suz = isCityStateSeat(seat) ? suzerainOf(s as CityState) : -1;
   const to = suz >= 0 ? suz : seat;

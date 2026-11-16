@@ -652,6 +652,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...ct), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentI..."
     - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."

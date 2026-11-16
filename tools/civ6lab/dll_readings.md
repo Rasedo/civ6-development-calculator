@@ -19695,3 +19695,42 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   plots, each Unowned with no resource), a city-state's every turn: what
   0x5ce680's full update runs for the Free Cities is unread. The loyalty
   level's GrowthChange (+0x24) is unported (C-102).
+
+## C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins
+
+- TWO TESTS OF A PLOT'S SOURCE. The holdings step 0x4ab6e0 (the turn's
+  m_aAccumulatedResourcePerTurn) walks each city's plots: an accumulating
+  resource the player sees (0x4ac140) pays its base rate plus the improved
+  rate where the plot's improvement stands unpillaged and lists the
+  resource (0x4aba6c..0x4abadb), else where the city holds a district on
+  the plot — 0x1ae690, the city's districts matched by the plot's index
+  alone — that IsPillaged (0x24c3a0) denies (0x4abadd..0x4abb0f). It never
+  reads the district's completion. The plot test 0x4aa8e0 (the reveal's
+  ownership pass 0x4ae4e0 at 0x4ae6d2, the city walk 0x4aafd0, Lua
+  IsResourceExtractableAt) takes the district's type only where 0x811b0
+  answers its +0xb08 (IsComplete 0x9c83d0 reads the same byte) and it is
+  not pillaged, then 0x4aaa70.
+- So a district still building on a resource pays the turn's income from
+  the turn the resource is seen, and is no source at the reveal's pass: the
+  pass pays a copy for an unpillaged improvement of the resource or a
+  complete, unpillaged district alone. Ported: `extractsResource` (the
+  income, any unpillaged district) and `handsResource` (the plot test) in
+  world/resources.ts, `revealPass` on the second; GPU `_res_extracting` /
+  `_res_handing`, `_reveal_pass`.
+- CONFIRMED: runs/h1_duels1128 city-state 4 (Nazca), its Holy Site placed on
+  33:10's Horses in t13 (record t14 and t15: not complete, 27 of 34;
+  complete in record t16), Animal Husbandry completed as its t14 opens: one
+  PlayerResourceChanged 42 in the turn, after CivicCompleted (the income),
+  none at ResearchCompleted; m_aAccumulatedResourcePerTurn 2.0 in records
+  t15-t24; Equestrian Orders 5 / 7 / 10 ... 22 / 25 at t15-t23 on 4, 6 ...
+  20 Horses (1.25 a copy), 25 held to t31 with the district pillaged in
+  record t24, unlogged from t37, the record its Horseman first stands in.
+  Against it
+  runs/h1_duels1171 city-state 2's Mine on 8:22's Iron at Bronze Working in
+  t33: two PlayerResourceChanged 43, one at the research's completion (the
+  pass) and one after it (the income), 3 copies at t33.
+- Open: the handlers of a district placed, completed and pillaged
+  (0x4ac6e0, 0x4ac8d0, 0x4acaa0, 0x4acc50 -> 0x4aaa70 with their own
+  district argument, 0x4ac8d0 reading +0xb08) for a luxury or bonus
+  resource under a district still building, unread: `extractsResource`
+  hands those over from the placement.

@@ -746,6 +746,7 @@
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
     - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...e Cothon,   the Royal Navy Dockyard) stands at the FROM plot, or at the TO plot — the   completion (0x811b0) read off the FROM plot's district in both cases (t72:   2's Swordsman embarking from (15,6) onto i..."
   context:
@@ -9586,6 +9587,7 @@
   readings:
     - "H-1: the district adjacency — READ"
     - "H-1: a plot's resource for its owner (strategic access) — READ"
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
   context:
     - "...tricts +0xe1 bit 4 — the Wonder district), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone..."
     - "...0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers t..."

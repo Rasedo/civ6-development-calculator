@@ -100,6 +100,23 @@
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
   review: reviewed
+- addr: 0x1ae690
+  final: 0x11e5c0
+  kind: function
+  name: the city's district on a plot
+  semantics: "City_Districts (the city's +0x1a48), a plot index: walks the city's district ids and answers the district whose plot (x + y x the map's width) is the index, complete or not, else null. The holdings step 0x4ab6e0 asks IsPillaged of its answer alone."
+  status: READ
+  cases:
+    - recording: h1_duels1128
+      turn: 14
+      value: "city-state 4's Holy Site on 33:10's Horses, not complete in records t14 and t15: m_aAccumulatedResourcePerTurn 2.0 for the Horses in record t15"
+  impl: [world/resources.ts:extractsResource, gpu/core/sim_seats.py:_res_extracting]
+  readings:
+    - "C-130 / C-98: a district still building pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+  context:
+    - "...lding pays the turn's income and no reveal's pass — READ (0x4ab6e0 at 0x4aba6c..0x4abb0f, 0x1ae690, 0x4aa8e0 at 0x4aa920..0x4aa972), both twins"
+    - "...the resource (0x4aba6c..0x4abadb), else where the city holds a district on the plot — 0x1ae690, the city's districts matched by the plot's index alone — that IsPillaged (0x24c3a0) de..."
+  review: reviewed
 - addr: 0x1ae7a0
   final: 0x11eac0
   kind: function
