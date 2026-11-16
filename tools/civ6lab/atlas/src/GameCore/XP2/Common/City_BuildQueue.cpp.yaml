@@ -224,9 +224,12 @@
   final: 0xf61c0
   kind: function
   name: CanConstruct
-  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged. At 0x170c87..0x170dd2: a building with progress (0x17d050) on its construction plot (0x179280) is refused where 0x5313f0 (the owner, the plot, flag 1) finds a hostile unit there (+0x29), else accepted at once. At 0x170644..0x170716, its sixth argument clear (every AI caller): per BuildingPrereqs row, as the player's version, with OuterDefenseHitPoints (+0x54 set, +0x58 above 0), the city lacking it sets the second byte (0x1713a4, refused for good); the city holding it under damaged outer defences (0x197ff0 above 0) returns false with the reason +4 naming it (0x170d8b), before the district and held tests: a held Castle or Star Fort is valued while the walls stand damaged."
+  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged. At 0x170c87..0x170dd2: a building with progress (0x17d050) on its construction plot (0x179280) is refused where 0x5313f0 (the owner, the plot, flag 1) finds a hostile unit there (+0x29), else accepted at once. At 0x170644..0x170716, its sixth argument clear (every AI caller): per BuildingPrereqs row, as the player's version, with OuterDefenseHitPoints (+0x54 set, +0x58 above 0), the city lacking it sets the second byte (0x1713a4, refused for good); the city holding it under damaged outer defences (0x197ff0 above 0) returns false with the reason +4 naming it (0x170d8b), before the district and held tests: a held Castle or Star Fort is valued while the walls stand damaged. At 0x1709b0..0x170a5e: each BuildingPrereqs row (its building as the player's version) is met by a building the city holds (0x18e9f0) and does not hold pillaged (0x18fe60); a pillaged prerequisite refuses the building, at the queue's head and in the pick."
   status: PARTLY
   cases:
+    - recording: h1_duels1143
+      turn: 135
+      value: "Bandar Brunei's Lighthouse pillaged by the blizzard at the t135 change: its Shipyard (60 of its cost) refused at the queue's head, contract 558 CANCELLED and the Lighthouse's repair picked at 847.3; duels1181 Ngazargamu t134 the same"
     - recording: h1_duely1117
       turn: 141
       value: "Valletta t134-141: its pillaged Lighthouse picked under its pillaged Harbor, refused at the queue, NO BUILDS AT ALL"
@@ -243,6 +246,12 @@
       turn: 104
       value: Cardiff's held Castle valued 2414.90 under its walls' 54 damage (t104-t107), FX(-9999) at t96-t103 and from t108; Bologna t92-96 the Star Fort FX(-9999) beside its unbuilt Castle
   impl:
+    - cpu/core/minorBuild.ts:minorBuildingOk
+    - cpu/core/minorBuild.ts:freeCityBuildingOk
+    - cpu/core/aiCityBuild.ts:constructibleNow
+    - gpu/core/sim_minors.py:_minor_building_ok
+    - gpu/core/sim_minors.py:_free_building_ok
+    - gpu/core/sim_cityvalue.py:_cv_constructible
     - cpu/core/aiCityBuild.ts:wallsPrereq
     - gpu/core/sim_cityvalue.py:_cv_walls_prereq
     - cpu/core/aiCityBuild.ts:PickFacts
@@ -261,6 +270,7 @@
     - cpu/core/minorCityAi.ts:districtDrowned
     - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
+    - "H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)"
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"

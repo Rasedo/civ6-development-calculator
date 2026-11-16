@@ -195,6 +195,7 @@
     - gpu/core/sim_tactics.py:first_in_reach
     - cpu/core/tactical.ts:coastalRaids
     - gpu/core/sim_tactics.py:reach_at
+    - cpu/harness/replay.ts:c
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
@@ -218,6 +219,7 @@
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:

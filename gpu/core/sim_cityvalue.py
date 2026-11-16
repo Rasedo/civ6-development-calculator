@@ -1172,7 +1172,7 @@ class SimCityValue:
         if b["prereqs"]:
             anyp = torch.zeros_like(ok)
             for p in b["prereqs"]:
-                anyp = anyp | _t(f.has_building(p), like).bool()
+                anyp = anyp | (_t(f.has_building(p), like).bool() & ~_t(f.building_pillaged(p), like).bool())
             ok = ok & anyp
         return ok
 

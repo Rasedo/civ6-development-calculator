@@ -1111,7 +1111,9 @@ function minorBuildingOk(state: GameState, cityState: CityState, id: string, unl
   // the queue's CanConstruct (0x1714d0) refuses a building of a pillaged
   // district (LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED)
   if (!home || irradiated(home) || home.districtPillaged) return false;
-  if (def.requiresAny?.length && !def.requiresAny.some((r) => held.includes(r))) return false;
+  // its BuildingPrereqs row is met by a building held and not pillaged
+  // (0x170450 at 0x170a19 / 0x170a33)
+  if (def.requiresAny?.length && !def.requiresAny.some((r) => held.includes(r) && !buildingPillaged(cityState, r))) return false;
   if (def.exclusiveWith?.some((x) => held.includes(x))) return false;
   if (def.special === 'WATER_MILL' && !hasRiver(centre)) return false;
   if (def.floodBarrier && cityLowlands(state, minorCity(cityState)).length === 0) return false;
@@ -2568,7 +2570,7 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
   // the queue's CanConstruct (0x1714d0) refuses a building of a pillaged
   // district (LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED)
   if (!home || irradiated(home) || home.districtPillaged) return false;
-  if (def.requiresAny?.length && !def.requiresAny.some((r) => city.buildings.includes(r))) return false;
+  if (def.requiresAny?.length && !def.requiresAny.some((r) => city.buildings.includes(r) && !buildingPillaged(city, r))) return false;
   if (def.exclusiveWith?.some((x) => city.buildings.includes(x))) return false;
   if (def.special === 'WATER_MILL' && !hasRiver(centre)) return false;
   if (def.walls && outerPool(state, city) < wallsMax(state, city)) return false;

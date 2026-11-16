@@ -18477,3 +18477,32 @@ gpu/core/sim_seats.py and gpu/core/sim_phase.py.
   for the game's 20, our centre 21 with its Palace and three envoys and the
   hills' 3; t18 the Slinger 655369 at 9 hit points on China's 32:10, 10 for
   13, the Horse Archer 851980 at 51 on it as logged).
+
+## H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)
+
+`minorBuildingOk`, `freeCityBuildingOk`, `constructibleNow` (cpu/core/minorBuild.ts,
+cpu/core/aiCityBuild.ts); GPU `_minor_building_ok`, `_free_building_ok`
+(gpu/core/sim_minors.py), `_cv_constructible` (gpu/core/sim_cityvalue.py); the
+harness's seizure (`barbarianAi`, the `seize` decision, cpu/harness/replay.ts).
+
+- THE PREREQUISITE BUILDING (0x170450 at 0x1709b0..0x170a5e): each BuildingPrereqs
+  row of the building (+0x1f8, its PrereqBuilding as the player's version) is met
+  where the city holds that building (City_Buildings 0x18e9f0) and does not hold it
+  pillaged (0x18fe60, the pillaged byte array); none met clears the result byte. A
+  pillaged prerequisite refuses the building at the queue's head (the build step's
+  head check) and in the pick, and the city's contract for it is CANCELLED.
+- CONFIRMED: runs/h1_duels1143 Bandar Brunei t135: its Lighthouse pillaged at the
+  t135 change (the blizzard centred 8:20), its Shipyard at 60 of its cost in hand;
+  in its DoTurn the Shipyard leaves the head, contract 558 CANCELLED, the
+  Lighthouse's repair picked at 847.3 (AI_CityBuild), the Shipyard again at t136.
+  runs/h1_duels1181 Ngazargamu t134 the same. runs/h1_duely1127 Muscat t231-240
+  (the Bank pillaged under its Sewer, the Sewer finished first) is no prerequisite.
+- THE CAPTIVE (0x212500): the unit the seizure makes is created with its Movement
+  spent (0x56d6f0) and its turn ended (0x570b40). A barbarians' seizure the
+  replay's battle has already made (the mover's advance) is still their seizure:
+  their turn's copy holds the civilian as its owner's until it falls, and the
+  captive then stands at Movement 0. Confirmed: runs/h1_duels1178 t103, player 1's
+  Settler 2818059 on 15:13 taken by the barbarian 4063233 as their Settler
+  4390919, Movement 0 and no planning in the game's aiunits, its Operation row on
+  15:13.
+- OPEN: the majors' CanConstruct (`rules.ts`) still counts a pillaged prerequisite.

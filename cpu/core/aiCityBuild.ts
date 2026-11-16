@@ -484,11 +484,12 @@ export function buildingTurns(f: CityBuildFacts, b: AiBuildingRow): number {
 }
 
 /** CanConstruct with its reasons all clear: the technology and the civic
- *  held, the district standing in the city, a prerequisite building held */
+ *  held, the district standing in the city, a prerequisite building held
+ *  and not pillaged (0x170450 at 0x170a19 / 0x170a33) */
 export function constructibleNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
   if (wallsPrereq(f, b) !== null || refused(f, b) || f.techTurns(b.tech) !== 0 || f.civicTurns(b.civic) !== 0) return false;
   if (b.district && !f.hasDistrict(b.district)) return false;
-  return !b.prereqs.length || b.prereqs.some((p) => f.hasBuilding(p));
+  return !b.prereqs.length || b.prereqs.some((p) => f.hasBuilding(p) && !f.buildingPillaged(p));
 }
 
 /** the three reasons the building value reads off CanConstruct

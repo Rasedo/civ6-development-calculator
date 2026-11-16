@@ -3881,6 +3881,7 @@
     - cpu/core/units.ts:canUpgradeUnit
     - cpu/core/tactical.ts:strike
     - gpu/core/sim_tactics.py:first_in_reach
+    - cpu/harness/replay.ts:c
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -3911,6 +3912,7 @@
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
     - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
+    - "H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:

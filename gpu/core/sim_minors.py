@@ -2415,7 +2415,9 @@ class SimMinors:
         have = self.city_bldg[:, row, 0]
         reqs = self._b_req_buildings[bi]
         if reqs:
-            ok = ok & have[:, reqs].any(dim=1)
+            # its BuildingPrereqs row is met by a building held and not
+            # pillaged (0x170450 at 0x170a19 / 0x170a33)
+            ok = ok & (have[:, reqs] & ~self.city_bldg_pillaged[:, row, 0][:, reqs]).any(dim=1)
         excl = self._b_excl_buildings[bi]
         if excl:
             ok = ok & ~have[:, excl].any(dim=1)
@@ -2891,7 +2893,7 @@ class SimMinors:
         have = self.city_bldg[:, row, j]
         reqs = self._b_req_buildings[bi]
         if reqs:
-            ok = ok & have[:, reqs].any(dim=1)
+            ok = ok & (have[:, reqs] & ~self.city_bldg_pillaged[:, row, j][:, reqs]).any(dim=1)
         excl = self._b_excl_buildings[bi]
         if excl:
             ok = ok & ~have[:, excl].any(dim=1)

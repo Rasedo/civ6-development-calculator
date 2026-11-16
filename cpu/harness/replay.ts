@@ -1687,12 +1687,15 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // take it; their Settler is first on their end look's records;
   // runs/h1_duely1121 t68: China's Settler on 7:14 Barbarian Attack's Target
   // 0, its Warrior taking it from 7:15, Barbarian Builder Capture started)
-  const seized: [Unit, Pick<Unit, 'id' | 'seat' | 'type' | 'tileIndex' | 'hp'>][] = [];
+  const seized: [Unit, Pick<Unit, 'id' | 'seat' | 'type' | 'tileIndex' | 'hp' | 'movesLeft'>][] = [];
   const stood: Unit[] = [];
   for (const { u, was } of [...ctx.barbSeized, ...madeSeized]) {
     const c = back.get(u);
     if (c && state.units.includes(u)) {
-      seized.push([c, { id: c.id, seat: c.seat, type: c.type, tileIndex: c.tileIndex, hp: c.hp }]);
+      // the captive made by the seizure has its Movement spent and its turn
+      // ended (0x212500: 0x56d6f0, 0x570b40; runs/h1_duels1178 t103 the
+      // barbarian Settler 4390919 at Movement 0, in no tactical step)
+      seized.push([c, { id: c.id, seat: c.seat, type: c.type, tileIndex: c.tileIndex, hp: c.hp, movesLeft: 0 }]);
       Object.assign(c, { id: was.id, seat: was.seat, type: was.type, tileIndex: was.tileIndex, hp: was.hp });
     } else {
       const x = structuredClone(was);
@@ -4991,6 +4994,18 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a victor's advance took it already, in the battle the log names
         // (runs/h1_duelw1117 t54: China's Warrior killed the escort)
         if (vic && vic.seat === seatOfP(ctx, d.player)) {
+          // ...a barbarians' seizure all the same: the civilian stands its
+          // owner's in their turn's copy until the seizure (runs/h1_duels1178
+          // t103: player 1's Settler 2818059 on 15:13, taken by the battle's
+          // advance of the barbarian 4063233 as their Settler 4390919)
+          const r = ctx.prev.units.find((x) => `${x.owner}:${x.id}` === d.victim);
+          const type = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
+          const seat = r ? seatOfP(ctx, r.owner) : NO_SEAT;
+          if (isBarbSeat(vic.seat) && type && seat !== NO_SEAT) {
+            const was = { ...vic, seat, type, tileIndex: d.plot, hp: UNIT_HP - num(r!.damage) };
+            delete was.originalOwner;
+            ctx.barbSeized.push({ u: vic, was });
+          }
           ctx.units.delete(d.victim);
           if (d.into) ctx.units.set(d.into, vic);
           count(ctx, 'seize', 'applied');
