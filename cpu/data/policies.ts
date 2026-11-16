@@ -185,8 +185,9 @@ export interface PolicyEffects {
    *  (EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY) */
   yieldPctPerSuzerain?: Partial<Yields>;
   /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
-   *  covers every combat unit instead */
-  unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number };
+   *  covers every combat unit instead; `attacking` only on the unit's own
+   *  attack (a modifier under an attacker's requirement set) */
+  unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number; attacking?: boolean };
   /** percentage POINTS joining every experience award's building percentage */
   xpPct?: number;
   /** the Overall war-weariness percent (EFFECT_ADJUST_WAR_WEARINESS Amount, signed) joining every accrual this seat scores */
@@ -1140,7 +1141,10 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     }),
     DK('TWILIGHT_VALOR', 'Twilight Valor', 1, 3,
       'All units +5 Combat Strength for all melee attack units. BUT: Cannot heal outside your territory.', {
-      unitCombatCS: { classes: ['MELEE'], cs: 5 },
+      // ABILITY_TWILIGHT_VALOR_ATTACK_BONUS on its TypeTags' classes (CLASS_RECON,
+      // _MELEE, _HEAVY_CAVALRY, _LIGHT_CAVALRY, _ANTI_CAVALRY, _NAVAL_MELEE) under
+      // UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS: the unit's attack alone
+      unitCombatCS: { classes: ['RECON', 'MELEE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV', 'NAVAL_MELEE'], cs: 5, attacking: true },
       healOnlyHome: true,
     }),
     DK('INQUISITION', 'Inquisition', 1, 3,
@@ -1567,6 +1571,7 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     'bonus.prodBoost.eraMax': { derived: '-1: every era - the flat bonus names no era', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=BonusType', 'Value')] },
     'bonus.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=Amount', 'Value')] },
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_ATTACK_BUFF&Name=Amount', 'Value'),
+    'effects.unitCombatCS.attacking': { derived: 'true where the modifier stands under an attacker\'s requirement set', inputs: [xml('Modifiers', 'ModifierId=FASCISM_ATTACK_BUFF', 'SubjectRequirementSetId', { expect: 'FASCISM_REQUIREMENTS' }), xml('RequirementSetRequirements', 'RequirementSetId=FASCISM_REQUIREMENTS', 'RequirementId', { expect: 'PLAYER_IS_ATTACKER_REQUIREMENTS' })] },
     'effects.wwPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
   DIGITAL_DEMOCRACY: {
@@ -1635,6 +1640,7 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   FASCISM: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'PolicyToUnlock', { expect: 'POLICY_GOV_FASCISM' }),
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_LEGACY_ATTACK_BUFF&Name=Amount', 'Value'),
+    'effects.unitCombatCS.attacking': { derived: 'true where the modifier stands under an attacker\'s requirement set', inputs: [xml('Modifiers', 'ModifierId=FASCISM_LEGACY_ATTACK_BUFF', 'SubjectRequirementSetId', { expect: 'FASCISM_REQUIREMENTS' }), xml('RequirementSetRequirements', 'RequirementSetId=FASCISM_REQUIREMENTS', 'RequirementId', { expect: 'PLAYER_IS_ATTACKER_REQUIREMENTS' })] },
     'effects.wwPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
 };
@@ -1693,12 +1699,15 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // Governors."
     G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { governorPerCitizen: { production: 0.6 } },
       '+0.6 production per citizen in cities with governors.'),
-    // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength." FASCISM_WAR_WEARINESS
-    // Overall Amount 20 adds 20 to the war-weariness percent (0xbe35b0), whatever
-    // its text ("War Weariness reduced by 15%") says.
+    // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength" —
+    // ABILITY_FASCISM_ATTACK_BUFF's FASCISM_ATTACK_BUFF under
+    // FASCISM_REQUIREMENTS (PLAYER_IS_ATTACKER_REQUIREMENTS), its legacy card's
+    // FASCISM_LEGACY_ATTACK_BUFF under the same: the unit's attack alone.
+    // FASCISM_WAR_WEARINESS Overall Amount 20 adds 20 to the war-weariness
+    // percent (0xbe35b0), whatever its text ("War Weariness reduced by 15%") says.
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
-      { unitCombatCS: { all: true, cs: 5 }, wwPct: 20 },
-      '+5 combat strength for all units; +20% war weariness.'),
+      { unitCombatCS: { all: true, cs: 5, attacking: true }, wwPct: 20 },
+      '+5 combat strength for all units attacking; +20% war weariness.'),
     // CIV6 (GS) INHERENT: "+2 Amenities in all cities, and +2 Culture per
     // Specialty District." Its flat bonus (`GOV_BONUS`) is the -3 Combat
     // Strength. A tier-4 government names no PolicyToUnlock, so it leaves

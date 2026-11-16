@@ -1078,6 +1078,7 @@ CITY_STATE = {
     "minorUpgrading": lambda sim, b, rows: [_minor_upgrading(sim, b, s) for s in rows],
     "minorCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.mops_camps[b, s].tolist() if x >= 0] for s in rows],
     "minorCitiesKnown": lambda sim, b, rows: [_cities_known(sim, b, s) for s in rows],
+    "minorCitiesKnownDistricts": lambda sim, b, rows: [_cities_known_districts(sim, b, s) for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
         for s in rows
@@ -1196,6 +1197,22 @@ def _cities_known(sim, b: int, s: int) -> list[int]:
     rank = sim.citystate_kb_city_rank[b, s]
     held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
     return [int(ctr[b, d]) for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist())]
+
+
+def _cities_known_districts(sim, b: int, s: int) -> list[float]:
+    """minor `s`'s knowledge base's cities standing, in its order, each its
+    district entries as its last look filled them: the centre's defense (-1
+    none), its walls standing (1 / 0), the Encampment's defense (-1 none),
+    its walls standing"""
+    none = sim.citystate_center[:, s].clone().fill_(-1)
+    live, _ctr = sim._known_trade_cands(none)
+    rank = sim.citystate_kb_city_rank[b, s]
+    held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
+    out: list[float] = []
+    for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist()):
+        out += [float(sim.citystate_kb_city_cdef[b, s, d]), int(sim.citystate_kb_city_cwall[b, s, d]),
+                float(sim.citystate_kb_city_edef[b, s, d]), int(sim.citystate_kb_city_ewall[b, s, d])]
+    return out
 
 
 def _trade_list(sim, b: int, s: int) -> list[int]:

@@ -434,7 +434,7 @@ export interface Modifiers {
   /** the percent added to every city's Tourism (`seatTourismPct`) */
   tourismPct: number;
   yieldPctPerSuzerain: Partial<Yields>;
-  unitCombatCS: { classMask: number; all: boolean; cs: number }[];
+  unitCombatCS: { classMask: number; all: boolean; cs: number; attacking: boolean }[];
   xpPct: number;
   wwPct: number;
   gppMult: number;
@@ -817,7 +817,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.unitCombatCS) {
     let mask = 0;
     for (const c of fx.unitCombatCS.classes ?? []) mask |= CLASS_BIT[c] ?? 0;
-    mods.unitCombatCS.push({ classMask: mask, all: !!fx.unitCombatCS.all, cs: fx.unitCombatCS.cs });
+    mods.unitCombatCS.push({ classMask: mask, all: !!fx.unitCombatCS.all, cs: fx.unitCombatCS.cs, attacking: !!fx.unitCombatCS.attacking });
   }
   if (fx.xpPct) mods.xpPct += fx.xpPct;
   if (fx.wwPct) mods.wwPct += fx.wwPct;
@@ -1475,19 +1475,25 @@ export function eraMatchupCS(state: GameState, unit: { seat: number }, foeType: 
   return n;
 }
 
-/** CIV6 (Oligarchy, Fascism): the government's flat Combat Strength for one
- *  unit — "All land melee, anti-cavalry, and naval melee class units gain +4
- *  Combat Strength" (the PROMOTION-class axis: MELEE, ANTICAV, NAVAL_MELEE)
- *  and "All units gain +5 Combat Strength" — read beside `congressUnitCS` at
- *  every roll that composes a unit's strength. */
-export function governmentUnitCS(state: GameState, unit: { type: string; seat: number }): number {
+/** CIV6 (Oligarchy, Fascism): the government's and cards' flat Combat
+ *  Strength for one unit — "All land melee, anti-cavalry, and naval melee
+ *  class units gain +4 Combat Strength" (the PROMOTION-class axis: MELEE,
+ *  ANTICAV, NAVAL_MELEE) — read beside `congressUnitCS` at every roll that
+ *  composes a unit's strength; a row whose modifier stands under an
+ *  attacker's requirement set (Fascism's FASCISM_REQUIREMENTS,
+ *  PLAYER_IS_ATTACKER_REQUIREMENTS) only where the unit is `attacking`
+ *  (runs/h1_duels1137 t191: China's Cuirassier 5177358 under Fascism
+ *  defends at 64, CombatLog DefenderStrMod 0, the barbarians' Frigate's
+ *  planned blow 21) */
+export function governmentUnitCS(state: GameState, unit: { type: string; seat: number }, attacking: boolean): number {
   if (!isCiv(unit.seat)) return 0;
   const def = UNITS[unit.type];
   if (!def?.combat) return 0;
   const bit = classBitOf(unit.type);
   let cs = 0;
   for (const r of getModifiers(state, unit.seat).unitCombatCS) {
-    if (r.all || (bit & r.classMask) !== 0) cs += r.cs;
+    if ((r.attacking && !attacking) || !(r.all || (bit & r.classMask) !== 0)) continue;
+    cs += r.cs;
   }
   return cs;
 }

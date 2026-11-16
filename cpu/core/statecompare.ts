@@ -1141,6 +1141,14 @@ const CITY_STATE_G: Record<string, Extractor> = {
     const at = cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
     return at >= 0 ? [at] : [];
   })),
+  minorCitiesKnownDistricts: overCityStates((cityState, state) => (cityState.citiesKnown ?? []).flatMap((k) => {
+    const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
+    const at = cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
+    if (at < 0) return [];
+    const centre = k.districts.find((d) => d.plot === at);
+    const camp = k.districts.find((d) => d.plot !== at);
+    return [centre?.defense ?? -1, centre && centre.walls > 0 ? 1 : 0, camp?.defense ?? -1, camp && camp.walls > 0 ? 1 : 0];
+  })),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorNetIncome: overCityStates((cityState) => cityState.netIncome ?? 0),

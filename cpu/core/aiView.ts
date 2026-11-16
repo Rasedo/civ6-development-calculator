@@ -892,36 +892,55 @@ function lookPlots(state: GameState, seat: number): (plot: number) => boolean {
   return (p) => isExplored(state, seat, p);
 }
 
+/** a known city's district entries as a look fills them (0x5efaf0): one for
+ *  each district with hit points on a plot the look takes — the centre, and
+ *  each Encampment — its city's standing strength with its own plot's
+ *  garrison (0x24ae80), its walls and strike while its own perimeter stands
+ *  (one not yet built behind its city's whole walls). The strike is the
+ *  city's whole one (0x249ee0 with no damage: `cityStrikeBase`). A city
+ *  known by another district's plot alone holds none. */
+function knownDistricts(state: GameState, c: City, looked: (plot: number) => boolean): AiKnownDistrictView[] {
+  const districts: AiKnownDistrictView[] = [];
+  if (looked(c.centerIndex)) {
+    const defense = centreStrength(state, c);
+    const walled = outerPool(state, c) > 0;
+    districts.push({ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeBase(state, c) : 0 });
+  }
+  for (const d of c.districts) {
+    if (d.type !== 'ENCAMPMENT' || !looked(d.tileIndex)) continue;
+    const tile = state.map.tiles[d.tileIndex];
+    const stands = (tile.districtComplete ? encampOuterPool(state, c, tile) : wallsMax(state, c)) > 0;
+    const own = districtGarrisonedStrength(state, c, d.tileIndex);
+    districts.push({ plot: d.tileIndex, defense: own, walls: stands ? own : 0, strike: stands ? cityStrikeBase(state, c) : 0 });
+  }
+  return districts;
+}
+
+/** the district entries a look fills for the known city of `owner` and `id`
+ *  (-1 a city-state's one city), standing (`knownDistricts`) */
+export function lookDistricts(state: GameState, owner: number, id: number, looked: (plot: number) => boolean): AiKnownDistrictView[] {
+  const cs = isCityStateSeat(owner) ? state.cityStates.find((c) => c.seat === owner) : undefined;
+  const city = cs ? (cs.centerIndex >= 0 ? { ...minorCity(cs), isCapital: true } : undefined)
+    : cityHolders(state).find((h) => h.seat === owner)?.cities.find((c) => c.id === id);
+  return city ? knownDistricts(state, city, looked) : [];
+}
+
 /** the cities the seat's knowledge base holds, as it records them (the look
  *  0x7877e0 -> 0x5f0280 -> 0x5efaf0): a city-state's the cities of its list
  *  (`CityState.citiesKnown`), any other seat's each city a district of which
  *  stands on a plot its look takes (`lookCities`); the majors' cities and
- *  the Free Cities' first, then the city-states'. Per
- *  city its record, then an entry for each district with hit points on a
- *  plot the look takes: the centre, and each Encampment — its city's
- *  standing strength with its own plot's garrison (0x24ae80), its walls and
- *  strike while its own perimeter stands (one not yet built behind its
- *  city's whole walls). The strike is the city's whole one (0x249ee0 with no
- *  damage: `cityStrikeBase`). A city known by another district's plot alone
- *  holds no district entry. */
+ *  the Free Cities' first, then the city-states'. Per city its record, then
+ *  its district entries (`knownDistricts`): a city-state's those its last
+ *  look filled (its upgrade and purchases after the look, and its pass's
+ *  blows on the city, none of them), any other seat's the city's now. */
 function knownCities(state: GameState, seat: number): AiKnownCityView[] {
   const out: AiKnownCityView[] = [];
   const looked = lookPlots(state, seat);
-  const add = (c: City, originalCapital: boolean) => {
+  const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat) : undefined;
+  const filled = new Map<string, readonly AiKnownDistrictView[]>((minor?.citiesKnown ?? []).map((k) => [`${k.owner}:${k.id}`, k.districts]));
+  const add = (c: City, originalCapital: boolean, key: string) => {
     const t = computeCityStats(state, c).total;
-    const districts: AiKnownDistrictView[] = [];
-    if (looked(c.centerIndex)) {
-      const defense = centreStrength(state, c);
-      const walled = outerPool(state, c) > 0;
-      districts.push({ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeBase(state, c) : 0 });
-    }
-    for (const d of c.districts) {
-      if (d.type !== 'ENCAMPMENT' || !looked(d.tileIndex)) continue;
-      const tile = state.map.tiles[d.tileIndex];
-      const stands = (tile.districtComplete ? encampOuterPool(state, c, tile) : wallsMax(state, c)) > 0;
-      const own = districtGarrisonedStrength(state, c, d.tileIndex);
-      districts.push({ plot: d.tileIndex, defense: own, walls: stands ? own : 0, strike: stands ? cityStrikeBase(state, c) : 0 });
-    }
+    const districts = minor ? filled.get(key)! : knownDistricts(state, c, looked);
     const resources = new Map<string, number>();
     for (const tile of state.map.tiles) {
       if (tile.ownerCity !== c.id || tileSeat(tile) !== c.seat || !tile.resource || !tile.improvement || tile.pillaged) continue;
@@ -933,10 +952,9 @@ function knownCities(state: GameState, seat: number): AiKnownCityView[] {
       yields: aiYieldKeys().map((k) => Math.trunc(t[k])), wonders: c.wonders.length, districts
     });
   };
-  const listed = new Set((isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat)?.citiesKnown ?? [] : lookCities(state, looked))
-    .map((k) => `${k.owner}:${k.id}`));
-  for (const h of cityHolders(state)) for (const c of h.cities) if (listed.has(`${h.seat}:${c.id}`)) add(c, (c.origCapitalSeat ?? -1) >= 0);
-  for (const cs of state.cityStates) if (cs.centerIndex >= 0 && listed.has(`${cs.seat}:-1`)) add({ ...minorCity(cs), isCapital: true }, true);
+  const listed = new Set((minor ? minor.citiesKnown ?? [] : lookCities(state, looked)).map((k) => `${k.owner}:${k.id}`));
+  for (const h of cityHolders(state)) for (const c of h.cities) if (listed.has(`${h.seat}:${c.id}`)) add(c, (c.origCapitalSeat ?? -1) >= 0, `${h.seat}:${c.id}`);
+  for (const cs of state.cityStates) if (cs.centerIndex >= 0 && listed.has(`${cs.seat}:-1`)) add({ ...minorCity(cs), isCapital: true }, true, `${cs.seat}:-1`);
   return out;
 }
 

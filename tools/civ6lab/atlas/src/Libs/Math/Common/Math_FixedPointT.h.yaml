@@ -590,6 +590,7 @@
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+    - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
   context:
     - "## C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "- THE WALK (0x727db0, from the military AI's job 0x722690 after 0x727510): the player's units in pool order..."

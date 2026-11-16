@@ -139,6 +139,7 @@
     - cpu/core/opsOrders.ts:targetStrength
     - gpu/core/sim_minorops.py:_mops_district_strikes
     - cpu/core/aiView.ts:knownCities
+    - cpu/core/aiView.ts:knownDistricts
   readings:
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -324,6 +325,7 @@
     - cpu/core/aiView.ts:knownCities
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/minorBuild.ts:strongerFoe
+    - cpu/core/aiView.ts:knownDistricts
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"

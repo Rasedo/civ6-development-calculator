@@ -1226,6 +1226,34 @@ class SimMinorOps:
         e = enemy.unsqueeze(1)
         return (other >= 0) & (other != seat) & ((other == e) | ((e < 0) & (war | barb)))
 
+    def _kb_city_entries(self, row: int, c: int, looked: torch.Tensor) -> tuple:
+        """`knownDistricts` of the city at (`row`, `c`) on the plots `looked`
+        [B, T]: ([B] f64 the centre's defense, -1 where the look takes no
+        centre; [B] its walls standing; [B] f64 its Encampment's — the city's
+        standing strength with its own plot's garrison — -1 where none is
+        placed on a plot the look takes; [B] that Encampment's own perimeter
+        standing, one not yet built behind its city's whole walls)"""
+        B, dev, bidx = self.B, self.device, self._bidx
+        col = torch.full((B,), c, dtype=torch.long, device=dev)
+        rt = torch.full_like(col, row)
+        wmax = self._walls_max_at(rt, col).long()
+        pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
+        ctr = self.city_center[:, row, c]
+        con = (ctr >= 0) & looked.gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
+        none = torch.full((B,), -1.0, dtype=torch.float64, device=dev)
+        d = torch.where(con, self._centre_strength(rt, col).to(torch.float64), none)
+        own, ewall = none, torch.zeros(B, dtype=torch.bool, device=dev)
+        if self._encamp_didx >= 0:
+            ep = self.city_dist_tile[:, row, c, self._encamp_didx]
+            e0 = ep.clamp(min=0)
+            eon = (ep >= 0) & looked.gather(1, e0.unsqueeze(1)).squeeze(1)
+            if bool(eon.any()):
+                ewall = eon & (torch.where(self.district_complete[bidx, e0],
+                                           torch.minimum(self.encamp_outer_hp[bidx, e0].long(), wmax), wmax) > 0)
+                gar = self._garrison_cs(rt, col, self._holder_strength(rt, col), plot=e0)
+                own = torch.where(eon, (self._centre_strength(rt, col, garrisoned=False) + gar).to(torch.float64), none)
+        return d, con & (pool > 0), own, ewall
+
     def _ops_enemy_str(self, seat: int, r: int, target: torch.Tensor, enemy: torch.Tensor) -> torch.Tensor:
         """[B] `enemyStrengthAbout` (0x73eb60) for an operation of `seat` (its
         knowledge base row `r`) on `target` against `enemy` [B]: of the
@@ -1261,7 +1289,6 @@ class SimMinorOps:
             if looked is None:
                 looked = torch.ones(B, self.T, dtype=torch.bool, device=dev)
             listed = self._known_city_first(looked) < self.T
-        bidx = self._bidx
         order = list(range(self.n_majors)) + [self._CITY_MINOR0 + s for s in range(self.S)] + [self.FREE_ROW]
         for row in order:
             hseat = int(self._ROW_SEAT[row])
@@ -1280,27 +1307,19 @@ class SimMinorOps:
                 m &= self.pair_dist[cc, tc].to(torch.long) <= 3
                 if not bool(m.any()):
                     continue
-                col = torch.full((B,), c, dtype=torch.long, device=dev)
-                rt = torch.full_like(col, row)
-                wmax = self._walls_max_at(rt, col).long()
-                pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
-                d = self._centre_strength(rt, col).to(torch.float64)
-                # the centre's entry where the look takes its plot
-                top = torch.where(looked.gather(1, cc.unsqueeze(1)).squeeze(1), torch.where(pool > 0, d, d - 10), torch.zeros_like(d))
-                # its Encampment placed on a plot the look takes: the
-                # city's standing strength with its own plot's garrison,
-                # behind its own perimeter (one not yet built behind its
-                # city's whole walls)
-                if self._encamp_didx >= 0:
-                    ep = self.city_dist_tile[:, row, c, self._encamp_didx]
-                    e0 = ep.clamp(min=0)
-                    em = m & (ep >= 0) & looked.gather(1, e0.unsqueeze(1)).squeeze(1)
-                    if bool(em.any()):
-                        stands = torch.where(self.district_complete[bidx, e0],
-                                             torch.minimum(self.encamp_outer_hp[bidx, e0].long(), wmax), wmax) > 0
-                        gar = self._garrison_cs(rt, col, self._holder_strength(rt, col), plot=e0)
-                        own = (self._centre_strength(rt, col, garrisoned=False) + gar).to(torch.float64)
-                        top = torch.where(em, torch.maximum(top, torch.where(stands, own, own - 10)), top)
+                # its district entries: a city-state's as its last look
+                # filled them, any other seat's the city's now
+                if 100 <= seat < 100 + self.S:
+                    k = slot0 + c
+                    d, cwall = self.citystate_kb_city_cdef[:, s0, k], self.citystate_kb_city_cwall[:, s0, k]
+                    own, ewall = self.citystate_kb_city_edef[:, s0, k], self.citystate_kb_city_ewall[:, s0, k]
+                else:
+                    d, cwall, own, ewall = self._kb_city_entries(row, c, looked)
+                # the centre's entry, and its Encampment's: each its defense,
+                # less 10 where its walls do not stand
+                top = torch.where(d >= 0, torch.where(cwall, d, d - 10), torch.zeros_like(d))
+                em = m & (own >= 0)
+                top = torch.where(em, torch.maximum(top, torch.where(ewall, own, own - 10)), top)
                 cdef = top.clamp(min=0).trunc().long()
                 strength = strength + torch.where(m, cdef, torch.zeros_like(cdef))
                 g = m & (cdef > 0) & ~garrison

@@ -995,13 +995,15 @@ class SimMinors:
         known-city slot whose city stands with a district on a plot the
         minor revealed (`mops_revealed`, `_known_city_first`) and holds no
         entry of that city's id joins the end of the list, in the order of
-        those plots"""
+        those plots; every entry's district entries filled anew
+        (`_kb_city_fill`)"""
         live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device))
         ids = self._known_trade_ids()
         rank = self.citystate_kb_city_rank[:, s]
         first = self._known_city_first(self.mops_revealed[:, s])
         new = alive.unsqueeze(1) & live & (first < self.T) & ((rank < 0) | (self.citystate_kb_city_id[:, s] != ids))
         if not bool(new.count_nonzero()):
+            self._kb_city_fill(s, alive, live)
             return
         big = 1 << 40
         order = torch.argsort(torch.where(new, first, torch.full_like(first, big)), dim=1, stable=True)
@@ -1011,6 +1013,24 @@ class SimMinors:
         self.citystate_kb_city_rank[:, s] = torch.where(new, n.unsqueeze(1) + pos, rank)
         self.citystate_kb_city_id[:, s] = torch.where(new, ids, self.citystate_kb_city_id[:, s])
         self.citystate_kb_city_n[:, s] = n + new.sum(dim=1)
+        self._kb_city_fill(s, alive, live)
+
+    def _kb_city_fill(self, s: int, alive: torch.Tensor, live: torch.Tensor) -> None:
+        """the district entries of every city minor `s`'s knowledge base
+        holds standing (`live` [B, ND] the slots' cities standing) as its
+        look fills them (`lookDistricts`, `_kb_city_entries` on the plots it
+        revealed)"""
+        held = alive.unsqueeze(1) & live & (self.citystate_kb_city_rank[:, s] >= 0) \
+            & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
+        looked = self.mops_revealed[:, s]
+        for k in held.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            row, c = (self._CITY_MINOR0 + k, 0) if k < self.S else self._trade_cand_row(k)
+            d, cwall, own, ewall = self._kb_city_entries(row, c, looked)
+            on = held[:, k]
+            self.citystate_kb_city_cdef[:, s, k] = torch.where(on, d, self.citystate_kb_city_cdef[:, s, k])
+            self.citystate_kb_city_cwall[:, s, k] = torch.where(on, cwall, self.citystate_kb_city_cwall[:, s, k])
+            self.citystate_kb_city_edef[:, s, k] = torch.where(on, own, self.citystate_kb_city_edef[:, s, k])
+            self.citystate_kb_city_ewall[:, s, k] = torch.where(on, ewall, self.citystate_kb_city_ewall[:, s, k])
 
     def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """the known cities of minor `s`'s trade AI: the known-city slots

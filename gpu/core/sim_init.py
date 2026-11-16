@@ -404,6 +404,13 @@ class SimInit:
         self.citystate_kb_city_rank = torch.full((B, s_pad, _nd), -1, dtype=torch.long, device=device)
         self.citystate_kb_city_id = torch.full((B, s_pad, _nd), -1, dtype=torch.long, device=device)
         self.citystate_kb_city_n = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # ...and per slot its district entries as the last look filled them
+        # (`lookDistricts`): the centre's defense and the Encampment's (-1
+        # none), each with its walls standing
+        self.citystate_kb_city_cdef = torch.full((B, s_pad, _nd), -1.0, dtype=torch.float64, device=device)
+        self.citystate_kb_city_cwall = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
+        self.citystate_kb_city_edef = torch.full((B, s_pad, _nd), -1.0, dtype=torch.float64, device=device)
+        self.citystate_kb_city_ewall = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
         self.citystate_trade_value = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the player its knowledge base last met, whose cities the route
         # value walks (the trade record's +0x6e0; its own seat before any),
@@ -3269,14 +3276,15 @@ class SimInit:
             self._gov_gpp = torch.tensor(
                 [[float(x) for x in r["gpp"]] for r in _govs],
                 dtype=torch.float64, device=device)
-            # unitCombatCS [promotion-class mask, allCombat, cs] — the
-            # PROMOTION-class axis (`governmentUnitCS`): Oligarchy names
-            # MELEE, ANTICAV and NAVAL_MELEE; Fascism's `all` arm reaches
-            # every combat unit.
+            # unitCombatCS [promotion-class mask, allCombat, cs, attacking
+            # only] — the PROMOTION-class axis (`governmentUnitCS`):
+            # Oligarchy names MELEE, ANTICAV and NAVAL_MELEE; Fascism's `all`
+            # arm reaches every combat unit's attack.
             _gucs = [r["unitCombatCS"] for r in _govs]
             self._gov_ucs_mask = torch.tensor([int(x[0]) for x in _gucs], dtype=torch.long, device=device)
             self._gov_ucs_allc = torch.tensor([bool(x[1]) for x in _gucs], dtype=torch.bool, device=device)
             self._gov_ucs_cs = torch.tensor([float(x[2]) for x in _gucs], dtype=torch.float64, device=device)
+            self._gov_ucs_att = torch.tensor([bool(x[3]) for x in _gucs], dtype=torch.bool, device=device)
             self._gov_xppct = torch.tensor([float(r["xpPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_wwpct = torch.tensor([float(r["wwPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
@@ -3470,6 +3478,7 @@ class SimInit:
             self._pol_ucs_mask = torch.tensor([int(x[0]) for x in _pucs], dtype=torch.long, device=device)
             self._pol_ucs_allc = torch.tensor([bool(x[1]) for x in _pucs], dtype=torch.bool, device=device)
             self._pol_ucs_cs = torch.tensor([float(x[2]) for x in _pucs], dtype=torch.float64, device=device)
+            self._pol_ucs_att = torch.tensor([bool(x[3]) for x in _pucs], dtype=torch.bool, device=device)
             self._pol_xppct = torch.tensor([float(r["xpPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_wwpct = torch.tensor([float(r["wwPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gppmult = torch.tensor([float(r["gppMult"]) for r in _pols], dtype=torch.float64, device=device)
@@ -4675,18 +4684,24 @@ class SimInit:
         self._type_anticav = torch.tensor([bool(u["antiCavalry"]) for u in ru], dtype=torch.bool, device=device)
         # the per-TYPE flat Combat Strength each government/policy row grants
         # (`_gov_unit_cs`): a promotion-class mask hit, or the all-combat
-        # arm, both gated on the chassis carrying any strength at all.
+        # arm, both gated on the chassis carrying any strength at all; the
+        # rows paid wherever the unit fights (`ucst`) apart from those paid on
+        # its attack alone (`ucsa`)
         _pcls = self.rules_dev.u_promo_class
         _pbit = torch.where(_pcls >= 0, torch.ones_like(_pcls) << _pcls.clamp(min=0), torch.zeros_like(_pcls))
         _pcbt = self._type_combat > 0
         if self._ngov:
             _ghit = (((self._gov_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
                      | self._gov_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
-            self._gov_ucs_by_type = self._gov_ucs_cs.unsqueeze(1) * _ghit.double()
+            _gall = self._gov_ucs_cs.unsqueeze(1) * _ghit.double()
+            self._gov_ucs_by_type = _gall * (~self._gov_ucs_att).double().unsqueeze(1)
+            self._gov_ucsa_by_type = _gall * self._gov_ucs_att.double().unsqueeze(1)
         if self._npol:
             _phit = (((self._pol_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
                      | self._pol_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
-            self._pol_ucs_by_type = self._pol_ucs_cs.unsqueeze(1) * _phit.double()
+            _pall = self._pol_ucs_cs.unsqueeze(1) * _phit.double()
+            self._pol_ucs_by_type = _pall * (~self._pol_ucs_att).double().unsqueeze(1)
+            self._pol_ucsa_by_type = _pall * self._pol_ucs_att.double().unsqueeze(1)
         self._type_bombard = torch.tensor([int(u["bombard"]) for u in ru], dtype=torch.long, device=device)
         # the CLASS bit mask and the ERA index a production card reads
         self._type_cls = torch.tensor([int(u["cls"]) for u in ru], dtype=torch.long, device=device)

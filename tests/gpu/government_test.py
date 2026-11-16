@@ -260,22 +260,24 @@ def main() -> None:
     _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p, _mn in fxF["prod"] if bool(_a[0])]
     assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: its flat bonus, +50% toward every unit"
 
-    # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;
-    #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto
-    #     the adopted slot proves the promotion-class mask arms.
+    # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants
+    #     attacking only; a city-state seat adopts nothing; OLIGARCHY's row
+    #     borrowed onto the adopted slot proves the promotion-class mask arms.
     simc = build(rules, paths[0], slot=1)
     simc.civ_civics[:, 0].copy_(cF)
     simc._eff_version += 1
     s0 = torch.zeros(simc.B, dtype=torch.long)
 
-    def ucs(sim_, uid, seat_t):
-        return int(sim_._gov_unit_cs(torch.full((sim_.B,), ui[uid], dtype=torch.long), seat_t)[0])
+    def ucs(sim_, uid, seat_t, attacking=True):
+        return int(sim_._gov_unit_cs(torch.full((sim_.B,), ui[uid], dtype=torch.long), seat_t, attacking)[0])
 
     for uid, want in (("WARRIOR", 5), ("ARCHER", 5), ("GALLEY", 5), ("SETTLER", 0), ("TRADER", 0)):
         assert ucs(simc, uid, s0) == want, f"FASCISM _gov_unit_cs {uid}: want {want}"
+        assert ucs(simc, uid, s0, False) == 0, f"FASCISM _gov_unit_cs {uid} defending: want 0"
     cs_seat = torch.full((simc.B,), 100, dtype=torch.long)
     assert ucs(simc, "WARRIOR", cs_seat) == 0, "a city-state seat adopts no government"
     simc._gov_ucs_by_type[fas] = simc._gov_ucs_by_type[oli]
+    simc._gov_ucsa_by_type[fas] = simc._gov_ucsa_by_type[oli]
     simc._eff_version += 1
     simc._gov_cat_version += 1
     for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("ARCHER", 0), ("SETTLER", 0)):

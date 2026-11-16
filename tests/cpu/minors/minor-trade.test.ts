@@ -53,7 +53,7 @@ function scene() {
   cs.research.civics = ['FOREIGN_TRADE'];
   // its knowledge base knows both minors (`minorCitiesLook`), its city's
   // trade list (`minorTradeList`) holds both
-  cs.citiesKnown = [{ owner: near.seat, id: -1 }, { owner: far.seat, id: -1 }];
+  cs.citiesKnown = [{ owner: near.seat, id: -1, districts: [] }, { owner: far.seat, id: -1, districts: [] }];
   cs.tradeCities = [near.centerIndex, far.centerIndex];
   // a route asks the origin's player has met the destination's (`tradeMet`)
   cs.metMinors = [near.seat, far.seat];
@@ -155,7 +155,7 @@ describe("a city-state's route", () => {
     near.centerIndex = tileAtCoords(state.map, 30, 30).index; // out of range: the major's city is the only one
     const cap = settleAt(state, tileAtCoords(state.map, 5, 14).index, 0);
     cs.met = [0];
-    cs.citiesKnown = [{ owner: 0, id: cap.id }];
+    cs.citiesKnown = [{ owner: 0, id: cap.id, districts: [] }];
     cs.tradeCities = [cap.centerIndex];
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
     tradeTurn(state, cs);

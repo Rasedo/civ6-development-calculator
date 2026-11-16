@@ -2678,6 +2678,20 @@
           "note": "the cities the minor's knowledge base holds (`minorCitiesLook`), those standing in its order, as their centre plots (the GPU's known-city slots read through their centres); an entry of a city gone never resolves again"
         },
         {
+          "name": "minorCitiesKnownDistricts",
+          "compare": "milli",
+          "covers": [
+            "CityState.citiesKnown"
+          ],
+          "planes": [
+            "citystate_kb_city_cdef",
+            "citystate_kb_city_cwall",
+            "citystate_kb_city_edef",
+            "citystate_kb_city_ewall"
+          ],
+          "note": "per city the minor's knowledge base holds standing, in its order, its district entries as its last look filled them (`lookDistricts`): the centre's defense (-1 none) and its walls standing, the Encampment's and its walls; the entries' strike has no GPU reader and is the CPU's alone"
+        },
+        {
           "name": "minorProjectYield",
           "compare": "milli",
           "covers": [

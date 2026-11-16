@@ -28,7 +28,7 @@
 import type { ArmyRecord, CityState, GameState, Unit, UpgradeTree } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
-import { aiView, lookCities } from './aiView';
+import { aiView, lookCities, lookDistricts } from './aiView';
 import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passPillage, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
@@ -118,17 +118,20 @@ export function minorCampsLook(state: GameState, cs: CityState, aged: boolean): 
  *  minor has revealed (`lookCities`), of any owner (the Free Cities'
  *  included), joins the end of its list where no entry of its owner and id
  *  stands (0x5e7ae0). An entry whose city stands no more leaves the list (a
- *  capture mints a new id, which joins at the end) */
+ *  capture mints a new id, which joins at the end). Every entry's district
+ *  entries are filled anew (0x5efaf0, `lookDistricts`): its readers until
+ *  the next look read the city as this look found it */
 export function minorCitiesLook(state: GameState, cs: CityState): void {
   const revealed = cs.revealed ?? [];
+  const looked = (p: number) => revealed[p] === 1;
   const stands = (k: { owner: number; id: number }): boolean => (k.id < 0
     ? state.cityStates.some((o) => o.seat === k.owner && o.centerIndex >= 0)
     : !!cityHolders(state).find((h) => h.seat === k.owner)?.cities.some((c) => c.id === k.id));
-  const known = (cs.citiesKnown ?? []).filter(stands);
+  const known = (cs.citiesKnown ?? []).filter(stands).map((k) => ({ owner: k.owner, id: k.id, districts: lookDistricts(state, k.owner, k.id, looked) }));
   const has = new Set(known.map((k) => `${k.owner}:${k.id}`));
-  for (const f of lookCities(state, (p) => revealed[p] === 1)) {
+  for (const f of lookCities(state, looked)) {
     if (has.has(`${f.owner}:${f.id}`) || !stands(f)) continue;
-    known.push(f);
+    known.push({ ...f, districts: lookDistricts(state, f.owner, f.id, looked) });
   }
   if (known.length) cs.citiesKnown = known;
   else delete cs.citiesKnown;

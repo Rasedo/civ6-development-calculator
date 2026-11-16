@@ -51,7 +51,7 @@ describe('the sourced government rows', () => {
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
       { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
-    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5 }, wwPct: 20 });
+    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5, attacking: true }, wwPct: 20 });
     expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ governorPerCitizen: { production: 0.6 } });
     // CIV6 (Democracy, GS): "Your Trade Routes to an Ally or Suzerain's city
     // provide +4 Food and +4 Production for both cities. Alliance Points with
@@ -82,25 +82,26 @@ describe('governmentUnitCS — the promotion-class axis', () => {
       const state = makeState();
       adopt(state);
       for (const type of ['WARRIOR', 'SPEARMAN', 'GALLEY']) {
-        expect(governmentUnitCS(state, { type, seat: 0 }), type).toBe(4);
+        expect(governmentUnitCS(state, { type, seat: 0 }, false), type).toBe(4);
       }
       for (const type of ['ARCHER', 'HORSEMAN', 'CATAPULT', 'SETTLER', 'BUILDER']) {
-        expect(governmentUnitCS(state, { type, seat: 0 }), type).toBe(0);
+        expect(governmentUnitCS(state, { type, seat: 0 }, false), type).toBe(0);
       }
       // a seat that adopts no government pays nothing, and neither does a barb
-      expect(governmentUnitCS(state, { type: 'WARRIOR', seat: 1 })).toBe(0);
-      expect(governmentUnitCS(state, { type: 'WARRIOR', seat: BARB_SEAT })).toBe(0);
+      expect(governmentUnitCS(state, { type: 'WARRIOR', seat: 1 }, false)).toBe(0);
+      expect(governmentUnitCS(state, { type: 'WARRIOR', seat: BARB_SEAT }, false)).toBe(0);
     });
   });
 
-  it('FASCISM pays +5 to every combat unit and no civilian', () => {
+  it('FASCISM pays +5 to every combat unit attacking, none defending and no civilian', () => {
     const state = makeState();
     adopt(state, 'TOTALITARIANISM'); // the only unlocked tier-3 => FASCISM
     for (const type of ['WARRIOR', 'ARCHER', 'GALLEY', 'CATAPULT']) {
-      expect(governmentUnitCS(state, { type, seat: 0 }), type).toBe(5);
+      expect(governmentUnitCS(state, { type, seat: 0 }, true), type).toBe(5);
+      expect(governmentUnitCS(state, { type, seat: 0 }, false), type).toBe(0);
     }
-    expect(governmentUnitCS(state, { type: 'SETTLER', seat: 0 })).toBe(0);
-    expect(governmentUnitCS(state, { type: 'TRADER', seat: 0 })).toBe(0);
+    expect(governmentUnitCS(state, { type: 'SETTLER', seat: 0 }, true)).toBe(0);
+    expect(governmentUnitCS(state, { type: 'TRADER', seat: 0 }, true)).toBe(0);
   });
 });
 
@@ -238,7 +239,7 @@ describe('the prodBoost targets', () => {
     adopt(state, 'TOTALITARIANISM');
     const mods = getModifiers(state, 0);
     expect(mods.wwPct).toBe(20);
-    expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5 }]);
+    expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5, attacking: true }]);
     // and Fascism's flat bonus: "+50% Production toward Units", every unit
     expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0.5);
   });

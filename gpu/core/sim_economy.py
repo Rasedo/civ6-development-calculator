@@ -4028,6 +4028,7 @@ class SimEconomy:
             # amenities and loyalty in a city with a garrisoned unit
             "garamen": _z64.clone(), "garloy": _z64.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
+            "ucsa": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwpct": _z.clone(), "wmdup": _z.clone(),
             "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
             # CIV6 (Thermopylae): how many MILITARY policies stand slotted
@@ -4140,6 +4141,7 @@ class SimEconomy:
                               self._gov_gppb_rows[_gi], self._gov_bamen_rows[_gi],
                               self._gov_dpow_rows[_gi], self._gov_dext_rows[_gi])
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
+            fx["ucsa"] = fx["ucsa"] + self._gov_ucsa_by_type[adopted] * _gf.double().unsqueeze(1)
             # a production row no game holds adds nothing to the additive
             # percent sum, so only the adopted ones are listed
             for _gi in range(self._ngov):
@@ -4247,6 +4249,7 @@ class SimEconomy:
                                       self._pol_gppb_rows[_pi], self._pol_bamen_rows[_pi],
                                       self._pol_dpow_rows[_pi], self._pol_dext_rows[_pi])
                 fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
+                fx["ucsa"] = fx["ucsa"] + cards.double() @ self._pol_ucsa_by_type
                 # ...and only the slotted cards'
                 for _pi in range(self._npol):
                     if _card_on[_pi] and float(self._pol_prodb[_pi, 0]) >= 0:

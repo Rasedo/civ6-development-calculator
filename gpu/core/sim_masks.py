@@ -1731,17 +1731,20 @@ class SimMasks:
             out = out | who
         return out
 
-    def _gov_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
-        """[B] long — `governmentUnitCS`' twin, the adopted government's flat
-        Combat Strength for one unit. CIV6 (Oligarchy): "All land melee,
+    def _gov_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor, attacking: bool) -> torch.Tensor:
+        """[B] long — `governmentUnitCS`' twin, the adopted government's and
+        cards' flat Combat Strength for one unit, the attack-only rows
+        (`ucsa`) where it `attacking`. CIV6 (Oligarchy): "All land melee,
         anti-cavalry, and naval melee class units gain +4 Combat Strength" —
         the three are PROMOTION classes (`u_promo_class`), so the Galley
-        rides NAVAL_MELEE. CIV6 (Fascism): "All units gain +5 Combat
-        Strength" — every COMBAT unit; a civilian has no strength to add
-        to."""
+        rides NAVAL_MELEE. CIV6 (Fascism): FASCISM_ATTACK_BUFF's +5 under
+        FASCISM_REQUIREMENTS (PLAYER_IS_ATTACKER_REQUIREMENTS) — every
+        COMBAT unit's attack; a civilian has no strength to add to."""
         z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
         t = utype.clamp(min=0, max=self.NU - 1)
         tab = self._fx_by_row("ucst")  # [B, n_majors, NU]
+        if attacking:
+            tab = tab + self._fx_by_row("ucsa")
         ok = (seat >= 0) & (seat < self.n_majors)
         s0 = seat.clamp(min=0, max=self.n_majors - 1)
         v = tab[torch.arange(self.B, device=self.device), s0, t]

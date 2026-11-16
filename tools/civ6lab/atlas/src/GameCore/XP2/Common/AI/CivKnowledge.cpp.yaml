@@ -183,6 +183,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
   context:
     - "...ties (TargetParameter > 0 needs the city AI's +0x1b8 above -1), value 0, enemy strength 0x5eb2c0 x 1.5 per 0x5eb600 > 1 and +0x58 > 1 (unread terms); COMBAT_DISTRICT / PASSIVE — the..."
   review: reviewed
@@ -507,12 +508,21 @@
     - recording: h1_duelq1128
       turn: 213
       value: "Xi'an's Encampment 13:13 under the Field Cannon Corps 5177352 (60 over the base 52): its entry 88 over the centre's 80, Barbarian Attack 150 for 142 the turns it stands empty"
+    - recording: h1_duels1144
+      turn: 64
+      value: city-state 3's own 31:19 at 26 in its record of the turn, the Swordsman 589830 its start's upgrade made on the centre after the look
   impl:
     - cpu/core/aiViewTypes.ts:AiKnownCityView
     - cpu/core/aiViewTypes.ts:AiKnownDistrictView
     - cpu/core/aiView.ts:knownCities
+    - cpu/core/aiView.ts:lookDistricts
+    - cpu/core/minorOps.ts:minorCitiesLook
     - gpu/core/sim_minorops.py:_ops_enemy_str
+    - gpu/core/sim_minorops.py:_kb_city_entries
+    - gpu/core/sim_minors.py:_kb_city_fill
+    - cpu/core/aiView.ts:knownDistricts
   readings:
+    - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
@@ -604,6 +614,7 @@
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+    - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
   review: reviewed
 - addr: 0x5f0440
   final: 0x3f5f20

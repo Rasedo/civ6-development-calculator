@@ -893,7 +893,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
       + rosterCS(state, defender, vs.attacker.seat, vs.attacker.hp, false) : 0) +
     (vs ? eraMatchupCS(state, defender, vs.attacker.type) : 0) +
     gdrArmorCS(state, defender, vs?.attacker.type) +
-    congressUnitCS(state, defender) + governmentUnitCS(state, defender)
+    congressUnitCS(state, defender) + governmentUnitCS(state, defender, false)
   );
 }
 
@@ -1371,11 +1371,11 @@ export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Til
       + fortifyBonus(defender) - woundPenalty(defender)
       + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile })
       + chassisAbilityCS(state, defender, tile.index, { defendingRanged: true });
-  // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is the
+  // CIV6 (Military Advisory / Oligarchy): a flat unit adder is the
   // unit's own strength wherever it fights, a city's shot included.
   return base + generalAuraCS(state, defender, tile.index)
     + gdrBeamCS(state, defender) // the beam "applies ... when defending"
-    + congressUnitCS(state, defender) + governmentUnitCS(state, defender)
+    + congressUnitCS(state, defender) + governmentUnitCS(state, defender, false)
     + rosterCS(state, defender, striker, null, true)
     + visibilityCS(state, defender.seat, striker);
 }
@@ -1676,7 +1676,7 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
     chassisAbilityCS(state, attacker, attacker.tileIndex, { vsDistrict: true, combatTile: targetIndex }) +
     generalAuraCS(state, attacker, attacker.tileIndex) +
     gdrBeamCS(state, attacker) + // the beam "applies to both melee and ranged attacks"
-    congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
+    congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true)
     + rosterCS(state, attacker, tileSeat(state.map.tiles[targetIndex]), null, true)
   );
 }
@@ -1689,7 +1689,7 @@ export function rangedCityAtkCS(state: GameState, attacker: Unit, holder: number
   return cityRangedStrength(state, attacker) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker)
     + chassisAttackCS(attacker) - woundPenalty(attacker)
     + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + rel
-    + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
+    + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true)
     + rosterCS(state, attacker, holder, null, true);
 }
 
@@ -1882,7 +1882,7 @@ function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: num
     - woundPenalty(attacker)
     + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] })
     + relCity + generalAuraCS(state, attacker, attacker.tileIndex)
-    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
+    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true)
     + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, diff, true, key));
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { dCity: true });
@@ -2170,7 +2170,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
     + visibilityCS(state, attacker.seat, defender.seat)
     + allianceWarCS(state, attacker.seat, defender.seat)
     + rosterCS(state, attacker, defender.seat, defender.hp, false)
-    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
+    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true);
   return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true, stands }) };
 }
 
@@ -2179,7 +2179,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
  *  the hostile seats' strike does not) */
 export function rangedUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, emergency = true): { atk: number; def: number } {
   const def = UNITS[attacker.type];
-  const atk = (def?.ranged?.strength ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type, combatTile: targetIndex }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + (emergency ? emergencyAttackCS(state, attacker.seat, defender.seat) : 0) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
+  const atk = (def?.ranged?.strength ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type, combatTile: targetIndex }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + (emergency ? emergencyAttackCS(state, attacker.seat, defender.seat) : 0) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true);
   return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: false }) };
 }
 

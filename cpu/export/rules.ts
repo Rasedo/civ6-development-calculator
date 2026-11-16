@@ -264,11 +264,11 @@ const effectRow = (fx: PolicyEffects) => ({
   tourismRouteBonus: fx.tourismRouteBonus ?? 0,
   tourismPct: fx.tourismPct ?? 0,
   yieldPctPerSuzerain: YIELD_KEYS.map((k) => fx.yieldPctPerSuzerain?.[k] ?? 0),
-  // [promotion-class mask (CLASS_BIT bits), allCombat, cs]
+  // [promotion-class mask (CLASS_BIT bits), allCombat, cs, attacking only]
   unitCombatCS: fx.unitCombatCS
     ? [(fx.unitCombatCS.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0),
-       fx.unitCombatCS.all ? 1 : 0, fx.unitCombatCS.cs]
-    : [0, 0, 0],
+       fx.unitCombatCS.all ? 1 : 0, fx.unitCombatCS.cs, fx.unitCombatCS.attacking ? 1 : 0]
+    : [0, 0, 0, 0],
   xpPct: fx.xpPct ?? 0,
   wwPct: fx.wwPct ?? 0,
   gppMult: fx.gppMult ?? 1,

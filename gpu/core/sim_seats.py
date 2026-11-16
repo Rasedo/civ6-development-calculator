@@ -13492,7 +13492,7 @@ class SimSeats:
                                             self.unit_formation.gather(1, a1).squeeze(1),
                                         self.unit_levied.gather(1, a1).squeeze(1)).to(atk_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
-                         + self._gov_unit_cs(at, a_seat)).to(atk_e.dtype)
+                         + self._gov_unit_cs(at, a_seat, True)).to(atk_e.dtype)
         def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
         def_civ_u = torch.where(d_barb, neg, d_seat)
         def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval, d_type).to(def_e.dtype)
@@ -13503,7 +13503,7 @@ class SimSeats:
                                         self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
                                         self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
         def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
-                         + self._gov_unit_cs(d_type, def_civ_u)
+                         + self._gov_unit_cs(d_type, def_civ_u, False)
                          + self._era_matchup_cs(def_civ_u, at)
                          + self._gdr_armor_cs(d_type, def_civ_u, at)
                          + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
@@ -14835,7 +14835,7 @@ class SimSeats:
                  + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
                                      self.unit_naval[at0] | a_emb[:, u], at0).to(def_cs.dtype)
                  + (self._congress_unit_cs(at0, a_seat[:, u])
-                    + self._gov_unit_cs(at0, a_seat[:, u])).to(def_cs.dtype)
+                    + self._gov_unit_cs(at0, a_seat[:, u], True)).to(def_cs.dtype)
                  + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
                                    self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True,
                                    getattr(self, f"{atk_kind}_unit_formation")[:, u],
@@ -14869,7 +14869,7 @@ class SimSeats:
                   + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                   + self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
-                  + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
+                  + self._gov_unit_cs(a_type[:, u], a_seat[:, u], True))
         major = POOL_CLASS[atk_kind] == "major"
         tc = tile.clamp(min=0)
         # CIV6 (Encampment): "Acquires Outer Defenses ... once Walls have been
@@ -15645,7 +15645,7 @@ class SimSeats:
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval, at0).to(atk_e.dtype)
         atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
                          + self._congress_unit_cs(at0, a_seat[:, u])
-                         + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
+                         + self._gov_unit_cs(at0, a_seat[:, u], True)).to(atk_e.dtype)
         atk_e = atk_e + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
                                         self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True,
                                         getattr(self, f"{atk_kind}_unit_formation")[:, u],
@@ -15677,7 +15677,7 @@ class SimSeats:
             atk_e = atk_e + self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval, ut0).to(atk_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
-                         + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
+                         + self._gov_unit_cs(ut0, a_seat, True)).to(atk_e.dtype)
         atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True,
                                         getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                         getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
@@ -16376,12 +16376,12 @@ class SimSeats:
                                         self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
         atk_e = atk_e + self._roster_cs(a_seat, at, a_tile, d_seat, def_hp, False, a_form, a_lev).to(atk_e.dtype)
         def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
-                         + self._gov_unit_cs(d_type, def_civ_u)
+                         + self._gov_unit_cs(d_type, def_civ_u, False)
                          + self._era_matchup_cs(def_civ_u, at)
                          + self._gdr_armor_cs(d_type, def_civ_u, at)
                          + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
-                         + self._gov_unit_cs(at, a_seat)).to(atk_e.dtype)
+                         + self._gov_unit_cs(at, a_seat, True)).to(atk_e.dtype)
         return atk_e, def_e
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int,
@@ -16575,7 +16575,7 @@ class SimSeats:
                     + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u) - self._wound(a_hp[:, u], a_type[:, u]))
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval, at0).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
-                               + self._gov_unit_cs(at0, aseat)).to(atk_base.dtype)
+                               + self._gov_unit_cs(at0, aseat, True)).to(atk_base.dtype)
 
         # who holds the tile, and is it hostile? `unitsHostile` answers for
         # every pair, so no seat needs a clause of its own. The shot takes a
@@ -16723,7 +16723,7 @@ class SimSeats:
                                             getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
             _ucs_seat = torch.where(d_barb, neg, d_seat)
             def_e = def_e + (self._congress_unit_cs(d_type, _ucs_seat)
-                             + self._gov_unit_cs(d_type, _ucs_seat)
+                             + self._gov_unit_cs(d_type, _ucs_seat, False)
                              + self._era_matchup_cs(_ucs_seat, at0)
                              + self._gdr_armor_cs(d_type, _ucs_seat, at0)
                              + self._governor_territory_cs(_ucs_seat, tgt)).to(def_e.dtype)

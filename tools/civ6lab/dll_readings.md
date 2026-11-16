@@ -18418,3 +18418,62 @@ order), `enemyCities` (cpu/core/operations/evaluate.ts, `EvalInputs.tradeListed`
   15.96, each twice the value at desire 0 less one Maintenance. Ported:
   `freeCityBuildFacts` handicap 0; GPU `_FreeFacts` takes
   `_MinorFacts.handicap`.
+
+## C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins
+
+`minorCitiesLook`, `CityState.citiesKnown`'s `districts` (cpu/core/minorOps.ts,
+cpu/core/types.ts), `lookDistricts` / `knownCities` (cpu/core/aiView.ts);
+GPU `_kb_city_fill` (gpu/core/sim_minors.py), `_kb_city_entries` and
+`_ops_enemy_str` (gpu/core/sim_minorops.py), the planes
+`citystate_kb_city_cdef` / `_cwall` / `_edef` / `_ewall`;
+`governmentUnitCS` (cpu/core/effects.ts) and its callers in
+cpu/core/combat.ts, the `attacking` arm of the `unitCombatCS` rows
+(cpu/data/policies.ts, cpu/export/rules.ts); GPU `_gov_unit_cs`
+(gpu/core/sim_masks.py) on the `ucst` / `ucsa` channels
+(gpu/core/sim_init.py, gpu/core/sim_economy.py) and its callers in
+gpu/core/sim_seats.py and gpu/core/sim_phase.py.
+
+- THE KNOWN CITY'S DISTRICT ENTRIES ARE THE LOOK'S. 0x5f0280 fills an
+  entry's 0x20-byte district entries (0x5efaf0: GetDefenseStrength, the
+  same while its perimeter stands, the strike) when the look takes the
+  district's plot; the knowledge base's readers (the tactical record, the
+  operations' enemy strength 0x5eb2c0, the war targets' marks) read the
+  entry, not the city. A city-state's look runs as its turn opens
+  (`minorKnowledge` before its contract purchases, its city AI's purchases
+  and its military AI's upgrade 0x727db0) and at its turn's end, so its
+  pass reads every known city as the look found it: its own centre before
+  the turn's upgrade on it, another city-state's centre before that one's
+  turn where its turn comes later. Ported for the city-states, whose list
+  is kept (`citiesKnown`); the barbarians' and the Free Cities' entries
+  stay the city's now (their look opens the turn they pass in).
+- CONFIRMED: runs/h1_duels1144 t64 city-state 3's own 31:19 at 26 (its
+  Warrior 262144 made the Swordsman 589830 on the centre at its start,
+  ours 41 before); t69 / t70 city-state 4's 34:12 27 / 32 in both
+  city-states' records (its t69 upgrade on 33:11, its t70 Swordsman 851969
+  on the centre; ours 32 / 42 before). Whole games aimem, 46 seeds:
+  kb.cities 2,698 rows -> 967; 1144 61 -> 4, 1147 61 -> 2, 1124 52 -> 3,
+  1117 53 -> 19.
+- FASCISM'S +5 IS AN ATTACKER'S. GOVERNMENT_FASCISM grants
+  ABILITY_FASCISM_ATTACK_BUFF (FASCISM_ATTACK, Governments.xml), its legacy
+  card ABILITY_FASCISM_LEGACY_ATTACK_BUFF (Expansion1_Governments.xml);
+  both modifiers (FASCISM_ATTACK_BUFF, FASCISM_LEGACY_ATTACK_BUFF,
+  MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH, Amount 5) stand under
+  FASCISM_REQUIREMENTS, whose one requirement is
+  PLAYER_IS_ATTACKER_REQUIREMENTS (UnitAbilities.xml): a unit defending
+  takes none, in a combat or the planning's simulation. Twilight Valor's
+  TWILIGHT_VALOR_ATTACK_BONUS stands under
+  UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS on CLASS_RECON, _MELEE,
+  _HEAVY_CAVALRY, _LIGHT_CAVALRY, _ANTI_CAVALRY and _NAVAL_MELEE
+  (Expansion1_UnitAbilities.xml). Ported: a `unitCombatCS` row's
+  `attacking` arm, paid by the attacker's composers alone.
+- CONFIRMED: runs/h1_duels1137 t191 China (Fascism) Cuirassier 5177358
+  defends the barbarian Frigate 2293767 at 64 (CombatLog DefenderStrMod
+  0, 20 dealt), the planned blow 21 for ours 17 before; t193 runs/h1_duels1157
+  China's Ironclad 6488087 attacks at 70 + 5. One-seed aimem trace 1137 to
+  t200: plan.blow 211 -> 6, every Quadrireme, Frigate and Galley blow on
+  China's units as logged.
+- OPEN: the barbarians' ranged blow on a centre a strength or six apart
+  (runs/h1_duels1152 t32-53 the Archer 1441809 on city-state 3's 28:16, 16
+  for the game's 20, our centre 21 with its Palace and three envoys and the
+  hills' 3; t18 the Slinger 655369 at 9 hit points on China's 32:10, 10 for
+  13, the Horse Archer 851980 at 51 on it as logged).
