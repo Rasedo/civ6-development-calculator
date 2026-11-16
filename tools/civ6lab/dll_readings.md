@@ -20538,3 +20538,57 @@ GPU `_mops_run`'s per-priority `_mops_free_trees` (gpu/core/sim_minorops.py),
 - OPEN: no recording tells the belief's refusal from the Temple's (both
   hold in every case); the player religion's byte +0x5b0 is read at
   CanTrain alone, its setter unread.
+
+## C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins
+
+`freeCityBuildFacts`, `majorUnitVersion`, `majorUnitExpected`
+(cpu/core/freeCityBuild.ts), the view's `cityHousingValue` and
+`unitPoolCount` (cpu/core/aiView.ts), `freeCitiesPhase` (cpu/core/phase.ts),
+`freeFinish` (cpu/core/minorBuild.ts); GPU `_FreeFacts.housing_value` /
+`resource_access` / `unit_version` / `unit_expected`
+(gpu/core/sim_cityvalue.py), `_free_cities_phase` (gpu/core/sim_phase.py),
+the flat bonus' pool count (gpu/core/sim_policy.py), `_free_city_produce`
+(gpu/core/sim_minorai.py).
+
+- THE CITY UPDATE OF A FREE CITIES' CITY (0x5ce680): after the pass test it
+  asks the owner's level (0x469d40, CIVILIZATION_LEVEL_FREE_CITIES) and for
+  the Free Cities stores the threat (0x5cbd10 into +0x160) and returns
+  (0x5ce6b7..0x5ce6ee). Nothing of the full update runs: not the
+  dependents' pass 0x5cadc0, the improvement pick 0x5c9a00, the resource
+  counts 0x5c9700 (its one caller is this update), the growth forecast
+  0x5cb570 (likewise), the standing army 0x5ca7e0, the events or the
+  update's own pick. The PLOT ANALYSIS LOG (0x5d4030) of a Free City is the
+  creation's (0x5cdd70 at 0x5ce1da), printed as the city is made. So the
+  stores those steps write stay as the CityBuildAI was made: the resource
+  counts (+0x978) none, a unit's strategic resource its player's stock
+  alone (0x7b62c0 at 0x7b71dd..0x7b7217); the growth forecast (+0x6c8 /
+  +0x738 / +0x7a8) empty, a housing value (0x7a3d70) the Food the housing
+  withholds now, from the start to the horizon.
+- Confirmed: duels1143 Taiyuan (China's, a Free City from t208).
+  AI_CityBuild.csv holds its PLOT ANALYSIS LOG twice at t208, between
+  player 0's and player 1's rows, and at no later turn (a city-state's
+  every turn). Horseback Riding t209-t212 at its value without the
+  Horseman (1775.6, 2184.3, 714.0, 1071.0; Horses on its own 7:9,
+  unimproved and revealed), Stirrups without the Knight; Civil Prestige
+  103.0 t210-t212 and t214-t215, 87 at t213: the city of 3 in a housing
+  of 4.
+- THE UNIT VERSIONS (0x4f4a50): a FoundCity row is none of the versions of a
+  player whose level founds no city; the install's CivilizationLevels give
+  the Free Cities CanFoundCities false. The expected count (0x5d4750) of a
+  unit CanTrain (0x172820, the version test at its head) refuses is 0:
+  duels1143 t208-t215 Colonization unlogged.
+- THE POOL COUNT of the Free Cities (+0x12e8 +0xc0, the COMBAT_EXPERIENCE
+  flat bonus' units) holds a unit their treasury disbanded this turn:
+  duels1143 t208, the revolt's second Mechanized Infantry disbanded,
+  Oligarchy's experience 1 in t209's Political Philosophy (1828.8).
+- THE GOVERNMENT VALUES of the Free Cities are taken after their military
+  AI's turn, on the enemy unit counts its ageing made (0x5eab80), off the
+  logs: duels1143 t209, Rome's Warriors and Catapult first counted that
+  turn, Oligarchy's melee strength 10 in t210's Political Philosophy
+  (1210.3).
+- THE BEST STRENGTH TRAINED rises on a unit a Free City trains
+  (PlayerStats m_iMaxMeleeStrengthTrained): duels1143 t212, Taiyuan's
+  Slinger, the knowledge base's maxMelee 0 -> 5 and the city's strike 3 ->
+  15 at that turn's end look, Agoge and Feudal Contract 70 -> 16.
+- Open (C-98): Raid's pillage value on the Free Cities' units, 2 to 8
+  under from t215 (duels1143 t215 138 for 141).

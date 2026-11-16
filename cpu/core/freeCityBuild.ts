@@ -107,13 +107,16 @@ function majorItemType(q: QueueItem | undefined): string | null {
   return null;
 }
 
-/** a major's or the Free Cities' version of a unit (player +0x12e8 +0x1c0)
- *  under its traits `traits`: none where the database bars it or it is
- *  another civilization's unique; a unique unit of its own in place of the
- *  base it replaces */
-export function majorUnitVersion(traits: readonly string[], u: string): string | null {
+/** a major's or the Free Cities' version of a unit (player +0x12e8 +0x1c0,
+ *  0x4f4a50) under its traits `traits`: none where the database bars it, it
+ *  is another civilization's unique, or it founds a city and the player's
+ *  civilization level founds none (`founds` false: the Free Cities'
+ *  CanFoundCities; runs/h1_duels1143 t208-215, Colonization unlogged on the
+ *  Free City's Settler); a unique unit of its own in place of the base it
+ *  replaces */
+export function majorUnitVersion(traits: readonly string[], u: string, founds: boolean): string | null {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  if (!row || !row.canTrain) return null;
+  if (!row || !row.canTrain || (row.foundCity && !founds)) return null;
   if (row.trait) return traits.includes(row.trait) ? u : null;
   const unique = AI_UNITS.find((x) => x.trait && traits.includes(x.trait)
     && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === engineId('unit', u, 'UNIT_', UNITS));
@@ -168,7 +171,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
     return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
   };
-  const unitVersion = (u: string): string | null => majorUnitVersion(traits, u);
+  const unitVersion = (u: string): string | null => majorUnitVersion(traits, u, !isFreeSeat(seat));
   const growth = cityGrowth(state, city);
   return {
     view,
@@ -345,13 +348,15 @@ export function majorItemTurns(state: GameState, city: City, type: string, extra
 
 /** CityBuildAI's expected count of a unit in a major's or a Free City's
  *  city (0x5d4750), raw: 1.0 with progress the queue holds on it; 0 where
- *  the city cannot train it (its production column closed); else 0.5 — the
- *  +0x400 list's entries (0.2 x their +0x160 more) not read */
+ *  the city cannot train it (a unit not its player's version, its
+ *  production column closed); else 0.5 — the +0x400 list's entries (0.2 x
+ *  their +0x160 more) not read */
 export function majorUnitExpected(state: GameState, city: City, type: string): number {
   const q = majorQueueItem(state, city.seat, city, type);
   if (!q) return 0;
   const k = keyOf(q);
   if ((city.queue.find((x) => keyOf(x) === k)?.progress ?? 0) > 0) return FX;
+  if (majorUnitVersion(majorTraits(state, city.seat), type, !isFreeSeat(city.seat)) !== type) return 0;
   const s = seatOf(state, city.seat)!;
   const col = queueItemColumn(q);
   const open = productionObs(state, s, { ...city, queue: [] }, unitGates(state, city.seat)).prodOpen;
@@ -379,7 +384,7 @@ export function freeResearchTerms(state: GameState): ReturnType<typeof minorRese
   const term = (units: readonly AiUnitRow[], civic: boolean): number => {
     let v = 0;
     for (const u of units) {
-      if (majorUnitVersion(traits, u.type) !== u.type) continue;
+      if (majorUnitVersion(traits, u.type, false) !== u.type) continue;
       const k = AI_UNIT_INDEX.get(u.type)!;
       let sum = 0;
       let n = 0;
@@ -426,10 +431,17 @@ export function freeResearchTerms(state: GameState): ReturnType<typeof minorRese
  *  Maintenance off (runs/h1_duels1143 t208, Taiyuan's first update on a
  *  table of 1.0 and the desire 1.0: the Slinger, no Maintenance, 54.9 as
  *  its pick logs, the Archery row's Archer 26.6 and the Wheel's Battering
- *  Ram 15.96, 1 Maintenance each) */
+ *  Ram 15.96, 1 Maintenance each). The city update of a Free Cities' city
+ *  stores its threat and returns (0x5ce680 at 0x5ce6b7..0x5ce6ee on
+ *  0x469d40), so the full update's stores stay as its CityBuildAI was made:
+ *  no resource counts (0x5c9700's +0x978: a unit's strategic resource is its
+ *  player's stock alone; runs/h1_duels1143 t209-214, the Horseman and the
+ *  Knight 0 with Horses on the city's own 7:9) and an empty growth forecast
+ *  (0x5cb570's +0x6c8: a housing value is the Food its housing withholds
+ *  now, to the horizon; t210-215 Civil Prestige 103 on the city of 3 in a
+ *  housing of 4) */
 export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts {
   const f = majorBuildFacts(state, city, minorKnownUnits(freeSeatOf(state)));
-  const centre = state.map.tiles[city.centerIndex];
   return {
     ...f,
     fullCiv: false,
@@ -438,7 +450,8 @@ export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts
     promotionWeight: (cls) => promotionWeight(['TRAIT_LEADER_FREE_CITIES'], cls),
     resourceAccess: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
-      return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
+      return !!id && stockFree(state, FREE_SEAT, id) !== 0;
     },
+    forecast: [],
   };
 }

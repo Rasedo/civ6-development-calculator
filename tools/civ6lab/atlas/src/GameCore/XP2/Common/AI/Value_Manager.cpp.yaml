@@ -326,6 +326,7 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
     - ".claude/scratchpad/cb3/NOTES.md: ...whole number only if constructible now. OPEN: GPP general (Barracks/Stable v 0, unsourced), housing 0x7a3d70 forecast, free units FX_MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Ligh..."
@@ -1176,6 +1177,7 @@
     - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
     - "C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins"
     - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

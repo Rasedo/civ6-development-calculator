@@ -1099,8 +1099,12 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  and Culture they make then (`minorResearchTurn` on their unit term,
  *  `freeResearchTerms`: runs/h1_duels1143 t216, Taiyuan's Loyalty fallen to
  *  Unrest in that turn, every row but the six in hand at its whole cost past
- *  the horizon), its Combat Desire between their policy jobs and government
- *  values (`freeDesire`) — with no city on no yield (`minorResearch`). Each Free City's
+ *  the horizon), its Combat Desire after their policy jobs (`freeDesire`),
+ *  its government values after its military AI's turn, on the enemy unit
+ *  counts that turn's ageing made (runs/h1_duels1143 t209: Rome's Warriors
+ *  first counted, Oligarchy's melee strength 10 in t210's Political
+ *  Philosophy, 1210.3 as logged) — with no city on no yield
+ *  (`minorResearch`). Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
@@ -1128,8 +1132,8 @@ export function freeCitiesPhase(state: GameState): void {
   if (free.cities.length === 0) {
     const { government } = minorResearch(state, free.research, FREE_SEAT, 0, 0, () => freeResearchTerms(state), urban, []);
     freeDesire(state);
-    government();
     freeMilitaryTurn(state);
+    government();
     delete free.armyCounted;
     delete free.targetDistricts;
     freeKnowledge(state, false);
@@ -1194,7 +1198,7 @@ export function freeCitiesPhase(state: GameState): void {
   });
   // their AIs' turns on the cities as their own turn left them: the research
   // and civics AIs on the Science and Culture they make now, the Combat
-  // Desire, the government values, the military AI's turn, then each city's
+  // Desire, the military AI's turn, the government values, then each city's
   // grant where one falls due and its city AI's update (`freeCityUpdate`)
   let scienceNow = 0;
   let cultureNow = 0;
@@ -1205,8 +1209,8 @@ export function freeCitiesPhase(state: GameState): void {
   }
   const government = minorResearchTurn(state, free.research, FREE_SEAT, scienceNow, cultureNow, terms, []);
   freeDesire(state);
-  government();
   freeMilitaryTurn(state);
+  government();
   for (const city of [...free.cities]) {
     freeCityGrant(state, city);
     freeCityUpdate(state, city);
@@ -1226,8 +1230,8 @@ export function freeCitiesPhase(state: GameState): void {
 }
 
 /** THE FREE CITIES' COMBAT DESIRE on the records as their last update aged
- *  them (`freeCombatDesire`), between their civics AI's policy jobs and its
- *  government values (`minorResearchTurn`) */
+ *  them (`freeCombatDesire`), after their civics AI's policy jobs and before
+ *  their military AI's turn and its government values (`minorResearchTurn`) */
 function freeDesire(state: GameState): void {
   const free = freeSeatOf(state);
   free.combatDesire = freeCombatDesire(state, state.turn - 1).desire;

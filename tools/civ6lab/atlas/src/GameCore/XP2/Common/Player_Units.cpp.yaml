@@ -460,6 +460,9 @@
   semantics: "per Units row the player's version (player +0x12e8 +0x1c0): itself, -1 for a row not CanTrain (+0x1b8 bit 0x20), a FoundCity row (+0x1b9 bit 2) the player's level forbids, a TraitType row (+0x2d0) its traits do not name, the level-hashed rows (0x8e7bf0); a trait's unit replaces its base (\"Two or more traits trying to replace the unit %s\"); EnabledByReligion (+0x1b8 bit 0x40) and Units_XP2 MajorCivOnly are not read (CanTrain 0x172941 refuses MajorCivOnly)"
   status: READ
   cases:
+    - recording: h1_duels1143
+      turn: 208
+      value: "the Free Cities (CanFoundCities false): Colonization unlogged t208-215, its Settler's expected count 0 in Taiyuan"
     - recording: h1_duelv1128
       turn: 56
       value: Nazca's Temple 43.25 as logged, its Warrior Monk (EnabledByReligion) valued through 0x7b62c0 where the version passes; the UNITS table's Warrior Monk FX(-9999) by CanTrain
@@ -470,11 +473,14 @@
       turn: 2
       value: "Lahore (LEADER_MINOR_CIV_LAHORE, MINOR_CIV_LAHORE_NIHANG_TRAIT): the Nihang in its unit production table t2-t239 and its UNITS row valued; the other city-states hold no Nihang"
   impl:
+    - cpu/core/freeCityBuild.ts:majorUnitVersion
     - cpu/core/minorBuild.ts:minorUnitVersion
     - cpu/data/cityStates.ts:minorUnitTrait
     - gpu/core/sim_cityvalue.py:unit_version_mask
     - gpu/core/sim_minorai.py:_minor_trait_version
+    - gpu/core/sim_cityvalue.py:unit_version
   readings:
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins"

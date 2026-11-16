@@ -1940,8 +1940,12 @@ class SimMinorAi:
             if bool(m.count_nonzero()):
                 ctr = self.city_center[:, row, j].clamp(min=0)
                 ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-                fin = fin | self._spawn_barb(m, self._city_unit_plot(row, j, ctr, ui), ui, seat=FREE_SEAT, home=torch.full((B,), -1, dtype=torch.long, device=dev),
-                                               stack=True)
+                born = self._spawn_barb(m, self._city_unit_plot(row, j, ctr, ui), ui, seat=FREE_SEAT, home=torch.full((B,), -1, dtype=torch.long, device=dev),
+                                        stack=True)
+                # the Free Cities' best strengths trained rise to it
+                # (`freeFinish`)
+                self._raise_best_trained(row, born, ui)
+                fin = fin | born
             m = done & is_b
             if bool(m.count_nonzero()):
                 rr = m.nonzero(as_tuple=True)[0]

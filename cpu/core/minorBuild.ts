@@ -2824,9 +2824,16 @@ function freeItemCost(state: GameState, city: City, q: QueueItem): number {
 
 /** a Free City's item completes: its unit on the centre or its district
  *  (`cityUnitPlot`), beside the Free Cities' own units there
- *  (`spawnUnit`'s 'stack'); false where no plot takes it */
+ *  (`spawnUnit`'s 'stack'), the Free Cities' best strengths trained rising
+ *  to it (`raiseBestTrained`; runs/h1_duels1143 t212: Taiyuan's Slinger,
+ *  m_iMaxMeleeStrengthTrained 0 -> 5, Agoge and Feudal Contract 70 -> 16 on
+ *  it); false where no plot takes it */
 function freeFinish(state: GameState, city: City, q: QueueItem): boolean {
-  if (q.kind === 'unit') return !!spawnUnit(state, q.unit, cityUnitPlot(state, city, q.unit), FREE_SEAT, 'stack');
+  if (q.kind === 'unit') {
+    if (!spawnUnit(state, q.unit, cityUnitPlot(state, city, q.unit), FREE_SEAT, 'stack')) return false;
+    raiseBestTrained(state, FREE_SEAT, q.unit);
+    return true;
+  }
   if (q.kind === 'building') {
     city.buildings.push(q.building);
     if (BUILDINGS[q.building].walls) {

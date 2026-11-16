@@ -3,3 +3,4 @@
 # no diff. Binary files are detected and left alone.
 * text=auto eol=lf
 *.ps1 text eol=crlf
+tools/aiport/README.md merge=union

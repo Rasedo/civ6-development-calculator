@@ -8198,6 +8198,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       state.units = state.units.filter((u) => !lostUnits.has(u));
       seatPhase(state, { seats: new Set([active.seat]), deals: false });
       for (const [u, i] of setAside) state.units.splice(Math.min(i, state.units.length), 0, u);
+      // ...and the completions the log holds in that start which the
+      // engine's research did not make: the city-states' and the Free
+      // Cities' catch-up lands with them (runs/h1_duels1143: Rome's
+      // Horseback Riding at its start of t90, the Free Cities' kept progress
+      // on it 59 -> 47 in record t90)
+      completeRecordedResearch(ctx, a, b, b.turn);
       advanceTurn(state);
     } catch (e) {
       report.stopped = `the engine's turn threw at turn ${a.turn}: ${(e as Error).message}`;

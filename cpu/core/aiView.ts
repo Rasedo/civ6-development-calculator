@@ -485,9 +485,13 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       }
       return [...minorListedUnits(state, cs)].flatMap(([type, n]) => Array<number>(n).fill(UNITS[type]?.maintenance ?? 0));
     },
+    // the pool's count (+0x12e8 +0xc0) holds a unit the Free Cities'
+    // treasury disbanded this turn (runs/h1_duels1143 t208: the revolt's
+    // second Mechanized Infantry, Oligarchy's experience 1 in t209's
+    // Political Philosophy, 1828.8 as logged)
     unitPoolCount: (i) => {
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      return cs ? minorListedCount(state, cs) : unitsOf(state, i).length;
+      return cs ? minorListedCount(state, cs) : unitsOf(state, i).length + (seatOf(state, i)?.unitsDisbanded?.length ?? 0);
     },
     // a city-state's units whose upgrade its research unlocks, each at the
     // city-state's upgrade price; another party's not read
@@ -545,7 +549,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
           };
           const known = minorKnownUnits(s);
           table = unitProductionTable({
-            isVersion: (u) => majorUnitVersion(traits, u) === u,
+            isVersion: (u) => majorUnitVersion(traits, u, i !== FREE_SEAT) === u,
             obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
             listed: seatListed(r, holds, i !== FREE_SEAT),
             owned: (u) => own.get(u) ?? 0,
@@ -576,7 +580,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       let best: string | null = null;
       let top = 0;
       for (const row of AI_UNITS) {
-        const version = traits ? majorUnitVersion(traits, row.type) : minorUnitVersion(seat(i) as CityState, row.type);
+        const version = traits ? majorUnitVersion(traits, row.type, i !== FREE_SEAT) : minorUnitVersion(seat(i) as CityState, row.type);
         if (version !== row.type || row.mustPurchase || row.promotionClass !== cls) continue;
         const tech = row.tech ? engineId('tech', row.tech, 'TECH_', TECHS) : null;
         if (row.tech && (!tech || !r.techs.includes(tech))) continue;
@@ -659,11 +663,14 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     // placed on its worked 11:12 takes the surplus 4 -> 2, the government
     // values' Monarchy walls housing on the forecast of 4, Divine Right
     // 363.5 at t109 as logged; t106 the Food a t105 harvest landed in the
-    // forecast, 272.5 at t107); any other city's its growth as it stands
+    // forecast, 272.5 at t107); a Free City's forecast is empty, its city
+    // update writing none (`freeCityBuildFacts`); any other city's its
+    // growth as it stands
     cityHousingValue: (i, id, housing, t, h) => {
       const city = cityOf(i, id);
       if (!city) return 0;
       const g = cityGrowth(state, city);
+      if (i === FREE_SEAT) return housingValue(g, [], housing, t, h);
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
       return housingValue(g, growthForecast((opts.updated ? cs?.aiGrowthSeen : undefined) ?? cs?.aiGrowth ?? g), housing, t, h);
     },

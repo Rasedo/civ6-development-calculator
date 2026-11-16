@@ -637,6 +637,20 @@ def what_record(g: Game, a) -> None:
     for p in (g.rec or {}).get("players", []):
         if p.get("id") == a.player:
             rows(f"p{a.player}", p, next((x for x in (g.next or {}).get("players", []) if x.get("id") == a.player), None))
+    # --mem Component[.field]: the player's named memory fields of the record
+    # (`mem`), a component's field names where no field is given
+    for name in a.mem or []:
+        comp, _, field = name.partition(".")
+        def of(rec):
+            c = ((rec or {}).get("mem") or {}).get(str(a.player), {}).get(comp)
+            return c if not field or not isinstance(c, dict) else c.get(field)
+        now, nxt = of(g.rec), of(g.next)
+        if not field and isinstance(now, dict):
+            print(f"== mem {comp} of p{a.player} t{g.turn}: fields {', '.join(now)}")
+            continue
+        s, n = json.dumps(now), json.dumps(nxt)
+        print(f"== mem {name} of p{a.player} t{g.turn} (-> t{g.turn + 1} where it differs)")
+        print(f"  {s[:a.wide]}" + (f"\n  ->  {n[:a.wide]}" if n != s else ""))
 
 
 WHAT = {"units": what_units, "planning": what_planning, "targets": what_targets, "danger": what_danger, "kb": what_kb, "trees": what_trees,
@@ -653,6 +667,7 @@ def main() -> int:
     ap.add_argument("--city")
     ap.add_argument("--plot")
     ap.add_argument("--what")
+    ap.add_argument("--mem", action="append", help="with --what record: the player's named memory field `Component.field` of the record (a component alone lists its fields)")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--wide", type=int, default=400, help="the widest a log row prints")
     ap.add_argument("--ords", help="A-B: every record event row of sequence A..B, any player, whole, and nothing else")

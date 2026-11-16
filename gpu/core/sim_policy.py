@@ -761,9 +761,13 @@ class SimPolicy:
                 # into GREAT_PEOPLE's, summed before the whole
                 if bonus != "GOVERNMENTBONUS_GREAT_PEOPLE":
                     # the unit pool count: a city-state's by its list
-                    # (`_minor_listed_units`)
+                    # (`_minor_listed_units`), the Free Cities' with the
+                    # units their treasury disbanded this turn
+                    # (`_free_disbanded`)
                     if ctx["s"] == self.FR:
                         n = (self.barb_unit_alive & (self.barb_unit_seat == ctx["seat"])).long().sum(dim=1)
+                        if self._free_disbanded is not None:
+                            n = n + self._free_disbanded.sum(dim=1)
                     else:
                         n = self._minor_listed_units(ctx["s"]).sum(dim=1)
                     p = "PSEUDOYIELD_UNIT_COMBAT"

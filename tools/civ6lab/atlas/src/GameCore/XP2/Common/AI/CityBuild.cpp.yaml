@@ -103,6 +103,7 @@
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-129 / C-134: the units that raise a player's best strengths, the standing army's swap under a recruit — READ (0x4bffa0, 0x56dc90, 0x5ca7e0 at 0x5caac7..0x5cad19), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   context:
     - "...] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job o..."
   review: reviewed
@@ -133,6 +134,7 @@
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   context:
     - "...ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv...."
   review: reviewed
@@ -159,6 +161,7 @@
     - gpu/core/sim_cityvalue.py:_cv_forecast
     - cpu/core/minorCityAi.ts:minorAiTurn
     - gpu/core/sim_minorai.py:_minor_ai_turn
+    - cpu/core/freeCityBuild.ts:freeCityBuildFacts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
@@ -168,6 +171,7 @@
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...8709, anyT +4503 (13212), onlyOurs 1318.  DONE (code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, no..."
   context:
@@ -222,6 +226,7 @@
     - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   context:
     - "...m the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv. are adv..."
   review: reviewed
@@ -494,6 +499,7 @@
     - cpu/core/minorBuild.ts:freePrimaryRegions
     - cpu/core/types.ts:Seat
   readings:
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
@@ -553,12 +559,15 @@
   final: 0x3e2820
   kind: function
   name: the city update
-  semantics: "the city's AI turn (from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, the City Analysis job 0x5ce3f0. Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150, the district event 0x5cc910, the improvement event 0x5ccc10, 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. At 0x5ce8f0: the update's Default Specialization on the empty queue: at a city's founding the pick reads the founding analysis (the Production before the Palace); the turn's own analysis, at the full Production, feeds the next turn's research. Every later turn the pick follows an item the city's production completed that turn, on the turn's tables, before the civics AI's turn (list A, pass 2, after the cities' job) reads the queue. Ported: minorAiTurn / _minor_ai_turn."
+  semantics: "the city's AI turn (from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, the City Analysis job 0x5ce3f0. Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150, the district event 0x5cc910, the improvement event 0x5ccc10, 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. At 0x5ce8f0: the update's Default Specialization on the empty queue: at a city's founding the pick reads the founding analysis (the Production before the Palace); the turn's own analysis, at the full Production, feeds the next turn's research. Every later turn the pick follows an item the city's production completed that turn, on the turn's tables, before the civics AI's turn (list A, pass 2, after the cities' job) reads the queue. Ported: minorAiTurn / _minor_ai_turn. At 0x5ce6b7..0x5ce6ee: a Free Cities player (0x469d40) stores the threat (0x5cbd10 into +0x160) and returns: no dependents' pass, improvement pick, resource counts (0x5c9700), growth forecast (0x5cb570), standing army, events or pick there; its Default Specialization is the second hook's (0x5ce5b0)."
   status: PARTLY
   cases:
     - recording: h1_duely1124
       turn: 2
       value: "every city-state founding of the five duely duels picks the game's item at its value: Antananarivo and Muscat the Slinger at 8.3, 1124 Bologna 30.2; Bologna t2 Archery 142.3 on the turn's own analysis"
+    - recording: h1_duels1143
+      turn: 210
+      value: "Taiyuan, a Free City from t208: AI_CityBuild.csv prints its PLOT ANALYSIS LOG at t208 alone (the creation's, 0x5cdd70), no later turn's; Horseback Riding 2184.3 with its Horseman at 0 beside Horses on its own 7:9, Civil Prestige 103.0 on a housing value of the Food withheld now"
     - recording: h1_duely1128
       turn: 216
       value: "Bologna's Sewer completed t216, the AT Crew contract 775 queued at the update: Totalitarianism (Fascism's UNIT_PRODUCTION flat bonus) 1509.5 at t217, the Builder t225 -> 1510.6 at t226, the Scouts t227-239 as logged"
@@ -567,7 +576,12 @@
     - cpu/core/aiCityTrees.ts:freeSlots
     - cpu/core/minorCityAi.ts:minorAiTurn
     - gpu/core/sim_minorai.py:_minor_ai_turn
+    - cpu/core/freeCityBuild.ts:freeCityBuildFacts
+    - gpu/core/sim_cityvalue.py:_FreeFacts
+    - gpu/core/sim_cityvalue.py:housing_value
+    - gpu/core/sim_cityvalue.py:resource_access
   readings:
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -956,6 +970,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-96: the unit value's unit count and the founding Production"
     - "C-126: the building contract purchase reads the turn's own City Analysis — READ (0x68afe0 -> 0x5d4920 on CityBuildAI +0xcf8, the analysis 0x5c24e0 on player signal +0x258 before the +0x370 list), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t; no direct caller) read by the improvement pick 0x5c9a00 (CityBuildAI +0x648; the log 0x5d4030 prints the same evaluations), the events: defence 0x5cced0 (slot 5), building or unit..."
@@ -1038,6 +1053,7 @@
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x1008], bare, from the start to start + the train turns), EFFECT_AD...

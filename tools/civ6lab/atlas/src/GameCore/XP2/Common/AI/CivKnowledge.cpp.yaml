@@ -91,6 +91,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+    - "C-98 / C-130: a Free City's city update stores its threat alone; the Free Cities' unit versions, pool count, government values' turn and best strength trained — READ (0x5ce680 at 0x5ce6b7..0x5ce6ee, 0x5cdd70, 0x4f4a50), both twins"
   review: reviewed
 - addr: 0x5eadb0
   kind: function

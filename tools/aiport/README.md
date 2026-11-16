@@ -87,6 +87,7 @@ turns before `<from>`.
     python tools/aiport/show.py 1171 38 --player 2                # events: every log row and record event of the turn
     python tools/aiport/show.py 1190 97 --player 3 --what record   # the record's own fields of its cities and of the player, T -> T+1 where they differ
     python tools/aiport/show.py 1171 43 --ords 8630-8643          # every record event row of sequence A..B, any player, whole (what stands between two rows)
+    python tools/aiport/show.py 1143 213 --player 62 --what record --mem PlayerTechs.m_axResearchProgress   # a named memory field of the record's player (`--mem PlayerTechs` lists the component's fields)
 
 `--what`: units, planning, targets, danger, kb, trees, contracts, ops,
 builds, research, events, record (several with commas). It reads the seed's

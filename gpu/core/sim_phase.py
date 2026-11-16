@@ -856,8 +856,9 @@ class SimPhase:
         (`_military_fav_tech`) on the records as their last update aged them,
         then their knowledge base ages and looks (`_free_knowledge`) and
         keeps its route value (`_free_trade_value`); their Combat Desire
-        (`_free_combat_desire`) is taken between their civics AI's policy
-        jobs and its government values (`_minor_research`). Their unit
+        (`_free_combat_desire`) is taken after their civics AI's policy
+        jobs, its government values (`_minor_research`) after this turn.
+        Their unit
         production table, which their cities' updates read, counts the
         records before the ageing and the look (`_cv_counted` at `FK`, held
         to the cities' turn's end)"""
@@ -916,8 +917,8 @@ class SimPhase:
             zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)
             _g, government = self._minor_research(self.FR, zero, zero)
             self._free_combat_desire(ones)
-            government()
             self._free_military_turn(ones)
+            government()
             del self._cv_counted[self.FK]
             self._tac_friendly.pop(FREE_SEAT, None)
             self._free_knowledge(ones, False)
@@ -1003,8 +1004,9 @@ class SimPhase:
             self._place_citizens(row, jc, act, None, full=True, fav_food=self.city_fav_food[:, row, j])
         # its AIs' turns on the cities as their own turn left them: the
         # research and civics AIs on the Science and Culture they make now,
-        # the Combat Desire, the government values, the military AI's turn (in
-        # every game: the cityless ones' too), then each city's grant where
+        # the Combat Desire, the military AI's turn (in every game: the
+        # cityless ones' too), the government values on the enemy unit counts
+        # its ageing made, then each city's grant where
         # one falls due and its city AI's update (`freeCitiesPhase`)
         walk_n = self._seat_city_walk(row, amen_yf=self._seat_amenity(row)[2], maint=self._seat_housing(row)[0])
         sci_n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
@@ -1014,8 +1016,8 @@ class SimPhase:
             cul_n = cul_n + walk_n[:, j, 4].double()
         government = self._minor_research_turn(self.FR, sci_n, cul_n)
         self._free_combat_desire(ones)
-        government()
         self._free_military_turn(ones)
+        government()
         for j in range(self.RC):
             act = alive_c[:, j] & self.city_alive[:, row, j]
             if not bool(act.count_nonzero()):

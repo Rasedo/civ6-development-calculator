@@ -61,8 +61,9 @@ describe("the Free City's production", () => {
     // Warrior Monk refused by CanTrain, the city following no religion whose
     // belief enables it; the Scout at 0 under the Free Cities'
     // PSEUDOYIELD_UNIT_EXPLORER of -1.0, and PSEUDOYIELD_UNIT_COMBAT their
-    // Combat Desire, 0 before their first military turn
-    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 5, 20541]);
+    // Combat Desire, 0 before their first military turn; the Settler none of
+    // their versions, their level founding no city
+    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 4, 17038]);
     const seq: unknown[] = [];
     for (let k = 0; k < 8; k++) {
       freeCityProduce(state, city, 5);

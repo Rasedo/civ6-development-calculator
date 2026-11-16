@@ -3223,9 +3223,13 @@ class _FreeFacts(_MinorFacts):
         self._slot = j
         self.seat = FREE_SEAT
 
-    def forecast_growth(self):
-        # a Free City's update reads its growth as it stands
-        return self.growth()
+    def housing_value(self, housing, t, h):
+        # a Free City's growth forecast is empty: its city update stores its
+        # threat alone and writes none (0x5ce680 on 0x469d40), so the value
+        # is the Food its housing withholds now, to the horizon
+        g = self.growth()
+        ft, fl, fp, fv = self.sim._cv_forecast(g, steps=0)
+        return self.sim._cv_housing_value(g, (ft, fl, fp, torch.zeros_like(fv)), housing, t, h)
 
     def building_held(self, b):
         # 0x17e690: the queue's head of the type (`freeCityPickFacts`)
@@ -3301,8 +3305,10 @@ class _FreeFacts(_MinorFacts):
         return 0
 
     def unit_version(self, u):
+        # the Free Cities' level founds no city: a FoundCity row is none of
+        # their versions (0x4f4a50)
         r = self.T["unit"].get(u)
-        return u if r is not None and r["canTrain"] and not r["trait"] else None
+        return u if r is not None and r["canTrain"] and not r["trait"] and not r["foundCity"] else None
 
     def has_building(self, b):
         bi = self._building_index(b)
@@ -3437,15 +3443,10 @@ class _FreeFacts(_MinorFacts):
         return 1
 
     def resource_access(self, res):
-        # a plot within three of the centre holds the resource
-        ri = self.E["resource"].get(res, -1)
-        if ri < 0:
-            return 0
-        sim = self.sim
-        d = self._disk()
-        on = sim.res_id.gather(1, d.clamp(min=0)) == ri
-        live = sim._res_live().gather(1, d.clamp(min=0))
-        return (on & live & (d >= 0)).any(dim=1)
+        # its player's stock alone, which the engine accrues none of
+        # (`stocked`): a Free City's update fills no resource counts
+        # (0x5c9700 behind 0x5ce680's Free Cities return)
+        return self.stocked(res)
 
     def best_combat_strength(self):
         return self.sim.free_best_melee
@@ -3596,7 +3597,8 @@ class _FreeFacts(_MinorFacts):
 
     def unit_expected(self, u):
         """`majorUnitExpected` (0x5d4750), raw: 1.0 with progress the queue
-        holds on the unit, 0 where the city cannot train it, else 0.5"""
+        holds on the unit, 0 where the city cannot train it (a unit not the
+        Free Cities' version among them), else 0.5"""
         sim = self.sim
         k = self._item_key(u)
         like = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
@@ -3604,7 +3606,7 @@ class _FreeFacts(_MinorFacts):
             return like
         head = sim.city_current[:, self.row, self.j, 0]
         kept = (head == k) & (sim.city_progress[:, self.row, self.j, 0] > 0)
-        can = _t(self.can_train(u), like).bool()
+        can = _t(self.can_train(u), like).bool() & (self.unit_version(u) == u)
         return torch.where(kept, like + _FX, torch.where(can, like + _FX // 2, like))
 
     def city_subjects(self):
