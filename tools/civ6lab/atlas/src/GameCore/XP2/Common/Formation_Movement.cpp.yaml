@@ -188,6 +188,8 @@
     - cpu/core/tactical.ts:attack
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:exits
+    - cpu/core/tactical.ts:fightersShown
+    - gpu/core/sim_tactics.py:_tac_fighters
   readings:
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
@@ -210,6 +212,7 @@
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
+    - "C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -899,6 +902,7 @@
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
+    - "C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."

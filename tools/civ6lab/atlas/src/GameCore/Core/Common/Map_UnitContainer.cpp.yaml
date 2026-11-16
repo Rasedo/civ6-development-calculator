@@ -136,6 +136,7 @@
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:fought
     - cpu/core/tactical.ts:enemyAt
+    - cpu/core/tactical.ts:fightersShown
   readings:
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -164,6 +165,7 @@
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
     - "C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins"
     - "C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look"
+    - "C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: reviewed

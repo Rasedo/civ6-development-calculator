@@ -571,10 +571,11 @@ export function goldenMoveBonus(state: GameState, unit: { type: string; seat: nu
     return goldenDedication(state, civ, DED_EXODUS) ? GOLDEN_MOVE_BONUS : 0;
   }
   /* CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
-     embarked units" — a hull's here (COMMEMORATION_EXPLORATION_GA_SEA_
-     MOVEMENT), an embarked unit's on its embarked pool
-     (`goldenEmbarkedMoves`) */
-  if (UNITS[unit.type]?.naval) {
+     embarked units" — a unit's of the sea domain here
+     (COMMEMORATION_EXPLORATION_GA_SEA_MOVEMENT, Mathematics' own
+     MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT), an embarked unit's on its
+     embarked pool (`goldenEmbarkedMoves`) */
+  if (UNITS[unit.type]?.naval || UNITS[unit.type]?.seaDomain) {
     return goldenDedication(state, civ, DED_DRACONES) ? GOLDEN_MOVE_BONUS : 0;
   }
   return 0;

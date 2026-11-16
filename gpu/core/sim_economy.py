@@ -6241,12 +6241,12 @@ class SimEconomy:
         self._gen_aura_cache = (key, out)
         return out
 
-    def _gen_aura_hit(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor,
-                      utype: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_hit(self, seat: torch.Tensor, tile: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """The RAW aura predicate — bool, shaped like `tile` — for a unit of
-        type `utype` of `seat` standing on `tile`, ADMIRAL-keyed when `naval`
-        (naval|embarked) else GENERAL-keyed, of a person whose era covers the
-        type's (`auraCoversEra`). Only a MAJOR owns an aura, so
+        type `utype` of `seat` standing on `tile`, ADMIRAL-keyed for a hull
+        else GENERAL-keyed, embarked or not (the type's own domain:
+        AOE_REQUIRES_SEA_DOMAIN / AOE_REQUIRES_LAND_DOMAIN), of a person whose
+        era covers the type's (`auraCoversEra`). Only a MAJOR owns an aura, so
         callers pass -1 for anyone else and the predicate is False there.
         THE single predicate behind both
         halves of the aura, mirroring `aura.inGeneralAura` — `_gen_aura_cs`
@@ -6270,12 +6270,12 @@ class SimEconomy:
         idx = ((g * NE + e) * self.T + tile.clamp(min=0)).reshape(self.B, -1)
         land_hit = land.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         sea_hit = sea.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
-        return torch.where(naval, sea_hit, land_hit) & valid
+        hull = self.unit_naval.take(utype.clamp(min=0, max=self.NU - 1))
+        return torch.where(hull, sea_hit, land_hit) & valid
 
-    def _gen_aura_cs(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor,
-                     utype: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_cs(self, seat: torch.Tensor, tile: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """The +generalAuraCs adder [B] (dtype) for own military near an own
-        GENERAL (land) / ADMIRAL (naval|embarked); `seat` < 0 scores nothing.
+        GENERAL (a land unit, embarked or not) / ADMIRAL (a hull); `seat` < 0 scores nothing.
         An INTEGER add joining the
         quantized assembly (the JUST_WAR / DEFENDER_OF_THE_FAITH pattern) — mirrors
         combat.generalAuraCS.
@@ -6284,7 +6284,7 @@ class SimEconomy:
         csty/cstyc, rngcs, vrngc, attacker side) and every
         CITY-STRIKE roll (cstk/estk, DEFENDER side). Absent from
         'rngrc' — TS does not add it there."""
-        return self._gen_aura_hit(seat, tile, naval, utype).to(self.dtype) * self._gen_aura_cs_val
+        return self._gen_aura_hit(seat, tile, utype).to(self.dtype) * self._gen_aura_cs_val
 
     def _seat_heal(self, pre: str) -> torch.Tensor:
         """What this pool's units heal — the refreshUnits rule.
@@ -6608,13 +6608,15 @@ class SimEconomy:
         # Carrier" — a fighter out on patrol heals only by Ground Crews' clause
         return out | ((getattr(self, f"{pre}_unit_patrol") >= 0) & ~_gc)
 
-    def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+    def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor,
+                     person: torch.Tensor | None = None) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
-        (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT) reaches a hull alone; the
-        three embark rungs raise the passenger's own pool. Each reads the
-        unit's seat's own research — a major's, a city-state's
-        (`citystate_techs`), the Free Cities' (`FR`) or the barbarians'
-        (`barb_techs`)."""
+        (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT) reaches a unit of the sea
+        domain: a hull, and `person` (a sea unit that is no hull, the Great
+        Admiral: `seaTechMoves`); the three embark rungs raise the
+        passenger's own pool. Each reads the unit's seat's own research — a
+        major's, a city-state's (`citystate_techs`), the Free Cities' (`FR`)
+        or the barbarians' (`barb_techs`)."""
         row = self._row_of(seat)
         ok = (row >= 0) & (row < self.n_majors)
         r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
@@ -6630,7 +6632,8 @@ class SimEconomy:
 
         out = torch.zeros_like(row)
         if self._sea_move_tech >= 0:
-            out = out + (has_tech(self._sea_move_tech) & naval).long() * self._sea_move_bonus
+            out = out + (has_tech(self._sea_move_tech) & (naval if person is None else naval | person)).long() \
+                * self._sea_move_bonus
         for ti, v in self._embark_move_techs:
             out = out + (has_tech(ti) & emb & ~naval).long() * v
         # ...and Hic Sunt Dracones' Golden face on the embarked pool
@@ -6716,13 +6719,17 @@ class SimEconomy:
         naval = self.unit_naval.take(typ)
         if emb is None:
             emb = getattr(self, f"{pre}_unit_emb")
+        # a unit of the sea domain that is no hull (the Great Admiral) holds
+        # no embarked pool: its own Moves with the Mathematics rung
+        person = self._type_sea_domain.take(typ) & ~naval
+        emb = emb & ~person
         # CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's rows
         base = torch.where(
             emb & ~naval,
             torch.full_like(base, self._embark_moves) + self._roster_embark_mp(getattr(self, f"{pre}_unit_seat"), typ),
             base,
         )
-        base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
+        base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval, person)
         # ONE multiply, at the end: every figure above is in WHOLE points, and
         # the aura's is already in `mp_scale` units (`unitFullMoves` scales its
         # own sum and refreshUnits adds the aura on top).
@@ -6883,7 +6890,6 @@ class SimEconomy:
         hit = self._gen_aura_hit(
             self.major_unit_seat,
             self.major_unit_tile,
-            self.unit_naval.take(self.major_unit_type) | self.major_unit_emb,
             self.major_unit_type,
         )
         self.major_unit_aura_mp.copy_((hit & ok).long() * self._gen_aura_mp)

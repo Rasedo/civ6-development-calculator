@@ -2975,8 +2975,10 @@
   final: 0x357f40
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:shown]
   readings:
     - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
+    - "C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ".....0x271f2e): 0x585fc0 gathers the plot's units of the other players (a hidden one where 0x5032d0 lets it) and 0x523520 answers whether any is at war — one that does not fight too, it..."
@@ -3302,6 +3304,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
+    - "C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins"
   context:
     - "...a node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin). An attack..."
     - "...(0x26e570 at 0x26e5cd): nothing leaves a node with +0x51 bit 0x40 (0x5861f0, 0x585fc0 → 0x523520; religious 0x5237e0); a bare centre is passed; cities zone their land (runs/h1_duelw112..."

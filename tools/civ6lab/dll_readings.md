@@ -20158,3 +20158,50 @@ cpu/export/planes.ts; GPU `_soil_mine` in gpu/core/sim_orders.py,
   Nihang bought at 1170 t241 forms a Corps with the first at once
   (UnitFormCorps 1900547, no new unit in record t242), ours keeps two
   (C-126).
+
+## C-132 / C-125: a hidden unit in a path node's units at war, the Great Admiral's Movement, a person's aura by the unit's own domain — READ (0x271be0 at 0x271e0d..0x271f2e, 0x5861f0 -> 0x585fc0 at 0x586059..0x586099 -> 0x5032d0, 0x26e570 at 0x26e6c9..0x26e775), both twins
+
+- A HIDDEN UNIT IS NONE OF A NODE'S UNITS AT WAR. The node build 0x271be0
+  sets the node's +0x51 bits 0x20 (a unit at war) and 0x40 (one that
+  fights) only on a plot its player sees now (+0x50 bit 2, tested at
+  0x271e0d) and from 0x5861f0, whose list 0x585fc0 walks the plot's units of
+  the mover's layer, skips the mover's player's own (0x586050) and takes a
+  unit with +0x15f0 set and +0x1650 clear only where the hidden layer's
+  count 0x5032d0 lets that player see it (0x586059..0x586099); 0x523520 then
+  asks the war and the strengths of the units listed. So a stealth unit the
+  mover's player does not see is a plain step of every search that reads
+  the bits: the danger map's (no unit attack of its own under flag 0x200),
+  a move order's path, the parent refusal 0x26e5cd. The planning's own
+  attack test (0x26e570 at 0x26e6c9..0x26e775, searches without flag 0x200)
+  walks the plot's list whole (0x75c50, the war 0x3dcec0, 0x209dd0) with no
+  hidden test. Ported: `groundOf`'s shown (foes, fought, the danger search's
+  fighters, foughtOn's fightersShown); `_tac_hostile` / `_tac_hostile_on` /
+  `_tac_fighters` under `shown`, `_tac_search`'s fought.
+  Confirmed, runs/h1_duels1143 t231 / t234 / t236 / t239: the barbarian
+  Quadrireme 1507342 on 12:25, 4 Movement, lays its 25 on 8:25 and 9:24 in
+  player 1's and player 0's maps, the range of 9:25 three steps west past
+  player 1's Nuclear Submarine on 10:25, no barbarian unit beside it; t233 /
+  t235 its own planning lists 9:25 and 8:25 at turn 2 past the Submarine.
+- THE GREAT ADMIRAL'S MOVEMENT. The install's UNIT_GREAT_ADMIRAL is of
+  DOMAIN_SEA and no hull class: it holds no embarked pool, its own BaseMoves
+  with the player's sea Movement (MATHEMATICS_ADJUST_SEA_MOVEMENT and the
+  Exploration Golden age's, both MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT)
+  and none of ABILITY_GREAT_LIGHTHOUSE_MOVEMENT (TypeTags CLASS_NAVAL_MELEE /
+  RANGED / RAIDER / CARRIER). Ported: `unitFullMoves`' seaPerson,
+  `seaTechMoves`, `goldenMoveBonus`; `_full_mp`'s person, `_sea_move_mp`,
+  `_golden_move_mp`. Confirmed, runs/h1_duels1141 t205-209: player 1's Great
+  Admiral 5242881 holds 5 Movement and its Nuclear Submarine 4980741, formed
+  with it, 7; the formation's 85 lies four plots and the range of 2 about
+  26:19 in the barbarians' map (26:13 the northmost), the least of its
+  members' Movement.
+- A PERSON'S AURA BY THE UNIT'S OWN DOMAIN. GREATPERSON_*_AOE_<era>_SEA asks
+  AOE_REQUIRES_SEA_DOMAIN and the _LAND rows AOE_REQUIRES_LAND_DOMAIN
+  (REQUIREMENT_UNIT_DOMAIN_MATCHES on the unit type's Domain): an embarked
+  land unit takes its Great General's Combat Strength and Movement and none
+  of a Great Admiral's. Ported: `inGeneralAura`; `_gen_aura_hit`. Confirmed,
+  runs/h1_duels1138 t201-209: player 1's embarked Line Infantry 4325400
+  under its embarked Great General 5505024 fights at +5 both ways in the
+  barbarians' planned blows (the Ranger 3407884 from 30:9 deals 31 and takes
+  39 back); h1_duels1141 t206: player 1's embarked Infantry 5767188 on
+  27:18 beside its Great Admiral holds 7 Movement, its 55 in the barbarians'
+  map seven plots out.

@@ -5,8 +5,8 @@
  * +MP half, and `combat.ts` already imports `units.ts`.
  *
  * Civ 6 grants nearby own units +5 Combat Strength AND +1 Movement: an own
- * LAND military unit within GENERAL_AURA_RANGE of an own live GENERAL, or an
- * own NAVAL/EMBARKED unit within range of an own live ADMIRAL, where the
+ * LAND military unit, embarked or not, within GENERAL_AURA_RANGE of an own
+ * live GENERAL, or an own hull within range of an own live ADMIRAL, where the
  * unit's era matches the person's (`auraCoversEra`). "Own" means same owner.
  * The GENERAL/ADMIRAL units are themselves combat-0 civilians and never
  * qualify on their own account.
@@ -37,7 +37,13 @@ export function auraCoversEra(person: number, unit: number): boolean {
 
 export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): boolean {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return false; // civilians are never affected
-  const auraType = unit.embarked || UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
+  // the person of the unit type's own domain, embarked or not
+  // (AOE_REQUIRES_SEA_DOMAIN / AOE_REQUIRES_LAND_DOMAIN,
+  // REQUIREMENT_UNIT_DOMAIN_MATCHES: runs/h1_duels1138 t205, player 1's
+  // embarked Line Infantry 4325400 on 31:10 under its Great General fights
+  // at +5 both ways; h1_duels1141 t206, player 1's embarked Infantry 5767188
+  // beside its Great Admiral holds 7 Movement)
+  const auraType = UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
   const era = UNIT_ERA_INDEX[unit.type] ?? 0;
   const tile = state.map.tiles[tileIndex];
   for (const g of state.units) {

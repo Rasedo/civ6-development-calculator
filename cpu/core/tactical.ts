@@ -297,6 +297,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const fighters = new Set<number>();
   // the same in every search (the node's +0x51 bits 0x20 and 0x40)
   const fought = new Set<number>();
+  // the fighters the node's +0x51 bit 0x40 holds
+  const fightersShown = new Set<number>();
   for (const u of state.units) {
     // its own units that stack with it, a Trader none (0x585d90 counts none
     // with MakeTradeRoute: runs/h1_duely1124 Cardiff t95 / t113, its Builder
@@ -310,15 +312,28 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     if (u.seat === unit.seat || !onMap(u) || mapLayer(u.type) === 'trade') continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
-    foes.add(u.tileIndex);
+    // a hidden unit the mover's player does not see is none of a node's
+    // units at war (the node's +0x51 bits 0x20 and 0x40: 0x5861f0's list
+    // 0x585fc0 at 0x586059..0x586099 takes a unit of +0x15f0 only where the
+    // hidden layer's count 0x5032d0 lets the player see it): its plot is a
+    // plain step (runs/h1_duels1143 t231: the barbarian Quadrireme on 12:25
+    // lays its 25 about 9:25 in player 1's map, three steps west past player
+    // 1's Nuclear Submarine on 10:25, no barbarian unit beside it)
+    const shown = unitVisibleTo(state, u, unit.seat);
+    if (shown) foes.add(u.tileIndex);
     const st = aiStrengths(state, u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
-    fought.add(u.tileIndex);
+    if (shown) fought.add(u.tileIndex);
     // ...of the mover's map layer (the plot's unit list 0x75c50 on the
     // formation's layer): a Trader steps onto a fighter's plot as any plot
     // (runs/h1_duels1124 t41: city-state 3's Trader 851971 on 41:12 plans the
-    // barbarian Slinger's 40:11 at (1/256))
-    if (planning && mapLayer(u.type) === mapLayer(unit.type)) fighters.add(u.tileIndex);
+    // barbarian Slinger's 40:11 at (1/256)); the planning's own attack test
+    // (0x26e570 at 0x26e6c9..0x26e775, the searches without flag 0x200)
+    // reads the plot's list whole, a hidden unit among it
+    if (planning && mapLayer(u.type) === mapLayer(unit.type)) {
+      if (shown || !dangerSearch) fighters.add(u.tileIndex);
+      if (shown) fightersShown.add(u.tileIndex);
+    }
   }
   // the planning's search (0x26e570): a plot of a unit at war that does not
   // fight (a civilian) is a plain step, neither barred nor attacked into
@@ -478,7 +493,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     crowded,
     stacked,
     foughtOn: (i) => {
-      if (!fighters.has(i)) return false;
+      if (!fightersShown.has(i)) return false;
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
       return seenNow[i] === 1;
     },

@@ -4647,9 +4647,9 @@ class SimMasks:
             holds = self._golden_ded_table(kind).gather(1, civ)
             out = torch.where(civ_ok & tsel & holds, torch.full_like(out, self._golden_move), out)
         # CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
-        # embarked units" — a hull's here, an embarked unit's on its embarked
-        # pool (`_sea_move_mp`)
-        nsel = self.unit_naval.take(typ)
+        # embarked units" — a unit's of the sea domain here, an embarked
+        # unit's on its embarked pool (`_sea_move_mp`)
+        nsel = self.unit_naval.take(typ) | self._type_sea_domain.take(typ)
         holds_d = self._golden_ded_table(self._ded_dracones).gather(1, civ)
         out = torch.where(civ_ok & nsel & holds_d, torch.full_like(out, self._golden_move), out)
         return out

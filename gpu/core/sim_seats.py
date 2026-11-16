@@ -13563,8 +13563,7 @@ class SimSeats:
         # keyed on `tgt` — any major seat, or barb (-1). Embarked/naval →
         # the ADMIRAL (sea) plane.
         if major:
-            atk_naval = self.unit_naval[at.clamp(min=0, max=self.NU - 1)] | a_emb
-            atk_e = atk_e + self._gen_aura_cs(a_seat, here, atk_naval, at).to(atk_e.dtype)
+            atk_e = atk_e + self._gen_aura_cs(a_seat, here, at).to(atk_e.dtype)
             atk_e = atk_e + self._emergency_pair_cs(a_seat, d_seat).to(atk_e.dtype)
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
             atk_e = atk_e + self._vis_cs(a_seat, d_seat).to(atk_e.dtype)
@@ -13574,9 +13573,8 @@ class SimSeats:
                                         self.unit_levied.gather(1, a1).squeeze(1)).to(atk_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
                          + self._gov_unit_cs(at, a_seat, True)).to(atk_e.dtype)
-        def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
         def_civ_u = torch.where(d_barb, neg, d_seat)
-        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval, d_type).to(def_e.dtype)
+        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, d_type).to(def_e.dtype)
         def_e = def_e + self._barb_cs(def_civ_u, a_seat).to(def_e.dtype)
         def_e = def_e + self._vis_cs(def_civ_u, a_seat).to(def_e.dtype)
         def_e = def_e + self._ally_war_cs(def_civ_u, a_seat).to(def_e.dtype)
@@ -14939,8 +14937,7 @@ class SimSeats:
                                             alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u],
                                             fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u],
                                             combat_tile=tc).to(def_cs.dtype)
-                 + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
-                                     self.unit_naval[at0] | a_emb[:, u], at0).to(def_cs.dtype)
+                 + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], at0).to(def_cs.dtype)
                  + (self._congress_unit_cs(at0, a_seat[:, u])
                     + self._gov_unit_cs(at0, a_seat[:, u], True)).to(def_cs.dtype)
                  + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
@@ -14988,10 +14985,9 @@ class SimSeats:
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u]).to(atk_cs.dtype)
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tc, a_emb[:, u]))
         if major:
-            atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype)
             atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tile).to(atk_e.dtype)
-            atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval, a_type[:, u]).to(atk_e.dtype)
+            atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], a_type[:, u]).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
             a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
@@ -15748,8 +15744,7 @@ class SimSeats:
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
         atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tgt).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT, torch.full_like(a_seat[:, u], -1), a_seat[:, u])
-        atk_naval = self.unit_naval[at0] | a_emb[:, u]
-        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval, at0).to(atk_e.dtype)
+        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], at0).to(atk_e.dtype)
         atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
                          + self._congress_unit_cs(at0, a_seat[:, u])
                          + self._gov_unit_cs(at0, a_seat[:, u], True)).to(atk_e.dtype)
@@ -15772,7 +15767,6 @@ class SimSeats:
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
-        a_naval = self.unit_naval.take(ut0) | _emb_p[:, u]
         atk_e = (self._city_ranged_strength(ut0, a_seat)
                  + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
                  - self._wound(a_hp, ut0)
@@ -15783,7 +15777,7 @@ class SimSeats:
             # to city assaults too — Crusade/Just War key on where the UNIT
             # stands — before the aura add, as the TS assembly orders them
             atk_e = atk_e + self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype)
-            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval, ut0).to(atk_e.dtype)
+            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, ut0).to(atk_e.dtype)
         atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, vs_district=True,
                                                  alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u],
                                                  fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u],
@@ -16423,7 +16417,6 @@ class SimSeats:
         a_form = self.unit_formation.gather(1, a1).squeeze(1)
         a_lev = self.unit_levied.gather(1, a1).squeeze(1)
         a_promos = self.unit_promos.gather(1, a1).squeeze(1)
-        a_naval = self.unit_naval.take(at) | self.unit_emb.gather(1, a1).squeeze(1)
         a_alive = self.unit_alive.gather(1, a1).squeeze(1)
         zl = torch.zeros(self.B, dtype=torch.long, device=self.device)
         ds0 = d_slot.clamp(min=0)
@@ -16475,10 +16468,9 @@ class SimSeats:
         atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type,
                                                  alpine=self.unit_alpine.gather(1, a1).squeeze(1), fionn=self.unit_fionn.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
         if not hostile:
-            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval, at).to(atk_e.dtype)
+            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, at).to(atk_e.dtype)
         def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
-        def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
-        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval, d_type).to(def_e.dtype)
+        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, d_type).to(def_e.dtype)
         def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
         atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
         def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
@@ -16681,11 +16673,10 @@ class SimSeats:
         at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
         aseat = a_seat[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
-        a_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_rs0 = self._type_ranged_strength[at0]
         atk_base = (atk_rs0 + self._form_cs_pool(atk_kind, u)
                     + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u) - self._wound(a_hp[:, u], a_type[:, u]))
-        atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval, at0).to(atk_base.dtype)
+        atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], at0).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
                                + self._gov_unit_cs(at0, aseat, True)).to(atk_base.dtype)
 
@@ -16825,9 +16816,8 @@ class SimSeats:
             # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
             atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type,
                                                      alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tgt).to(atk_e.dtype)
-            def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
-                torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval, d_type).to(def_e.dtype)
+                torch.where(ok_m & ~d_barb, d_seat, neg), tgt, d_type).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
             atk_e = atk_e + (self._emergency_pair_cs(aseat, d_seat)
                              + self._barb_cs(aseat, d_seat)).to(atk_e.dtype)

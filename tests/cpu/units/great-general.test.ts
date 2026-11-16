@@ -88,7 +88,7 @@ describe('aura', () => {
     }
   });
 
-  it('ADMIRAL +5 to own NAVAL/embarked within 2; not to land units', () => {
+  it('ADMIRAL +5 to own hulls within 2; not to land units, embarked or not', () => {
     const state = newGame();
     const cap = seatOf(state, 0)!.cities[0].centerIndex;
     const adm = spawnUnit(state, 'ADMIRAL', cap, 0)!;
@@ -97,8 +97,11 @@ describe('aura', () => {
     const war = spawnUnit(state, 'SWORDSMAN', t2, 0)!;
     // a LAND unit gets nothing from an admiral
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
-    // an EMBARKED land unit reads the ADMIRAL aura
+    // ...embarked neither: the aura asks the unit's own domain
     war.embarked = true;
+    expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
+    // an EMBARKED land unit reads its GENERAL's aura
+    state.units.push({ ...adm, id: adm.id + 1000, type: 'GENERAL', gpAt: 0 }); // Boudica, a Classical General
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(GENERAL_AURA_CS);
   });
 

@@ -168,8 +168,7 @@ class SimPhase:
         # Support received by the defender"
         def_e = def_cs - self._wound(def_hp, d_type)
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
-        _def_nav = torch.where(is_vet_mil, self.unit_naval.take(d_type.clamp(min=0, max=self.NU - 1)), torch.zeros_like(d_emb))
-        def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav, d_type).to(def_e.dtype)
+        def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_type).to(def_e.dtype)
         # CIV6 (Military Advisory / Oligarchy): a flat unit adder is
         # the unit's own strength wherever it fights, a city's shot included.
         def_e = def_e + (self._gdr_beam_cs(d_type, d_seat)  # "...and when defending"

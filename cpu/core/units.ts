@@ -1266,8 +1266,15 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
   const promo = promoValue(unit, 'MOVES');
-  const atSea = seaMoveBonus(state, unit.seat);
-  if (unit.embarked && !def?.naval) {
+  // a unit of the sea domain that is no hull (the Great Admiral) holds no
+  // embarked pool: its own Moves with the player's sea Movement, none of the
+  // hull classes' abilities (runs/h1_duels1141 t205: player 1's Great Admiral
+  // 5242881 on 30:20 holds 5 Movement, its Nuclear Submarine 4980741 with it
+  // 7 under one promotion and the Great Lighthouse, and the formation lays
+  // its 85 four plots and its range out in the barbarians' map)
+  const seaPerson = !!def?.seaDomain && !def.naval;
+  const atSea = def?.naval ? seaMoveBonus(state, unit.seat) : seaPerson ? seaTechMoves(state, unit.seat) : 0;
+  if (unit.embarked && !def?.naval && !seaPerson) {
     return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + promo + rosterEmbarkMoves(state, unit));
   }
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
@@ -1278,7 +1285,7 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const levy = unit.leviedFrom !== undefined
     ? getModifiers(state, unit.seat).levy.reduce((n, r) => Math.max(n, r.levyMoves), 0) : 0;
   return MP_SCALE * (
-    (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + raider + levy + goldenMoveBonus(state, unit)
+    (def?.moves ?? 2) + atSea + promo + raider + levy + goldenMoveBonus(state, unit)
     + startTileMoves(state, unit)
     // CIV6 (TRAIT_*_WAR_MOVEMENT, Amount 2): the flat Movement a leader's
     // units carry for the turns after a declaration of the row's own war
@@ -1296,15 +1303,20 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex])));
 }
 
-/** the Mathematics rung (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT): a hull's
- *  alone — an embarked unit keeps its embarked pool (runs/h1_duelw1117 t78:
- *  city-state 2's embarked Swordsman plans on 2 Movement with Mathematics,
- *  AI_Planning.csv), then the seat's wonders' (the Great Lighthouse's
- *  ABILITY_GREAT_LIGHTHOUSE_MOVEMENT: runs/h1_duelp1124 t61, China's Galley
- *  3 -> 4 the turn it stands) */
+/** the Mathematics rung (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT): a unit's
+ *  of the sea domain — an embarked unit keeps its embarked pool
+ *  (runs/h1_duelw1117 t78: city-state 2's embarked Swordsman plans on 2
+ *  Movement with Mathematics, AI_Planning.csv) */
+export function seaTechMoves(state: GameState, seat: number): number {
+  return seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0;
+}
+
+/** a hull's sea Movement: the Mathematics rung, then the seat's wonders'
+ *  (the Great Lighthouse's ABILITY_GREAT_LIGHTHOUSE_MOVEMENT, the hull
+ *  classes' alone: runs/h1_duelp1124 t61, China's Galley 3 -> 4 the turn it
+ *  stands) */
 export function seaMoveBonus(state: GameState, seat: number): number {
-  return (seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0)
-    + seatWonderSum(state, seat, 'navalMoves');
+  return seaTechMoves(state, seat) + seatWonderSum(state, seat, 'navalMoves');
 }
 
 /** the three rungs that raise the EMBARKED pool itself, then the seat's

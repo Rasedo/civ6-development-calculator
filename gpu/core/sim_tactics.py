@@ -294,22 +294,30 @@ class SimTactics:
             out &= (s == seat) | ~self._tac_layer(pl, rel)
         return out
 
-    def _tac_hostile(self, seat: int) -> torch.Tensor:
+    def _tac_hostile(self, seat: int, shown: bool = False) -> torch.Tensor:
         """[B, T] bool — a unit of a player at war with `seat` holds the plot
-        (an aircraft or a spy holds none)."""
+        (an aircraft or a spy holds none). With `shown` (a path node's units
+        at war, +0x51 bits 0x20 and 0x40: 0x5861f0 -> 0x585fc0) none hidden
+        from `seat` (`_stealth_hidden`; `groundOf`'s shown)."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))
-            out |= (pl >= 0) & self._seats_hostile(seat, s)
+            h = (pl >= 0) & self._seats_hostile(seat, s)
+            if shown:
+                h = h & ~self._stealth_hidden(seat, pl)
+            out |= h
         return out
 
-    def _tac_hostile_on(self, seat: int, rel: bool) -> torch.Tensor:
+    def _tac_hostile_on(self, seat: int, rel: bool, shown: bool = False) -> torch.Tensor:
         """[B, T] bool — `_tac_hostile` on the map layer of a religious mover
         (`rel`) or of any other (`enemyAt`)"""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))
-            out |= self._tac_layer(pl, rel) & self._seats_hostile(seat, s)
+            h = self._tac_layer(pl, rel) & self._seats_hostile(seat, s)
+            if shown:
+                h = h & ~self._stealth_hidden(seat, pl)
+            out |= h
         return out
 
     def _tac_closed(self, seat: int) -> torch.Tensor:
@@ -390,9 +398,9 @@ class SimTactics:
         land unit takes too."""
         block = self._centre_plane() & (self.tile_seat != seat) if forts else torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         if foes:
-            hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat)
+            hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat, shown=True)
             if foes_seen:
-                hostile = self._tac_hostile_on(seat, rel) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+                hostile = self._tac_hostile_on(seat, rel, shown=True) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
             block = block | hostile
             if closed:
                 block = block | self._tac_closed(seat)
@@ -421,17 +429,22 @@ class SimTactics:
             fort = fort | (self.district == self._encamp_didx)
         return fort & (self.tile_seat >= 0) & (self.tile_seat != seat) & ~self._seats_hostile(seat, self.tile_seat)
 
-    def _tac_fighters(self, seat: int) -> torch.Tensor:
+    def _tac_fighters(self, seat: int, shown: bool = False) -> torch.Tensor:
         """[B, T] bool — a unit of a player at war with `seat` that fights
         (0x209dd0: a Combat, Ranged or Bombard strength) holds the plot (an
-        aircraft or a spy holds none)"""
+        aircraft or a spy holds none); with `shown` none hidden from `seat`
+        (the planning's own attack test 0x26e570 reads the plot's list whole,
+        the node's bits and the danger map's search the units shown)"""
         fight = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             pc = pl.clamp(min=0)
             ut = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
             st = (self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
-            fight |= (pl >= 0) & st & self._seats_hostile(seat, s)
+            f = (pl >= 0) & st & self._seats_hostile(seat, s)
+            if shown:
+                f = f & ~self._stealth_hidden(seat, pl)
+            fight |= f
         return fight
 
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,
@@ -447,11 +460,11 @@ class SimTactics:
         `planning`) on plots it sees now; and the fighters' water a land unit
         its player may embark attacks into too (in the danger map's search
         the water of any unit at war)."""
-        foe = self._tac_hostile(seat)
+        foe = self._tac_hostile(seat, shown=True)
         if planning and not danger_search:
             # the planning's search: a civilian at war is a plain step
             foe = torch.zeros_like(foe)
-        fight = self._tac_fighters(seat) if planning else torch.zeros_like(foe)
+        fight = self._tac_fighters(seat, shown=danger_search) if planning else torch.zeros_like(foe)
         fight &= self.passable | self.wpass
         ctr = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
         land = self.passable & ((foe & ~self.water) | ctr)
@@ -879,9 +892,7 @@ class SimTactics:
                 # the danger map's search: with the Great General's or
                 # Admiral's Movement where each stands now (`generalAuraMP`)
                 live = self.major_unit_alive & (self._type_combat.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) > 0)
-                hit = self._gen_aura_hit(self.major_unit_seat, self.major_unit_tile,
-                                         self.unit_naval.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) | self.major_unit_emb,
-                                         self.major_unit_type)
+                hit = self._gen_aura_hit(self.major_unit_seat, self.major_unit_tile, self.major_unit_type)
                 fnow = fnow + (hit & live).long() * self._gen_aura_mp
                 mp = fnow[rows, slots]
             mp = torch.where(mate >= 0, torch.minimum(mp, fnow[rows, mm]), mp)
@@ -1072,7 +1083,7 @@ class SimTactics:
                 # ...and so onto a plot of a unit at war that fights, of its
                 # map layer (a Trader's none): its ground, water where it
                 # embarks and the player may enter it
-                fu = self._tac_fighters(seat) & unseen
+                fu = self._tac_fighters(seat, shown=stand) & unseen
                 cart_v = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=dev))
                 fu_w = fu & self.wpass & ~(self.ocean_tile & ~cart_v.unsqueeze(1))
                 fu_n = torch.where(naval.unsqueeze(1), fu_w[rows], (fu & self.passable)[rows] | (fu_w[rows] & placed.unsqueeze(1)))
@@ -1082,7 +1093,7 @@ class SimTactics:
                     # plot it sees now holding a unit at war of its layer,
                     # one that does not fight too (`groundOf`'s enter: the
                     # validity 0x2720a0 at 0x272528..0x272544)
-                    seen_h = by_layer(lambda r: self._tac_hostile_on(seat, r)) & ~unseen[rows]
+                    seen_h = by_layer(lambda r: self._tac_hostile_on(seat, r, shown=True)) & ~unseen[rows]
                     ent_n = ent_n & ~((weak & ~trader_u).unsqueeze(1) & seen_h)
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
@@ -1098,7 +1109,7 @@ class SimTactics:
                 atk_n = atk_n | (~rv_n & fort_x[rows])
                 # ...and a unit at war that fights there, of the mover's map
                 # layer (a Trader's none) (`search`'s fortBlind, `fighterAt`)
-                atk_n = atk_n | (~rv_n & self._tac_fighters(seat)[rows] & ~trader_u.unsqueeze(1))
+                atk_n = atk_n | (~rv_n & self._tac_fighters(seat, shown=stand)[rows] & ~trader_u.unsqueeze(1))
         # the danger map's search (flag 0x200) pays the attack's spend on a
         # district alone (`search`'s districtAttack: a city centre or an
         # Encampment of a player at war); a step onto a unit's plot is priced
@@ -1144,7 +1155,7 @@ class SimTactics:
             ut_ = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
             st_ = (self._type_combat.take(ut_) > 0) | (self._type_ranged_strength.take(ut_) > 0) | (self._type_bombard.take(ut_) > 0)
             sv_ = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
-            fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_)
+            fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_) & ~self._stealth_hidden(seat, pl)
         fought = fought & sn
         if not zoc:
             # an attack's plot ends the breadth-first searches' paths (the
