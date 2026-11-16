@@ -748,7 +748,8 @@ class SimMinorAi:
         self._imp_buildable_cache = out
         return out
 
-    def _minor_ground_imps(self, s: int, standing: bool = False, drought: bool = True) -> torch.Tensor:
+    def _minor_ground_imps(self, s: int, standing: bool = False, drought: bool = True,
+                           any_owner: bool = False) -> torch.Tensor:
         """[B, T, K] — `groundImprovements` (with `standing`,
         `standingImprovements`: the plot as it stands alone, the trees'
         nodes' test): the improvements the ground of
@@ -763,7 +764,9 @@ class SimMinorAi:
         Mine, the Lumber Mill, the Seaside Resort and the ground-only rows,
         each on its own ground; a bare mountain of its own the Builder's
         adjacent-plot rows (the Ski Resort); no row a governor gates; with
-        `drought` none a drought bars"""
+        `drought` none a drought bars; with `any_owner` the unowned plots
+        too, their ownership waived; the Military Engineer's rows on ground
+        holding no resource the minor sees, or a harvestable one's"""
         B, T, dev = self.B, self.T, self.device
         K = int(self._imp_unlock.numel())
         PN = self._cv_tables()["plot_names"]
@@ -783,8 +786,13 @@ class SimMinorAi:
         live_feat = (self.feat_id >= 0) & ~self.feat_stripped
         harvestable = res & harv_tab[torch.where(self.res_id >= 0, self.res_id, len(PN["resourceType"]))]
         clearable = live_feat & rem_tab[torch.where(self.feat_id >= 0, self.feat_id, len(PN["feature"]))]
-        base = ((self.tile_seat == 100 + s) & (self.district < 0) & ~self._centre_plane() & ~self.nwonder
-                & (self.built_wonder < 0) & (self.passable | self.wpass))
+        # a flooded plot (0x35fd60 at 0x35ff96: the terrain manager's
+        # flooded set) and a dig site the minor sees (`digSeen`) take no
+        # improvement
+        mine_t = (self.tile_seat == 100 + s) | (self.tile_seat < 0) if any_owner else self.tile_seat == 100 + s
+        base = (mine_t & (self.district < 0) & ~self._centre_plane() & ~self.nwonder
+                & (self.built_wonder < 0) & (self.passable | self.wpass) & ~self.tile_flooded
+                & ~self._dig_seen(self._CITY_MINOR0 + s))
         dry = self.drought > 0
         bare = ~live_feat
         appeal_ok = self._tile_appeal() >= self._seaside_min_appeal
@@ -840,9 +848,10 @@ class SimMinorAi:
                            & appeal_ok)
             elif self._imp_eng[k] and not self._imp_adj_plot[k]:
                 # the Military Engineer's own rows (the Fort): its land as it
-                # stands, its improvement and resource read past
+                # stands, its improvement read past, a resource the minor
+                # sees there harvested
                 if not standing:
-                    ok = ok | (base & ~self.water & self._imp_ground_ok(k))
+                    ok = ok | (base & ~self.water & (~res | harvestable) & self._imp_ground_ok(k))
             elif self._imp_adj_plot[k]:
                 # an adjacent-plot row (the Ski Resort, the Military
                 # Engineer's Mountain Tunnel): a bare mountain of its own,
@@ -1149,6 +1158,23 @@ class SimMinorAi:
                             torch.full_like(tot, -fx_of(1)))
         return torch.where(member.any(dim=1), turns, torch.full_like(turns, -1))
 
+    def _minor_trait_version(self, s: int) -> torch.Tensor:
+        """[B, NU] per AI unit row: a unit of minor `s`'s own leader's trait
+        (`minorUnitTrait`: `citystate_unit_trait`, a `citystate.unitTraits`
+        index) that founds no city and that the database lets train — the
+        rows `minorUnitVersion` takes past the trait-free ones; none past the
+        city-states"""
+        rows = self._cv_tables()["unit_rows"]
+        idx = getattr(self, "_minor_trait_rows", None)
+        if idx is None:
+            traits = list(self.rules.citystate["unitTraits"])
+            idx = self._minor_trait_rows = torch.tensor(
+                [traits.index(r["trait"]) if r["trait"] in traits and r["canTrain"] and not r["foundCity"] else -1
+                 for r in rows], dtype=torch.long, device=self.device)
+        if s >= self.S:
+            return torch.zeros(self.B, len(rows), dtype=torch.bool, device=self.device)
+        return (idx.unsqueeze(0) >= 0) & (idx.unsqueeze(0) == self.citystate_unit_trait[:, s].unsqueeze(1))
+
     def _minor_best_plot_buy(self, s: int, evals: dict) -> torch.Tensor:
         """`minorBestPlotToBuy` [B] (0x5c9700, CityBuildAI m_bestPlotToBuy):
         over the evaluations in order, an unowned plot beside the minor's
@@ -1159,7 +1185,7 @@ class SimMinorAi:
         row = self._CITY_MINOR0 + s
         plots = evals["plot"]
         p0 = plots.clamp(min=0)
-        res = (self._res_live() & ~self._res_hidden(row)).gather(1, p0)
+        res = ((self._res_live() & ~self._res_hidden(row)) | self._dig_seen(row)).gather(1, p0)
         feat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, p0)
         cand = evals["valid"] & evals["near_owned"] & res
         imps = evals["imps"]
@@ -1228,9 +1254,11 @@ class SimMinorAi:
                             torch.zeros(B, P, ND, dtype=torch.long, device=dev))
         # the plot test asks no drought; the value of an improvement a
         # drought on the plot lists is 0 (`_cv_improvement`)
-        ground = self._minor_ground_imps(s, drought=False)
+        # an unowned plot's improvements valued with its ownership waived
+        # (`groundImprovements` anyOwner)
+        ground = self._minor_ground_imps(s, drought=False, any_owner=True)
         K = ground.shape[2]
-        g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
+        g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & ev.unsqueeze(-1)
         # 0x5ce970's +0x54: an improvement the plot test takes, a plot
         # holding one among them, its own valued 0
         improvable = owned & ev & g.any(-1)
@@ -1272,12 +1300,14 @@ class SimMinorAi:
         # the plot taking it (research waived, any owner); the other
         # districts a value weighs against are those the city does not hold
         cand_rows = []
+        # a dig site the minor sees takes no district (`digSeen`)
+        no_dig = ~self._dig_seen(row).gather(1, p0)
         for i, r in enumerate(dist_rows):
             dv = int(E["district"][i])
             if r["trait"] or r["type"] in ("DISTRICT_CITY_CENTER", "DISTRICT_WONDER") or dv < 0:
                 continue
             # the plot test (0x35f2d0) asks no population limit
-            pb = self._minor_district_plane(s, dv, False, False, limit=False).gather(1, p0) & ev
+            pb = self._minor_district_plane(s, dv, False, False, limit=False).gather(1, p0) & ev & no_dig
             other = pb & (held[:, dv] < 0).unsqueeze(1)
             pl = other | (pb if bool(self._is_repeatable[dv]) else torch.zeros_like(pb))
             if bool(pl.count_nonzero()):
@@ -1599,15 +1629,13 @@ class SimMinorAi:
 
     def _minor_gold_price(self, s: int, ui: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `minorUnitPrice` in Gold: the unit's Production cost (a
-        Builder's and a Trader's climbing) times the purchase multiplier,
+        Builder's, a Trader's and a Nihang's climbing) times the purchase multiplier,
         floored to the purchase step"""
         row = self._CITY_MINOR0 + s
         u0 = ui.clamp(min=0, max=self.NU - 1)
-        cost = self._type_cost.take(u0).double()
+        cost = self._unit_progress_cost(row, u0).double()
         if self._builder_idx >= 0:
             cost = torch.where(u0 == self._builder_idx, self._builder_cost(self.citystate_builders_trained[:, s]).double(), cost)
-        if self._trader_idx >= 0 and bool((u0 == self._trader_idx).any()):
-            cost = torch.where(u0 == self._trader_idx, self._trader_cost(row).double(), cost)
         return self._purchase_step(cost * float(self.rules.gold_purchase_mult))
 
     def _minor_buy_unit(self, s: int, mask: torch.Tensor, ui: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
@@ -2732,7 +2760,8 @@ class _MinorWorld:
         fr = torch.where((fid >= 0) & ~sim.feat_stripped.gather(1, fl), CT.feat_row.to(dev)[fid.clamp(min=0)], -1)
         frc = fr.clamp(min=0)
         clears = (fr >= 0) & CT.f_removable.to(dev)[frc] & ~CT.f_valid_district.to(dev)[frc]
-        seen = sim._res_live().gather(1, fl) & ~sim._res_hidden(sim._CITY_MINOR0 + self.s).gather(1, fl)
+        seen = ((sim._res_live().gather(1, fl) & ~sim._res_hidden(sim._CITY_MINOR0 + self.s).gather(1, fl))
+                | sim._dig_seen(sim._CITY_MINOR0 + self.s).gather(1, fl))
         here = sim.district.gather(1, fl)
         for r in sorted(set(d.reshape(-1).tolist())):
             if r < 0:

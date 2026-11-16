@@ -29,7 +29,7 @@ import { TERRAINS } from '../../world/terrains';
 import { FEATURES, featureRefusesDistrict, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
-import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, MINOR_UNIT_TRAIT_LIST, SUZ_EFFECTS, minorUnitTrait } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER, MP_SCALE } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -62,6 +62,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     suzImp: IMPROVEMENT_IDS.indexOf(
       Object.values(IMPROVEMENTS).find((i) => i.suzerainOf === cityState.name)?.id ?? '',
     ),
+    // its own leader's unit trait, a `unitTraits` index, -1 none
+    unitTrait: MINOR_UNIT_TRAIT_LIST.indexOf(minorUnitTrait(cityState.name) ?? ''),
     // its starting army, in `state.units` order (`loadWorld`)
     units: state.units
       .filter((u) => u.seat === cityState.seat)

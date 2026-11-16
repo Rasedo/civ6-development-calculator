@@ -21,7 +21,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_LAST_ERA, GENERAL_AURA_MP, GENERAL_AURA_R
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, CHINGUETTI_FOLLOWER_FAITH, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, HATTUSA_FREE_STRATEGIC, AYUTTHAYA_BUILDING_CULTURE_PCT, FEZ_CONVERSION_SCIENCE, WOLIN_GP_PCT } from '../data/cityStates';
-import { CITY_STATE_TYPES, govInfluence, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { CITY_STATE_TYPES, govInfluence, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT, MINOR_UNIT_TRAIT_LIST } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot, unitBaseResourceCost } from '../core/stockpile';
@@ -831,8 +831,6 @@ export function buildRules() {
       pathDenom: ROUTE_PATH_DENOM,
       // each game era's minimum-term addition (tradeRouteMinDuration)
       eraTerm: [...TRADE_ROUTE_ERA_TERM],
-      // the Trader's install Cost and climb (`traderCost`, `progressCost`)
-      traderProgress: [UNITS.TRADER.progressBase ?? 0, gameProgressK(UNITS.TRADER.costProgressGame ?? 100)],
     },
     warWeariness: {
       base: WW_BASE,
@@ -1249,6 +1247,9 @@ export function buildRules() {
       excludedUnitClasses: MINOR_EXCLUDED_UNIT_CLASSES.map((c) => PROMO_CLASSES.indexOf(c)),
       // a minor's upgrade price (`minorUpgradeUnit`)
       upgradeGold: MINOR_UPGRADE_GOLD,
+      // the city-states' own leader traits that are units' TraitType, the
+      // order the per-CS `unitTrait` plane indexes (`minorUnitTrait`)
+      unitTraits: MINOR_UNIT_TRAIT_LIST,
       // Suzerain perks modeled as RULES — `effects` is the code order the
       // per-CS `suzCode` plane indexes.
       suz: {
@@ -2391,6 +2392,11 @@ export function buildRules() {
       // faith-purchase-only (MISSIONARY) — the trainableUnits filter's
       // mirror; masks the type out of the GPU purchase path.
       fo: u.faithOnly ? 1 : 0,
+      // CIV6 (COST_PROGRESSION_GAME_PROGRESS, the Trader and the Nihang):
+      // the install Cost and its climb (`gameProgressUnitCost`), -1 / 0 on
+      // another row
+      pgb: u.progressBase ?? -1,
+      pk: u.costProgressGame === undefined ? 0 : gameProgressK(u.costProgressGame),
       so: u.spawnOnly ? 1 : 0,
       settler: u.settler ? 1 : 0,
       // the UNIQUE UNIT wire (`civUnitAllowed` / `civUpgradeTarget` / the

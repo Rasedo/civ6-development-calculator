@@ -65,7 +65,7 @@ _PER_GAME = frozenset(simbase._MUTABLE) | frozenset((
     "_arange_bt _citystate_didx _citystate_item_type _citystate_route_to6 _cs_type_onehot _flood_home "
     "_flood_lists _frm0 _ftr0 _ftu0 _ice_at_start _march_miss _removable_at_start _tile_miss _volcano_order "
     "_wok_sea _ww_hooked _ww_opened appeal_over appeal_self citystate_alive citystate_center citystate_hp "
-    "citystate_pop citystate_suz_code citystate_suz_imp citystate_type civ_alive cliff_mask drought_cand "
+    "citystate_pop citystate_suz_code citystate_suz_imp citystate_type citystate_unit_trait civ_alive cliff_mask drought_cand "
     "feat_id0 feat_yields fertilizable floodplain max_camps nwonder ocean_tile res_yields river_comp "
     "river_mask row_civ row_leader shallow_adj storm_fam tile_area tile_continent tile_mountain tile_nw_adj "
     "tile_range tile_region tile_river volcano_at wonder_near").split())

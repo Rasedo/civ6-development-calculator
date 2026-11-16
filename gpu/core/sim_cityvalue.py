@@ -938,7 +938,7 @@ class SimCityValue:
     def _cv_unit_exit(self, f, unit: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """`unitValueExit`: where FX(-9999) applies"""
         like = f.like()
-        ex = (t >= h) | torch.full_like(like, int(f.unit_version(unit) != unit), dtype=torch.bool)
+        ex = (t >= h) | ~f.unit_version_mask(unit)
         if not f.full_civ() and not f.tribe():
             ex = ex | (~_t(f.at_war(), like).bool() & (_t(f.unit_count(), like) > 5))
         if unit == "UNIT_SPY" and not f.full_civ():
@@ -1073,7 +1073,8 @@ class SimCityValue:
             # horizon, values FX(-9999) whatever the rest reads
             # (and CanTrain, its prerequisites skipped, refuses a MajorCivOnly
             # unit to a player that is not a full civilization)
-            if f.unit_version(u["type"]) != u["type"] or (u["majorOnly"] and not f.full_civ()):
+            # (`_cv_unit_exit` takes the games of which it is not)
+            if not bool(f.unit_version_mask(u["type"]).any()) or (u["majorOnly"] and not f.full_civ()):
                 out.append((torch.full_like(like, _FX_MIN), torch.ones_like(like, dtype=torch.bool)))
                 continue
             t = self._cv_unit_turns(f, u["type"])
@@ -2135,10 +2136,23 @@ class _MinorFacts:
         return None if r is None or r["trait"] else b
 
     def unit_version(self, u):
+        """`minorUnitVersion` past its own leader's trait units (those
+        `unit_version_mask` adds per game)"""
         r = self.T["unit"].get(u)
         # neither EnabledByReligion nor MajorCivOnly asked (`minorUnitVersion`)
         ok = r is not None and not r["trait"] and not r["foundCity"] and r["canTrain"]
         return u if ok else None
+
+    def unit_version_mask(self, u):
+        """[B] `minorUnitVersion`: the unit the player's version of itself —
+        a trait-free one everywhere, its own leader's trait unit where it
+        holds that trait (`_minor_trait_version`)"""
+        if self.unit_version(u) == u:
+            return self._bools(True)
+        k = next((i for i, r in enumerate(self.T["unit_rows"]) if r["type"] == u), -1)
+        if k < 0:
+            return self._bools(False)
+        return self.sim._minor_trait_version(self.s)[:, k]
 
     def _followed(self):
         return self.sim._minor_followed()[:, self.s]
@@ -2319,6 +2333,7 @@ class _MinorFacts:
             dev = sim.device
             eng = self.E["unit"]
             version = torch.tensor([self.unit_version(r["type"]) is not None for r in rows], dtype=torch.bool, device=dev)
+            version = version.unsqueeze(0) | sim._minor_trait_version(s)
             obs = self._obsolete()
             mine = self._mine()
             owned = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
@@ -2328,7 +2343,7 @@ class _MinorFacts:
             known = sim._cv_known(s) if tabled is None else tabled
             if self.no_known is not None:
                 known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
-            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, sim._unit_listed(s), owned, known, sim._cv_unit_surplus(self.row))
+            return sim._cv_unit_production(version, obs, sim._unit_listed(s), owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod" if tabled is None else "uprod_tabled", build)
 
     def _obsolete(self):
@@ -2515,8 +2530,8 @@ class _MinorFacts:
             ui = self._uidx(item)
             if ui == sim._builder_idx:
                 return sim._builder_cost(sim.citystate_builders_trained[:, s]).double()
-            if ui == sim._trader_idx:
-                return sim._trader_cost(row).double()
+            if int(sim._type_pk[ui]) > 0:
+                return sim._unit_progress_cost(row, ui).double()
             return sim._type_cost[ui].double().expand(sim.B)
         if item.startswith("BUILDING_"):
             bi = self._building_index(item)
@@ -2680,9 +2695,10 @@ class _MinorFacts:
         if k < 0:
             return like
         kept = torch.where(sim.citystate_item[:, s] == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k])
-        if self.unit_version(u) is None:
+        vm = self.unit_version_mask(u)
+        if not bool(vm.any()):
             return torch.where(kept > 0, like + _FX, like)
-        can = _t(self.can_train(u), like).bool()
+        can = _t(self.can_train(u), like).bool() & vm
         # 0.2f x the most priority of its city's listed contracts of the
         # unit + 0.5f, the fraction truncated (`expectedOfPriority`)
         row = next((i for i, r in enumerate(self.T["unit_rows"]) if r["type"] == u), -1)
@@ -2874,7 +2890,7 @@ class _MinorFacts:
         ui = self._uidx(u)
         if ui < 0:
             return 0
-        return self._item_cost(u).long() if ui in (self.sim._builder_idx, self.sim._trader_idx) else int(self.sim._type_cost[ui])
+        return self._item_cost(u).long() if ui == self.sim._builder_idx or int(self.sim._type_pk[ui]) > 0 else int(self.sim._type_cost[ui])
 
     def plot_unit_cost(self, u):
         # the plot values' build unit: a Builder at the count its City

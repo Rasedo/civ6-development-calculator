@@ -269,6 +269,9 @@
     - recording: h1_duelp1121
       turn: 236
       value: city-state 4's best plot to buy makes Expropriation 0.5 t236-249 as logged
+    - recording: h1_duels1181
+      turn: 220
+      value: "Ngazargamu: the unowned 37:7 Niter's Mine 868.45 and 36:9's Farm 585.96 as logged, an unowned plot's improvement values its ground's with ownership waived"
   impl:
     - cpu/core/minorBuild.ts:minorResourceCounts
     - cpu/core/minorCityAi.ts:minorBestPlotToBuy
@@ -278,6 +281,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
+    - "C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins"
   context:
     - ...adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0...
   review: reviewed

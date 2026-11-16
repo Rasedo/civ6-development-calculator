@@ -511,8 +511,9 @@ class SimMinorOps:
         nu = len(rows)
         cache = getattr(self, "_mops_rows_static", None)
         if cache is None:
-            # the minor's version (`minorUnitVersion`): no trait unit, no unit
-            # that founds a city, one the database lets train
+            # the minor's version (`minorUnitVersion`): no trait unit (its
+            # own leader's join per game below), no unit that founds a city,
+            # one the database lets train
             version = torch.tensor([bool(r["canTrain"]) and not r["trait"] and not r["foundCity"] for r in rows],
                                    dtype=torch.bool, device=dev)
             combat = torch.tensor([r["combat"] != 0 and (not r["pseudo"] or r["pseudo"] in
@@ -552,7 +553,9 @@ class SimMinorOps:
         own = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         own.scatter_add_(1, torch.where(u["own"] & (u["row"] >= 0), u["row"], torch.full_like(u["row"], nu)), u["own"].long())
         own = own[:, :nu]
-        entry = cache["version"].unsqueeze(0) & ~(obsolete & (own <= 0)) & listed
+        # its own leader's trait units too (`_minor_trait_version`)
+        version = cache["version"].unsqueeze(0) | self._minor_trait_version(s)
+        entry = version & ~(obsolete & (own <= 0)) & listed
         rec = self._mops_records(self._mops_kb(s))
         live = rec["live"] & (rec["row"] >= 0)
         n_all = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
@@ -565,7 +568,7 @@ class SimMinorOps:
         n_war = n_war[:, :nu]
         # every player's field the entry's value, the at-war one the at-war
         # players' count over their sum the value's way (0 with none at war)
-        s_all, _e = self._cv_unit_production(cache["version"].unsqueeze(0).expand(B, -1), obsolete, listed, own, n_all,
+        s_all, _e = self._cv_unit_production(version, obsolete, listed, own, n_all,
                                              self._cv_unit_surplus(srow))
         opp = cache["combat"].unsqueeze(0) & ~obsolete & (n_all > 0)
         n_all = torch.where(opp, n_all, torch.zeros_like(n_all))

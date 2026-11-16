@@ -1645,9 +1645,15 @@ export function builderCost(state: GameState, seat: number): number {
  * 30 of 30).
  */
 export function traderCost(state: GameState, seat: number): number {
+  return gameProgressUnitCost(state, seat, UNITS.TRADER);
+}
+
+/** a COST_PROGRESSION_GAME_PROGRESS unit's live Cost for `seat` (the
+ *  Trader, the Nihang), its own Cost on another row */
+export function gameProgressUnitCost(state: GameState, seat: number, t: UnitDef): number {
+  if (t.costProgressGame === undefined || t.progressBase === undefined) return t.cost;
   const r = seatOf(state, seat)!.research;
-  const t = UNITS.TRADER;
-  return progressCost(t.progressBase!, gameProgressK(t.costProgressGame!), gameProgressPct(r.techs.length, r.civics.length));
+  return progressCost(t.progressBase, gameProgressK(t.costProgressGame), gameProgressPct(r.techs.length, r.civics.length));
 }
 
 /**

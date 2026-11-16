@@ -14,7 +14,7 @@ import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/al
 import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
-import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
+import { MINOR_UPGRADE_GOLD, cityStateCivilization, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
 import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, planningAt, reachPlots, revealedPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
@@ -23,7 +23,7 @@ import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeBase, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { encampOuterPool, outerPool, portalAt, wallsMax, wallsTier } from './rules';
 import { targetStrength } from './opsOrders';
-import { borderClosedTo, builderCost, cityAtIndex, cityNavalCapable, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, cityNavalCapable, embarkTechMoves, formationMates, plotUnits, gameProgressUnitCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -403,7 +403,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       if (!id) return 0;
       if (UNITS[id].settler) return settlerCost(state, i);
       if (id === 'BUILDER') return builderCost(state, i);
-      if (UNITS[id].trader) return traderCost(state, i);
+      if (UNITS[id].costProgressGame !== undefined) return gameProgressUnitCost(state, i, UNITS[id]);
       return Math.trunc(unitProdCost(state, i, id, UNITS[id].cost));
     },
     districtBuildingYields: (i, type, yieldType) => {
@@ -568,7 +568,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       let best: string | null = null;
       let top = 0;
       for (const row of AI_UNITS) {
-        const version = traits ? majorUnitVersion(traits, row.type) : minorUnitVersion(row.type);
+        const version = traits ? majorUnitVersion(traits, row.type) : minorUnitVersion(seat(i) as CityState, row.type);
         if (version !== row.type || row.mustPurchase || row.promotionClass !== cls) continue;
         const tech = row.tech ? engineId('tech', row.tech, 'TECH_', TECHS) : null;
         if (row.tech && (!tech || !r.techs.includes(tech))) continue;
@@ -693,7 +693,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     minorCivilization: (cs) => {
       const minor = seatOf(state, cs) as CityState | undefined;
       if (!minor || !isCityStateSeat(cs)) return null;
-      return CITY_STATE_SUZERAIN_BONUS[minor.name]?.civ ?? `CIVILIZATION_${minor.name.toUpperCase().replace(/[ -]/g, '_')}`;
+      return cityStateCivilization(minor.name);
     },
     cityCitizens: (i, id) => {
       const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;

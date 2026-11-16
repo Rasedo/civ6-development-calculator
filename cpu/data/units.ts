@@ -3880,6 +3880,31 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         religiousStrength: xml('Units', 'UnitType=UNIT_GURU', 'ReligiousStrength'),
       },
     }),
+    // THE NIHANG, appended last. CIV6 (GranColombia_Maya_Units.xml): Lahore's
+    // unit (TraitType MINOR_CIV_LAHORE_NIHANG_TRAIT), a land melee unit of
+    // its own promotion class with no promotions, MustPurchase with Faith
+    // (faith-only: no trainable list offers it), its price climbing over the
+    // game (COST_PROGRESSION_GAME_PROGRESS 400, `gameProgressUnitCost`); the
+    // city-state holds its version (`minorUnitVersion`)
+    U({
+      id: 'LAHORE_NIHANG',
+      name: 'Nihang',
+      cost: 100,
+      costProgressGame: 400,
+      maintenance: 2,
+      moves: 2,
+      combat: 25,
+      faithOnly: true,
+      description: 'Lahore\'s melee unit, bought with Faith.',
+      src: {
+        cost: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'CostProgressionParam1'),
+        maintenance: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'Maintenance'),
+        moves: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'BaseMoves'),
+        combat: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'Combat'),
+        faithOnly: xml('Units', 'UnitType=UNIT_LAHORE_NIHANG', 'PurchaseYield', { expect: 'YIELD_FAITH' }),
+      },
+    }),
   ].map((u) => [u.id, u]),
 );
 

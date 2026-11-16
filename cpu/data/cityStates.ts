@@ -465,6 +465,29 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 
+/** the install CivilizationType of the city-state the engine names `name`:
+ *  its suzerain-bonus row's, else the name's own */
+export function cityStateCivilization(name: string): string {
+  return CITY_STATE_SUZERAIN_BONUS[name]?.civ ?? `CIVILIZATION_${name.toUpperCase().replace(/[ -]/g, '_')}`;
+}
+
+/** CIV6 (GranColombia_Maya_Leaders.xml LeaderTraits): a city-state's own
+ *  leader trait that is a unit's Units.TraitType, by its CivilizationType —
+ *  LEADER_MINOR_CIV_LAHORE's MINOR_CIV_LAHORE_NIHANG_TRAIT, the Nihang's
+ *  (GranColombia_Maya_Units.xml). The city-state holds the unit's version as
+ *  its own; its suzerain's MODIFIER_PLAYER_ADJUST_VALID_UNIT_BUILD is a
+ *  major's, whose actions the record carries */
+export const MINOR_UNIT_TRAITS: Readonly<Record<string, string>> = {
+  CIVILIZATION_LAHORE: srcConst('cityState.unitTrait.Lahore', 'MINOR_CIV_LAHORE_NIHANG_TRAIT',
+    xml('LeaderTraits', 'LeaderType=LEADER_MINOR_CIV_LAHORE', 'TraitType', { expect: 'MINOR_CIV_LAHORE_NIHANG_TRAIT' })),
+};
+
+/** the traits of `MINOR_UNIT_TRAITS`, each once */
+export const MINOR_UNIT_TRAIT_LIST: readonly string[] = [...new Set(Object.values(MINOR_UNIT_TRAITS))];
+
+/** the unit trait of the city-state the engine names `name`, null none */
+export const minorUnitTrait = (name: string): string | null => MINOR_UNIT_TRAITS[cityStateCivilization(name)] ?? null;
+
 /** the envoys a city-state takes from the first major to meet it
  *  (runs/h1_duelw1117-1124: the first meeting of every minor, by either
  *  major, adds one to its count that record; no later meeting does) */

@@ -538,8 +538,21 @@ class SimEconomy:
     def _trader_cost(self, row: int) -> torch.Tensor:
         """`traderCost` — [B] long: floor(½·40·(1 + 3P)), COST_PROGRESSION_GAME_PROGRESS
         Param1 400 through `_progress_cost`."""
-        base, k = self._trader_progress
-        return self._progress_cost(base, k, self._progress_pct(row))
+        return self._unit_progress_cost(row, self._trader_idx)
+
+    def _unit_progress_cost(self, row: int, ui) -> torch.Tensor:
+        """`gameProgressUnitCost` — [B] long: a GAME_PROGRESS unit row's
+        (the Trader, the Nihang) live Cost for `row` through `_progress_cost`,
+        another row's own; `ui` a unit index or a [B] tensor of them"""
+        pct = self._progress_pct(row)
+        if isinstance(ui, int):
+            if int(self._type_pk[ui]) <= 0:
+                return self._type_cost[ui].long().expand(self.B)
+            return self._progress_cost(int(self._type_pgb[ui]), int(self._type_pk[ui]), pct)
+        u0 = ui.clamp(min=0, max=self._type_pk.numel() - 1)
+        k = self._type_pk.take(u0)
+        prog = self._progress_cost(self._type_pgb.take(u0).clamp(min=0), k, pct)
+        return torch.where(k > 0, prog, self._type_cost.take(u0).long())
 
     def _progress_pct_of(self, techs_n: torch.Tensor, civics_n: torch.Tensor) -> torch.Tensor:
         """`gameProgressPct` — [B] long: max(floor(100·techs/77),

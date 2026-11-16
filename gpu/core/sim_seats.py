@@ -12792,7 +12792,13 @@ class SimSeats:
         research reveals, and a dig site its civics reveal (an Antiquity Site
         past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`; a
         city-state's dig sites past its own civics or its suzerain's)."""
-        seen = self._res_live() & ~self._res_hidden(row)
+        return (self._res_live() & ~self._res_hidden(row)) | self._dig_seen(row)
+
+    def _dig_seen(self, row: int) -> torch.Tensor:
+        """[B, T] bool — the dig sites `_seen_resource` takes: an Antiquity
+        Site past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`
+        (`seenResourceAt` on a plot of no resource)."""
+        seen = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         s = row - self._CITY_MINOR0
         for plane, civic in ((self.antiquity, self._antiquity_civic), (self.shipwreck, self._shipwreck_civic)):
             if civic >= 0 and (row < self.n_majors or row == self.FREE_ROW):

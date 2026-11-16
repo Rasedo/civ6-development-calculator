@@ -18040,3 +18040,48 @@ rules' `unitFormationAi`.
 - OPEN: the execution's orders go through the units' operation queues
   (0x570b40, MoveTo 0x962030, Swap 0x972880 through vtable +0x60), the
   engines' walk at once (duels1163 t88: AUDIT C-95).
+
+## C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins
+
+- A CITY-STATE'S OWN UNIT: the unit versions (0x4f4a50) keep a TraitType
+  row the player's traits name. LEADER_MINOR_CIV_LAHORE holds
+  MINOR_CIV_LAHORE_NIHANG_TRAIT (GranColombia_Maya_Leaders.xml
+  LeaderTraits), the Nihang's TraitType, so the Nihang is Lahore's version
+  of itself (`minorUnitVersion`, `minorUnitTrait`; `unit_version_mask`,
+  `_minor_trait_version`) in its unit production table, its UNITS values
+  and its building event. The Nihang's row (GranColombia_Maya_Units.xml:
+  Cost 100, COST_PROGRESSION_GAME_PROGRESS 400, Combat 25, BaseMoves 2,
+  Maintenance 2, MustPurchase with Faith) is in UNITS, its Cost the game's
+  progress (`gameProgressUnitCost`, `_unit_progress_cost`, the Trader's
+  curve). Confirming: duels1170 Lahore t2-t239 its unit production table
+  holds the Nihang (249 tables), its Build City Building contracts of
+  t2 / t23 name it; duels1186 Lahore t9 alike; duels1170 t240 the Nihang
+  Lahore bought stands in its table's held count.
+- AN UNOWNED PLOT'S IMPROVEMENTS: the plot evaluation values the
+  improvements of an unowned plot on its ground with its ownership waived
+  (`groundImprovements` anyOwner; `_minor_ground_imps` any_owner); the
+  best plot to buy (0x5c9700) reads them. Confirming: duels1181 Ngazargamu
+  t220 the unowned 37:7 Niter's Mine 868.45 and 36:9's Farm 585.96 as
+  logged; duels1170 city-state 3's POLICY_LAND_SURVEYORS rows t88-t115
+  (ours 1, the game's unlogged) gone.
+- A FLOODED PLOT: the plot test refuses every improvement row on a plot in
+  the terrain manager's flooded set (0x35ff96..0x35ffab, +0xb0), as the
+  district test does at 0x35f475..0x35f48a (`groundImprovements`,
+  `standingImprovements`; `tile_flooded`). Confirming: duels1143 Antioch
+  t227 its pillaged Farm on the flooded 42:18, every IMPROVEMENTS entry
+  FX(-9999), no Builder contract t227-t238.
+- A DIG SITE (read off the logs): a plot holding an Antiquity Site or a
+  Shipwreck the city-state sees takes no improvement and no district, and
+  the best plot to buy takes it as a resource (`digSeen`; `_dig_seen`).
+  Confirming: duels1181 Ngazargamu t180-t239 its Antiquity Site 35:8 every
+  IMPROVEMENTS and DISTRICTS entry FX(-9999); its district contracts
+  t183-t225 on the game's plots.
+- THE MILITARY ENGINEER'S ROWS: the Fort's row on a plot holding a resource
+  the city-state sees values the plot with the resource harvested alone
+  (duels1181 Ngazargamu t220: the Niter on 37:7 and the Iron on 34:9 value
+  the Mine alone, the Stone on 37:5 its Fort at 40.34).
+- OPEN: the Nihang's Barracks / Armory / Academy +15 abilities
+  (GranColombia_Maya_Buildings.xml LAHORE_NIHANG_*_ABILITY), a city-state's
+  Faith purchase of it (duels1170 Lahore t239 / t243) and its suzerain's
+  (MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK) are unported; the dig site's rule
+  is read off the logs, its plot test unread.

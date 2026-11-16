@@ -74,7 +74,7 @@ import { minorCity, minorFoodFocus } from './cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
-import { borderCandidates, computeCityStats, extractionChanged } from './city';
+import { borderCandidates, computeCityStats, extractionChanged, seenResourceAt } from './city';
 import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
@@ -151,6 +151,7 @@ function groundOpts(state: GameState, cs: CityState) {
  *  Builder on plot 570's Marsh t7-t21, the Marsh gone t22, the Alcazar
  *  t24) */
 function standingImprovements(state: GameState, cs: CityState, tile: Tile): readonly string[] {
+  if (tile.flooded || digSeen(state, cs, tile)) return [];
   return [...validImprovementsIn(seenGround(state, cs, tile), groundOpts(state, cs)), ...adjacentRowsOn(state, cs, tile)];
 }
 
@@ -191,6 +192,16 @@ function seenGround(state: GameState, cs: CityState, tile: Tile): Tile {
   return tile.resource && hiddenResourcesFor(state, cs.seat).has(tile.resource) ? { ...tile, resource: null } : tile;
 }
 
+/** a dig site the minor sees on the plot (`seenResourceAt`): the game's
+ *  RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a resource no improvement
+ *  works and none harvests, so the plot test takes no improvement there,
+ *  the Military Engineer's neither (runs/h1_duels1181 Ngazargamu t180-t239:
+ *  its Antiquity Site on 35:8, every IMPROVEMENTS entry FX(-9999), no
+ *  Solar Farm tree; its Fort valued 52.45 there at t150 with no site) */
+function digSeen(state: GameState, cs: CityState, tile: Tile): boolean {
+  return (!!tile.antiquity || !!tile.shipwreck) && seenResourceAt(state, cs.seat)({ ...tile, resource: null });
+}
+
 /** a plot's feature and the resource the seat sees on it, install types
  *  (the trees' `plotGround`) */
 export function plotGroundOf(state: GameState, seat: number, plot: number): { feature: string | null; resource: string | null } {
@@ -214,20 +225,32 @@ export function plotStandingOf(state: GameState, plot: number): { improvement: b
  *  ground row's civic (the Farm on Hills, a feature row) held: those of the
  *  plot as it stands, of the plot with its resource harvested (one with
  *  Resource_Harvests rows) and with its
- *  removable feature cleared (the value prices the harvest and the clearing) */
-function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<string> {
-  const opts = groundOpts(state, cs);
+ *  removable feature cleared (the value prices the harvest and the clearing);
+ *  an unowned plot's (`anyOwner`) with its ownership waived. A flooded plot
+ *  takes none (0x35fd60 at 0x35ff96..0x35ffab: the terrain manager's flooded
+ *  set, +0xb0; runs/h1_duels1143 Antioch t227, its pillaged Farm on the
+ *  flooded 42:18 every IMPROVEMENTS entry FX(-9999), no Builder contract
+ *  t227-t238), nor a dig site the minor sees (`digSeen`) */
+function groundImprovements(state: GameState, cs: CityState, actual: Tile, anyOwner = false): Set<string> {
+  if (actual.flooded || digSeen(state, cs, actual)) return new Set();
+  const opts = anyOwner ? { ...groundOpts(state, cs), ownsTile: () => true } : groundOpts(state, cs);
   const tile = seenGround(state, cs, actual);
   const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
   const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
   // the Military Engineer's own rows too (the Fort), its improvement read
   // past (runs/h1_duely1127 Muscat t172: the Fort on the Farmed 658 at 88.0
-  // the pick, m_bestImprovementToMake 12, its tree's reservation 88.0)
-  const out = new Set<string>([...validImprovementsIn(tile, opts), ...adjacentRowsOn(state, cs, tile),
-    ...validImprovementsIn({ ...tile, improvement: null, pillaged: false }, { ...opts, builder: 'MILITARY_ENGINEER' })]);
+  // the pick, m_bestImprovementToMake 12, its tree's reservation 88.0), on
+  // ground holding no resource the minor sees — a resource's plot takes them
+  // harvested alone (runs/h1_duels1181 Ngazargamu t220: the Niter on 37:7
+  // and the Iron on 34:9 value the Mine alone, the Stone on 37:5 its Fort
+  // at 40.34)
+  const engineer = (g: Tile): readonly string[] => (g.resource ? []
+    : validImprovementsIn({ ...g, improvement: null, pillaged: false }, { ...opts, builder: 'MILITARY_ENGINEER' }));
+  const out = new Set<string>([...validImprovementsIn(tile, opts), ...adjacentRowsOn(state, cs, tile), ...engineer(tile)]);
   for (const [harvest, clear] of [[true, false], [false, true], [true, true]]) {
     if ((harvest && !harvestable) || (clear && !clearable)) continue;
     const ground = { ...tile, resource: harvest ? null : tile.resource, feature: clear ? null : tile.feature };
+    if (harvest && !clear) for (const id of engineer(ground)) out.add(id);
     // the plot test takes a removable feature only for a Buildable row
     // (0x35fd60's fifth argument at 0x36079e / 0x36085d: Improvements +0x108
     // & 8, the loader's Buildable): no Solar or Wind Farm on a Forest
@@ -271,7 +294,8 @@ export function plotImprovementType(tile: Tile, camps: ReadonlySet<number>): str
  * per plot its flags — the seat owns it, an improvement may stand on its
  * ground (research waived) where no district or improvement stands, a district may stand
  * where the analysis values one, an unowned plot beside one of the seat's —
- * and its improvements' and districts' values in database order. An
+ * and its improvements' and districts' values in database order, an unowned
+ * plot's improvements on its ground with its ownership waived. An
  * improvement the ground does not take, a district the plot cannot hold or
  * the city has, one the minor's type disfavours (`minorDistrictVerdict`):
  * FX(-9999); one only a drought on the plot bars, 0. The centre, another
@@ -292,7 +316,10 @@ export function plotImprovementType(tile: Tile, camps: ReadonlySet<number>): str
  * THE CITY'S BEST PLOT TO BUY (0x5c9700 at 0x5c983d..0x5c99e3, CityBuildAI
  * m_bestPlotToBuy, after the improvement pick): over the update's plot
  * evaluations in order, an unowned plot beside the city's (+0x57) holding a
- * resource the player sees (+0x00): the first is taken at no value; a later
+ * resource the player sees (+0x00, a dig site among them; its improvement
+ * values those of the plot's ground, ownership waived: runs/h1_duels1181
+ * Ngazargamu t220, the unowned 37:7 Niter's Mine 868.45 and 36:9's Farm
+ * 585.96 as logged): the first is taken at no value; a later
  * one replaces it where the one taken has a feature (+0x04) and it has none,
  * the most of its improvement values (+0x30) then the value taken, else where
  * one of its improvement values tops the value taken, which it then holds;
@@ -305,7 +332,7 @@ export function minorBestPlotToBuy(state: GameState, cs: CityState, evals: reado
   let top = 0;
   for (const e of evals) {
     const tile = state.map.tiles[e.plot];
-    if (!e.nearOwned || !tile.resource || hidden.has(tile.resource)) continue;
+    if (!e.nearOwned || ((!tile.resource || hidden.has(tile.resource)) && !digSeen(state, cs, tile))) continue;
     const feature = !!tile.feature;
     if (best < 0) {
       best = e.plot;
@@ -382,7 +409,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICT_HOUSING.get(n.district) ?? 0) > 0),
       unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * (cs.aiBuilders ?? cs.buildersTrained)
         : UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.cost ?? 0),
-      buildsUnit: (u) => minorUnitVersion(u) === u,
+      buildsUnit: (u) => minorUnitVersion(cs, u) === u,
       extraCharges: () => 0,
       progressPct: gameProgressPct(r.techs.length, r.civics.length),
       escalation: GAME_COST_ESCALATION,
@@ -407,7 +434,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     // Kong: the Farm at 9:6 72.45 to t4, 0.00 through the drought of t5-t9,
     // 71.45 at t10; the drought of t16-t17 makes 8:5's, 7:6's and 7:7's
     // Farms and 8:6's Camp 0.00, 7:5's Mine 71.45)
-    const ground = owned && !repair ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }) : new Set<string>();
+    const ground = !repair ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }, !owned) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
       if (!id || !ground.has(id)) return FX_MIN;
@@ -425,12 +452,15 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     // the plot test (0x35f2d0) asks no population limit: the value's own
     // term reads it (runs/h1_duelv1124 Bologna t20: its Campus at the
     // limit of 3 citizens, its Harbor rows valued 33-41 and its tree's
-    // Celestial Navigation contract at 50.0, as logged)
+    // Celestial Navigation contract at 50.0, as logged); a dig site the
+    // minor sees takes none (runs/h1_duels1181 Ngazargamu t220: every
+    // DISTRICTS entry of its Antiquity Site 35:8 FX(-9999))
+    const dig = digSeen(state, cs, tile);
     const placed = new Map<DistrictId, boolean>();
     let others: string[] | undefined;
     const placeable = (id: DistrictId): boolean => {
       let ok = placed.get(id);
-      if (ok === undefined) placed.set(id, (ok = canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true, anyCount: true }).ok));
+      if (ok === undefined) placed.set(id, (ok = !dig && canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true, anyCount: true }).ok));
       return ok;
     };
     const df: DistrictValueFacts = {
@@ -682,7 +712,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     // an improvement's: the first of its build units the city may train
     // (runs/h1_duels1142 city-state 2 t189: the Fort's tree, its Military
     // Engineer contract 565); with none named, the Builder
-    builderType: (imp) => (imp === null ? (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null)
+    builderType: (imp) => (imp === null ? (minorUnitVersion(cs, 'UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null)
       : AI_IMPROVEMENTS.find((r) => r.type === imp)?.buildUnits.map(([u]) => u).find((u) => city.canTrain(u)) ?? null),
     plotCity: (plot) => (owned(plot) ? city.id : -2),
     reachThisTurn: (u, plot, moves) => {
@@ -707,7 +737,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       if (tile.district !== id) {
         const g = plotGroundOf(state, cs.seat, plot);
         const f = g.feature ? FEATURE_ROW.get(g.feature) : undefined;
-        if ((f?.removable && !f.validDistrictPlacement) || g.resource) return false;
+        if ((f?.removable && !f.validDistrictPlacement) || g.resource || digSeen(state, cs, tile)) return false;
       }
       // the placement test asks no population limit (runs/h1_duels1185
       // Lisbon t73: its Commercial Hub's Check Plot SUCCESS at population 3
@@ -848,7 +878,7 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const wars = seatOf(state, cs.seat)?.wars ?? [];
   const players = [...new Set(records.map((x) => x.owner))].sort((a, b) => a - b);
   const rows = unitProductionEntries({
-    isVersion: (u) => minorUnitVersion(u) === u,
+    isVersion: (u) => minorUnitVersion(cs, u) === u,
     obsolete: (u) => unitObsoleteIn(r, u),
     listed: seatListed(r, holds, false),
     owned: (u) => own.get(u) ?? 0,

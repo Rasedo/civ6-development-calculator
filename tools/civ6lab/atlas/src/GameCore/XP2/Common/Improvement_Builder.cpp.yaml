@@ -58,14 +58,18 @@
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
     - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
+    - "C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x35fd60
   final: 0x25acf0
   kind: function
-  semantics: "the improvement plot test (plot, improvement, ..., fifth argument): a feature the row neither lists nor keeps (0x363a20 false) passes only with the fifth argument 1, the row's Improvements +0x108 & 8 (Buildable) set and the feature's Features +0xc1 at 0x80 or above (Removable), at 0x36079e / 0x36085d / 0x36086c; else the row fails. The first block of the walk (0x36076d, [rax+0x28] & 1) unread. With SameAdjacentValid false (+0x10a & 8, the loader's column 41) the walk 0x6b000 over the plots within 1 (0x6af80 -> 0x69010, the plot itself first at 0x696c0) with the lambda 0x363e40 (Plot +0x44 the row) refuses at 0x35ffad..0x360008: the plot's own improvement, pillaged or not, counts."
+  semantics: "the improvement plot test (plot, improvement, ..., fifth argument): a feature the row neither lists nor keeps (0x363a20 false) passes only with the fifth argument 1, the row's Improvements +0x108 & 8 (Buildable) set and the feature's Features +0xc1 at 0x80 or above (Removable), at 0x36079e / 0x36085d / 0x36086c; else the row fails. The first block of the walk (0x36076d, [rax+0x28] & 1) unread. With SameAdjacentValid false (+0x10a & 8, the loader's column 41) the walk 0x6b000 over the plots within 1 (0x6af80 -> 0x69010, the plot itself first at 0x696c0) with the lambda 0x363e40 (Plot +0x44 the row) refuses at 0x35ffad..0x360008: the plot's own improvement, pillaged or not, counts. A plot in the terrain manager's flooded set (0xa39c20 +0xb0, 0xa3a0f0; the set lIsFlooded 0x8643c0 reads) refuses every row at 0x35ff96..0x35ffab, as the district test 0x35f2d0 does at 0x35f475..0x35f48a."
   status: READ
   cases:
+    - recording: h1_duels1143
+      turn: 227
+      value: "Antioch: its pillaged Farm on 42:18, flooded that turn (record flooded 1), every IMPROVEMENTS entry FX(-9999), no Builder contract t227-t238"
     - recording: h1_duels1138
       turn: 125
       value: "Nalanda: its pillaged Mahavihara on 37:9 reads FX(-9999) on its own row, the pick the Fort, no Builder contract (t125-t127, t177-t195)"
@@ -94,6 +98,7 @@
     - cpu/core/minorCityAi.ts:out
     - cpu/core/minorCityAi.ts:tile
   readings:
+    - "C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins"
     - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
     - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"

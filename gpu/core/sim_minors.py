@@ -1968,11 +1968,9 @@ class SimMinors:
         rd = self.rules_dev
         is_u, is_b, is_d, is_p, is_r = self._mk_kinds(key)
         ui = key.clamp(min=0, max=self.NU - 1)
-        out = self._type_cost.take(ui).double()
+        out = self._unit_progress_cost(row, ui).double()
         if self._builder_idx >= 0:
             out = torch.where(ui == self._builder_idx, self._builder_cost(self.citystate_builders_trained[:, s]).double(), out)
-        if self._trader_idx >= 0 and bool((is_u & (ui == self._trader_idx)).any()):
-            out = torch.where(ui == self._trader_idx, self._trader_cost(row).double(), out)
         nb = int(rd.b_cost.shape[0])
         bcost = rd.b_cost.to(torch.float64)
         bi = torch.where(is_r, key - self._mk_r0, key - self._mk_b0).clamp(min=0, max=nb - 1)

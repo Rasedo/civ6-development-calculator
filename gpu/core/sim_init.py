@@ -519,6 +519,9 @@ class SimInit:
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index
         self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # its own leader's unit trait, a `citystate.unitTraits` index, -1 none
+        # (`minorUnitTrait`)
+        self.citystate_unit_trait = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for s, cs in enumerate(f.get("cityStates", [])):
                 self.citystate_alive[b, s] = True
@@ -527,6 +530,7 @@ class SimInit:
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
                 self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
+                self.citystate_unit_trait[b, s] = cs.get("unitTrait", -1)
                 self.citystate_founded_turn[b, s] = cs["foundedTurn"]
                 # its founding Settler's look (`placeCityStateAt`)
                 self.mops_revealed[b, s, torch.tensor(cs["revealed"], dtype=torch.long, device=device)] = True
@@ -3570,7 +3574,6 @@ class SimInit:
         self._path_denom = int(_tr["pathDenom"])
         self._path_cap = int(round(float(_tr["pathMaxRatio"]) * self._path_denom))
         self._trade_era_term = torch.tensor([int(x) for x in _tr["eraTerm"]], dtype=torch.long, device=device)  # by game era
-        self._trader_progress = tuple(int(x) for x in _tr["traderProgress"])  # (install Cost, climb)
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters
         # THE TURN'S ONE DRAW (`eventRows`): each row's weight per site, in
@@ -4767,6 +4770,10 @@ class SimInit:
         self._type_noncombat = _nc
         self._type_charges = torch.tensor([u["charges"] for u in ru], dtype=torch.long, device=device)
         self._type_faith_only = torch.tensor([bool(u["fo"]) for u in ru], dtype=torch.bool, device=device)
+        # a GAME_PROGRESS row's install Cost and climb (`gameProgressUnitCost`;
+        # -1 / 0 on another row)
+        self._type_pgb = torch.tensor([int(u["pgb"]) for u in ru], dtype=torch.long, device=device)
+        self._type_pk = torch.tensor([int(u["pk"]) for u in ru], dtype=torch.long, device=device)
         self._type_spawn_only = torch.tensor([bool(u["so"]) for u in ru], dtype=torch.bool, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         self._settler_idx = next((i for i, u in enumerate(ru) if bool(u["settler"])), -1)

@@ -377,6 +377,9 @@ class City:
 
     unit_version = version
 
+    def unit_version_mask(self, u):
+        return torch.tensor([True])
+
     def belief_enables(self, u):
         return 0
 

@@ -13,18 +13,20 @@ import { isCityStateSeat, isFreeSeat, seatOf } from '../seats';
 import { CIVICS } from '../../data/civics';
 import { RESOURCES } from '../../../world/resources';
 import { TECHS } from '../../data/techs';
+import { minorUnitTrait } from '../../data/cityStates';
 import { UNITS } from '../../data/units';
 import { engineId } from '../../data/aliases';
 import { researchable } from '../aiResearch';
 import { storedTable } from './unitChoice';
-import type { GameState } from '../types';
+import type { CityState, GameState } from '../types';
 import { stockFree, strategicSurplus } from '../stockpile';
 
 /** a city-state's version of a unit (player +0x12e8 +0x1c0): a unit it may
- *  train of no trait that a major alone may not train */
-const minorVersion = (u: string): string | null => {
+ *  train of no trait but its own leader's (`minorUnitTrait`) that a
+ *  major alone may not train */
+const minorVersion = (cs: CityState) => (u: string): string | null => {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  return row && row.canTrain && !row.trait && !row.majorOnly ? u : null;
+  return row && row.canTrain && (!row.trait || row.trait === minorUnitTrait(cs.name)) && !row.majorOnly ? u : null;
 };
 
 /** a major's version of a unit: its own unique unit where one of its
@@ -112,7 +114,7 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
     const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
     return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
   };
-  const version = isCityStateSeat(seat) ? minorVersion : majorVersion(majorTraits(state, seat));
+  const version = isCityStateSeat(seat) ? minorVersion(s as CityState) : majorVersion(majorTraits(state, seat));
   const own = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== seat) continue;

@@ -23,7 +23,7 @@ import { CIVICS } from '../data/civics';
 import {
   CITY_STATE_TYPE_DISTRICT, MINOR_BUILDER_PROD_PCT, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT,
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
-  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT,
+  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT, minorUnitTrait,
 } from '../data/cityStates';
 import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
@@ -53,7 +53,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
+import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
@@ -961,11 +961,11 @@ export function minorUpgradeVisible(state: GameState, cityState: CityState, u: U
 }
 
 /** A unit's purchase price for the minor: its Production cost (a Builder's
- *  and a Trader's climb with their copies and the game's progress) times the
+ *  climbing with its copies, a GAME_PROGRESS row's with the game's progress) times the
  *  purchase multiplier, in Gold; in Faith its Faith price. */
 export function minorUnitPrice(state: GameState, cityState: CityState, id: string, currency: 'gold' | 'faith'): number {
-  if (currency === 'faith') return purchaseStep(Math.round(UNITS[id].cost * FAITH_PURCHASE_MULT));
-  const cost = id === 'BUILDER' ? builderCost(state, cityState.seat) : id === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[id].cost;
+  if (currency === 'faith') return purchaseStep(Math.round(gameProgressUnitCost(state, cityState.seat, UNITS[id]) * FAITH_PURCHASE_MULT));
+  const cost = id === 'BUILDER' ? builderCost(state, cityState.seat) : gameProgressUnitCost(state, cityState.seat, UNITS[id]);
   return purchaseStep(cost * GOLD_PURCHASE_MULT);
 }
 
@@ -1516,7 +1516,7 @@ export function minorUnitExpected(state: GameState, cityState: CityState, unit: 
   const k = minorItemKey(item);
   const kept = cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0;
   if (kept > 0) return FX;
-  if (!minorUnitVersion(unit) || !minorCanTrain(state, cityState, item.unit)) return 0;
+  if (!minorUnitVersion(cityState, unit) || !minorCanTrain(state, cityState, item.unit)) return 0;
   const book = cityState.cityAi;
   let most = 0;
   for (const id of book?.city[-1] ?? []) {
@@ -1592,16 +1592,18 @@ export function analysedTurns(entries: readonly { id: string; next: string; turn
 }
 
 /** A minor's version of a unit (player +0x12e8 +0x1c0, written by
- *  0x4f4a50): none for a civilization's unique unit (TraitType +0x2d0), a
+ *  0x4f4a50): none for a unique unit of a trait (TraitType +0x2d0) other
+ *  than the city-state's own leader's (`minorUnitTrait`: runs/h1_duels1170
+ *  Lahore t2, its UNITS row's Nihang 16.18, the other city-states' none), a
  *  unit that founds a city, one the database bars from training (CanTrain
  *  +0x1b8 bit 0x20); neither EnabledByReligion (bit 0x40) nor MajorCivOnly
  *  is asked (runs/h1_duelv1128 Nazca t44-57: the Temple's Warrior Monk
  *  valued through 0x7b62c0, the Temple valid; runs/h1_duelq1127 Hattusa
  *  t249: the Giant Death Robot in its unit production table, its Uranium's
  *  need 31) — CanTrain refuses a MajorCivOnly unit (`minorCanTrain`) */
-export function minorUnitVersion(u: string): string | null {
+export function minorUnitVersion(cityState: CityState, u: string): string | null {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  return row && !row.trait && !row.foundCity && row.canTrain ? u : null;
+  return row && (!row.trait || row.trait === minorUnitTrait(cityState.name)) && !row.foundCity && row.canTrain ? u : null;
 }
 
 /** Units_XP2 MajorCivOnly (+0x48 bit 0x10): CanTrain (0x172820, before the
@@ -1649,7 +1651,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
     own.set(t, (own.get(t) ?? 0) + 1);
   }
   return unitProductionTable({
-    isVersion: (u) => minorUnitVersion(u) === u,
+    isVersion: (u) => minorUnitVersion(cityState, u) === u,
     obsolete: (u) => unitObsoleteIn(r, u),
     listed: seatListed(r, (x) => researchHolds(r, x), false),
     owned: (u) => own.get(u) ?? 0,
@@ -1900,7 +1902,7 @@ function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (
   return (units, civic) => {
     let v = 0;
     for (const u of units) {
-      if (minorUnitVersion(u.type) !== u.type) continue;
+      if (minorUnitVersion(cityState, u.type) !== u.type) continue;
       facts ??= minorBuildFacts(state, cityState, minorKnownUnits(cityState));
       let avg = 0;
       if (table && facts.trainsDomain(u.domain)) {
@@ -2043,7 +2045,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     // a city-state holds one city
     regionalAmenities: () => [amenity],
     regionalBuildingCities: () => 1,
-    unitVersion: minorUnitVersion,
+    unitVersion: (u) => minorUnitVersion(cityState, u),
     beliefEnables: (u) => {
       const rel = majorityReligionOf(state, cityState.seat);
       return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
@@ -2336,13 +2338,13 @@ export function minorRepairResumed(state: GameState, cityState: CityState, item:
 }
 
 /** A minor's item's price: a unit's Production cost (a Builder's and a
- *  Trader's climbing), a building's (`minorBuildingCost`), a district's
+ *  GAME_PROGRESS row's climbing), a building's (`minorBuildingCost`), a district's
  *  (`minorDistrictCost`), a project's, a repair's rest past
  *  `MINOR_REPAIR_RESUME_PCT`. */
 export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
   return 'unit' in item
     ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
-      : item.unit === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[item.unit].cost)
+      : gameProgressUnitCost(state, cityState.seat, UNITS[item.unit]))
     : 'building' in item ? minorBuildingCost(state, cityState, item.building)
       // the row's OWN base, not the specialty one: a minor builds real
       // districts too and the install prices an Aqueduct at 36

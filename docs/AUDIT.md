@@ -362,7 +362,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (unit values): PSEUDOYIELD_GPP_GENERAL -1.0 (0x700810's writer)
   - LAB (unit values): locked units by +0x388
   - BUILD (unit values): duels1136 the UNITS table's Trader: player 4 t64 397.54 ours 227.08, player 3 t65 550.14 ours 308.38, player 2 t100-t123 246.72 ours 0.00
-  - BUILD (unit values): the engines hold no UNIT_LAHORE_NIHANG (GranColombia_Maya_Units.xml: Combat 25, MustPurchase, YIELD_FAITH, COST_PROGRESSION_GAME_PROGRESS 400, TraitType MINOR_CIV_LAHORE_NIHANG_TRAIT, its Barracks / Armory / Academy +15 abilities): Lahore's building event takes it where ours takes another (duels1160 t2 the Nihang at 16 for ours' Walls; duels1170 t2 / t23 / t238, 1186 t9; 17 contract rows on 8 seeds), its unit production table holds it (unit.table duels1170 t2-t240), duels1170 t240 the game buys one
+  - BUILD (unit values): the Nihang's Barracks / Armory / Academy +15 base Combat (GranColombia_Maya_Buildings.xml LAHORE_NIHANG_BARRACKS_ABILITY, _ARMORY_, _ACADEMY_ granting the Inactive ABILITY_NIHANG_*_STRENGTH to CLASS_LAHORE_NIHANG) is in neither twin (no recorded case: duels1170 Lahore, the one buyer, holds none of the three)
   - LAB (unit production table): the military AI's unit production table (0x7989e0's +0x20 counts, the obsolete entry's hold) left on the units standing, no case telling the two apart
   - LAB (unit production table): a gone non-army COMBAT unit joining the standing-army walk below the quota (its +0x7d0 after the kill unread), a gone member's Combat as it stood and its place in the pool order
   - LAB (unit production table): duels1124 t206 city-state 4: five entries at twice the game's value (Crossbowman 21 / 10, Pikeman 23 / 11, Musketman 44 / 22, Privateer 53 / 26, Military Engineer 2 / 1), its other 50 equal; the game's other 743 tables equal (aiscore kind `unit.table`); the units held differ on 15 tables (t18 city-state 4 Warrior 5 / 4, t68 city-state 3 Warrior 0 / 1), ours counted at the upgrade step
@@ -399,6 +399,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (treasury): a minor's treasury off the record's: 1127 Hattusa t178
   - LAB (purchases): 1128 Nazca t25 a Builder PURCHASE (0x5f3c40) ours trains
   - LAB (purchases): unit purchases of the game ours does not make: duels1134 city-state 3 t47 a Spearman (threat 1, ours 98.9 Gold), 1146 city-state 2 t43 a Galley (ours 2.0 Gold), 1137 city-state 3 t178 a Caravel, 1146 city-state 3 t208 an AT Crew (untraced)
+  - BUILD (purchases): a city-state's Faith purchase is in neither twin (its purchase AI buys with Gold alone; the suzerain's Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK alike): duels1170 Lahore buys a Nihang t239 and t243 (unit.bought), its Build City Building contract of the Nihang gone, ours none bought and the contract held t239-t243
   - LAB (upgrades): an upgrade past an obsolete rung (1128 t110 Hong Kong's Warrior 1966081: the game's Man-at-Arms 2097159, ours a Swordsman)
   - LAB (disbands): 0x4dd270's disband count floor(S/10) against runs/bankrupt_m35's one a turn
   - LAB (disbands): a city-state's disbands: 1121 t165 / t219 a unit short of the game's
@@ -622,7 +623,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
   - LAB (card values): duels1146 city-state 4 at 15 citizens: Liberalism's and Civil Prestige's Amenity 4 over t200 and t224-241 (182 for 178 at t224), 24-26 under t242-247 (150 for 176); Civil Prestige 141 for 162 at t199
   - LAB (card values): duels1146 city-state 4 t224-247 Liberalism 4 over, then 24-26 under from t242; Market Economy 7 under t242-248; Third Alternative and E-Commerce 4-5 over t246-248
-  - LAB (card values): duels1140 city-state 4 t34-48 Land Surveyors 0.5 for none; Expropriation 0.5 for none duels1134 city-state 2 t242-249 and duels1146 city-state 4 t219-223 (the plot's price over the gross Gold a whole 1 where the game's is 0)
+  - LAB (card values): Expropriation 0.5 for none duels1134 city-state 2 t242-249 and duels1146 city-state 4 t219-223 (the plot's price over the gross Gold a whole 1 where the game's is 0)
   - LAB (card values): duels1136 city-state 2 t238 Integrated Space Cell 10 for 8 (t229-247 else as logged); Nobel Prize 0 for 15 (duels1144 city-state 2 t242, duels1145 city-state 2 t247)
   - LAB (card values): duels1145 city-state 4 Conscription 14 for 22 at t57, 7 for 14 at t59, 0 for 7 at t72 and t119
   - LAB (card values): a plot's record of its resource (0x50a690) is not held: the district adjacency of a city-state reads its own research (a fit: a plot first seen after its suzerain's reveal would show the resource), a plot's own resource yield and the boosts' improvements the condition with the suzerain's sight; the record's writer 0x50b3e0 and its refresh are unread
@@ -630,7 +631,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): duels1176 city-state 3 Caravansaries 65 for 53 t71-92 and Triangular Trade 147 for 124 t93-97: its Gold 9 for the record's 11 from t70, the Trading Dome on plot 922 (Samarkand's improvement, 2 Gold in the record) having no engine improvement row, its Gold boost on a net -6 for the game's -4
   - LAB (card values): duels1148 city-state 3 Equestrian Orders 2 under t40-48 on the same Iron (5 a copy, the game's 5 a copy plus 2) and a turn behind the game's fall t49-52
   - LAB (card values): duels1158 city-state 3 Equestrian Orders 96 for 140 at t204 falling 17.5 a turn to 0 for 105 at t210, 0 for 100-20 t211-215, 60 for 190 to 0 for 10 t233-242: its free Horses 29 at t204 in ours (39 less the 10 the Cavalry at the queue's front reserves, record 204), the game's values paying 16 copies at t204, 20 at t206, rising 2 a turn to 40 by t216
-  - LAB (card values): duels1170 city-state 3 t88-119 Land Surveyors 1 for none: our best plot to buy 465 (Whales, price 60), the game's m_bestPlotToBuy at x 29 (469, Maize, price 90: 0 at 5^4); the two the first resource plots beside the city's in order, every improvement value of an unowned plot FX_MIN in ours (minorPlotEvals' ground set), so the Maize's never tops the first taken
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
   - LAB (archaeologist): the Archaeologist's artifact count: t179 9.1 at T 49 where the game counts none (1124 city-state 3)
