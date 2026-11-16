@@ -37,7 +37,7 @@ import { lumpFood, seatGrowth } from './seatTurn';
 import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
-import { applyTrainingGrants, cityDefenseStrength } from './combat';
+import { applyTrainingGrants, centreStrength } from './combat';
 import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
@@ -2107,7 +2107,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
  *  centre's defence strength (0x24ae80 with no garrison), whole; the Free
  *  Cities fight every major */
 export function strongerFoe(state: GameState, seat: number, city: City): boolean {
-  const defense = Math.floor(cityDefenseStrength(state, city, false));
+  const defense = Math.floor(centreStrength(state, city, false));
   return majorsAlive(state).some((p) => p !== seat
     && (seat === FREE_SEAT || civsAtWar(state, seat, p) || denounceActive(state, seat, p) || denounceActive(state, p, seat))
     && (seatOf(state, p)?.bestMeleeCS ?? 0) > defense);

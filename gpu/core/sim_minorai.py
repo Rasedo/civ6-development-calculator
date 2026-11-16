@@ -670,11 +670,11 @@ class SimMinorAi:
         T = self._cv_tables()
         rows = T["unit_rows"]
         # D holds no garrison (GetDefenseStrength with its flag set)
-        dcs = self._city_defense_cs(hrow, hcol, False)[0]
+        dcs = self._centre_strength(hrow, hcol, False)
         d = dcs * _FX
         # the centre's garrison term (0x24a180) the margin over a full civ
         # not hostile reads
-        gar = torch.trunc(self._garrison_cs(hrow, hcol, self._ROW_SEAT.take(hrow), self._holder_strength(hrow, hcol)) * _FX)
+        gar = torch.trunc(self._garrison_cs(hrow, hcol, self._holder_strength(hrow, hcol)) * _FX)
         slot = self.citystate_kb_slot[:, r].long()
         owner = self.citystate_kb_owner[:, r].long()
         typ = self.citystate_kb_type[:, r].long()

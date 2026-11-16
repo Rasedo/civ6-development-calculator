@@ -169,9 +169,13 @@
     - recording: h1_duels1149
       turn: 209
       value: the barbarian Nuclear Submarine 2883601 m_bHiddenVisibilityForfeited 1 from t207 (its strikes of t206 / t207) through t249 (aiunits), in player 1's and city-state 3's danger maps
+    - recording: h1_duels1143
+      turn: 233
+      value: city-state 3's Nuclear Submarine on 2:18, its strikes on player 0's Warriors of t232-234 (CombatLog), lays its 85 in player 0's maps of t233-235 (player 0's DoTurn before the city-state's gives its visibility back) and none at t236
   impl: [cpu/core/units.ts:unitVisibleTo, gpu/core/sim_masks.py:_stealth_hidden]
   readings:
     - "C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360

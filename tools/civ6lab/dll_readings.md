@@ -18085,3 +18085,46 @@ rules' `unitFormationAi`.
   Faith purchase of it (duels1170 Lahore t239 / t243) and its suzerain's
   (MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK) are unported; the dig site's rule
   is read off the logs, its plot test unread.
+
+## C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins
+
+- A DISTRICT'S DEFENCE (0x24ae80 = 0x24a000 + 0x24a180) is one composer for
+  every district with hit points: the Encampment's takes the centre's inner
+  defence (city +0x188c at 0x24aa0d, unconditional: the Palace's
+  PALACE_ADJUST_GARRISON_STRENGTH and Victor's Redoubt
+  DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH, both
+  MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE -> EFFECT_ADJUST_CITY_INNER_DEFENSE)
+  and the outer defence beside the walls' OuterDefenseStrength (city +0x1888,
+  Bastions) while the perimeter stands (0x24b960). Ported: `centreStrength`
+  holds both (`cityDefenseStrength` deleted), `_centre_strength`.
+- THE GARRISON TERM asks 0x208b80 for the plot's best defender of player -1
+  (edx = r8d = -1, flags 0x10, at 0x24a24c..0x24a275): any player's unit on
+  the district garrisons it. Ported: `garrisonCS` on `bestDefender(NO_SEAT)`,
+  `_garrison_cs` on `_best_defender(-1)`.
+- THE DANGER LIST'S LOCATION TEST (0x26dab0 -> 0x586900 under flag 1): on a
+  plot never revealed, 0x586360's district test lets a melee unit onto a
+  district of hit points at war (refused only to a member whose ranged or
+  bombard strength tops its combat strength), so the danger map lists such a
+  plot reached as an attack. Ported: `groundOf`'s fits, `_tac_search`'s
+  fort_f.
+- A HIDDEN UNIT'S FORFEIT (0x20ad00 at 0x20ae90 sets it, 0x4f1b20 clears it
+  at its owner's DoTurn, the players' DoTurns by index: the majors, the
+  city-states, the Free Cities 62, the barbarians 63 skipping it): a player
+  whose DoTurn comes before the owner's sees a strike of the turn before.
+  Ported: `unitVisibleTo`'s `turnOrder`, the import's strike history for
+  every non-major hider, `_stealth_hidden`.
+- CONFIRMED: runs/h1_duels1191 t158-172 Shanghai's unbuilt Encampment 8:3,
+  the record's 81 = the centre's with the Redoubt, the barbarians' map 82
+  (ours 77 before); 1124 t237 / t246 / t248 Chengdu's Encampment 16:16 105;
+  1181 t192-199 Shenyang's 8:5 74; 1127 t248-249 Chengdu's 13:2 83.
+  runs/h1_duels1144 t118 the barbarian Man-At-Arms on Handan's unbuilt
+  Encampment 12:6: the record's 47, its centre 42. runs/h1_duels1149 t25 the
+  barbarian Scout on 6:12 lays its 10 on city-state 102's unrevealed centre
+  4:12 in player 0's map, its planning 4:12 (1/0); 1183 t5, 1187 t28, 1151
+  t38 alike. runs/h1_duels1143 t234-235 city-state 3's Nuclear Submarine,
+  its strikes of t233 / t234, in player 0's maps.
+- Open: runs/h1_duels1143 t233 player 0's map holds 85 where the engines lay
+  two Nuclear Submarines' 170 (city-state 3's on 2:18 and city-state 4's on
+  6:19 / 7:19, player 0's embarked Warriors beside them); the Encampment's
+  walls are gated on the city's perimeter, not its own (0x24b960 on the
+  district), in the engines.

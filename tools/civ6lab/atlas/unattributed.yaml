@@ -1790,6 +1790,7 @@
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."

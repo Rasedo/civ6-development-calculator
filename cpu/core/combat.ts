@@ -1163,10 +1163,12 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
 }
 
 /**
- * THE GARRISON TERM — what a military unit of the holder standing on the
- * centre adds: max(0, its Combat less its wounded loss (`woundedLoss256`,
- * none for a chassis that suffers no wound penalty) - `base`), in 1/256
- * (0x24a180). A Corps or an Army garrisons with its
+ * THE GARRISON TERM — what a military unit of any player standing on the
+ * district adds (0x24a180 asks 0x208b80 for the plot's best defender of
+ * player -1: runs/h1_duels1144 t118, the barbarian Man-At-Arms on Handan's
+ * unbuilt Encampment 12:6 holds it at 47, the centre at 42): max(0, its
+ * Combat less its wounded loss (`woundedLoss256`, none for a chassis that
+ * suffers no wound penalty) - `base`), in 1/256. A Corps or an Army garrisons with its
  * formation's strength on that Combat (runs/h1_duelw1107, Taiyuan: a
  * Pike and Shot Army on a base of 55 added 17 t177-182, a Line Infantry
  * Corps 20 t183-211 and Army 27 t212-235). A ship in the city garrisons it as a land
@@ -1178,7 +1180,7 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
  * of 70 at 75 HP, 66.6015625). An aircraft and a passenger are no garrison.
  */
 function garrisonCS(state: GameState, city: City, base: number, plot = city.centerIndex): number {
-  const best = bestDefender(state, city.seat, plot);
+  const best = bestDefender(state, NO_SEAT, plot);
   if (!best) return 0;
   const loss = woundedLoss256(Math.trunc(((UNIT_HP - best.unit.hp) * 100) / UNIT_HP), UNITS[best.unit.type]?.noWoundPenalty ? 100 : 0);
   return Math.max(0, best.top - loss / 256 - base);
@@ -1218,28 +1220,33 @@ export function wallsStrength(city: { buildings: string[] }): number {
  * - the holder's base (`holderStrength`);
  * - `Districts.CityStrengthModifier` over the city's complete, unpillaged
  *   districts (`DistrictDef.cityStrength`);
- * - each wall building's own strength (`wallsStrength`) while the perimeter
- *   stands (`outerPool` above 0: runs/h1_duelw1108, Xi'an 3 lower t97-111
- *   behind a breached wall);
- * - the Palace's +3 where the city holds it (a city-state's city does);
- * - the garrison term (`garrisonCS`). The Encampment asks without it
- *   (`garrisoned` false) — CIV6: it fights "similar to the parent City
- *   Center, excluding any bonus obtained for a Garrisoned unit";
+ * - each wall building's own strength (`wallsStrength`) and a major's outer
+ *   defence (city +0x1888, Bastions' EFFECT_ADJUST_CITY_OUTER_DEFENSE) while
+ *   the perimeter stands (`outerPool` above 0: runs/h1_duelw1108, Xi'an 3
+ *   lower t97-111 behind a breached wall; runs/h1_duelw1116 t97-104 Beijing
+ *   and Chengdu, no walls, read no Bastions);
+ * - the inner defence (city +0x188c, EFFECT_ADJUST_CITY_INNER_DEFENSE): the
+ *   Palace's +3 where the city holds it (a city-state's city does) and the
+ *   Redoubt's +5 (`governorSum`), the Encampment's as the centre's
+ *   (runs/h1_duels1191 t159: Shanghai's centre and its unbuilt Encampment
+ *   8:3 both 81 with the Redoubt);
+ * - the garrison term (`garrisonCS`). The Encampment asks without the
+ *   centre's (`garrisoned` false) and with its own plot's
+ *   (`districtGarrisonedStrength`);
  * - a city-state's +1 per envoy of the seat that holds the most there
  *   (`mostEnvoysReceived`, GetMostTokensReceived in 0x24a180).
  * The garrison term is fractional, so the strength is; the damage law takes
- * it as it stands. The governor and policy terms ride on top in
- * `cityDefenseStrength` and `cityStrikeStrength`. The GPU twin is
- * `_centre_strength`.
+ * it as it stands. The GPU twin is `_centre_strength`.
  */
 export function centreStrength(state: GameState, city: City, garrisoned = true): number {
   const base = holderStrength(state, cityBaseSeat(city));
-  let n = base + (outerPool(state, city) > 0 ? wallsStrength(city) : 0);
+  let n = base + (outerPool(state, city) > 0 ? wallsStrength(city) + (isCiv(city.seat) ? getModifiers(state, city.seat).cityDefense : 0) : 0);
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].cityStrength;
   }
   if (city.buildings.includes('PALACE')) n += PALACE_CITY_CS;
+  if (isCiv(city.seat)) n += governorSum(state, city, (e) => e.cityDefense);
   if (garrisoned) n += garrisonCS(state, city, base);
   if (isCityStateSeat(city.seat)) {
     const minor = seatOf(state, city.seat) as CityState | undefined;
@@ -1262,16 +1269,6 @@ export function districtGarrisonedStrength(state: GameState, city: City, plot: n
   return centreStrength(state, city, false) + garrisonCS(state, city, holderStrength(state, cityBaseSeat(city)), plot);
 }
 
-/** What an attacker measures itself against — Bastions' "+6 City Defense
- *  Strength" half, EFFECT_ADJUST_CITY_OUTER_DEFENSE: the walls' strength, so
- *  paid only while the perimeter stands (runs/h1_duelw1116 t97-104: Beijing
- *  and Chengdu, no walls, read no Bastions; China's walled cities read +6).
- *  A city-state's centre stands on `centreStrength` alone. */
-export function cityDefenseStrength(state: GameState, city: City, garrisoned = true): number {
-  return centreStrength(state, city, garrisoned) + (outerPool(state, city) > 0 ? getModifiers(state, city.seat).cityDefense : 0)
-    + governorSum(state, city, (e) => e.cityDefense);
-}
-
 /** THE DEFENDING DISTRICT'S TERMS in a fight (0x51eaf0, after its standing
  *  strength): the damaged district's loss (`districtDamageLoss` on its own
  *  hit points) off, and its plot's terrain term on (0x522c10 on the
@@ -1285,10 +1282,10 @@ function districtFightTerms(state: GameState, seat: number, plot: number, hp: nu
 }
 
 /** a major's or a Free City's centre defending a fight: its defence
- *  (`cityDefenseStrength`) with the defending district's terms
+ *  (`centreStrength`) with the defending district's terms
  *  (`districtFightTerms`) */
 export function cityCombatDefense(state: GameState, city: City): number {
-  return cityDefenseStrength(state, city) + districtFightTerms(state, city.seat, city.centerIndex, city.hp, CITY_MAX_HP);
+  return centreStrength(state, city) + districtFightTerms(state, city.seat, city.centerIndex, city.hp, CITY_MAX_HP);
 }
 
 /** a city-state's centre defending a fight: its standing strength

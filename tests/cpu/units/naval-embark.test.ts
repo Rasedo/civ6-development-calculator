@@ -618,6 +618,10 @@ describe('the naval raider is invisible', () => {
     expect(rangedAttack(state, raider.id, eye.tileIndex).ok).toBe(true);
     expect(raider.revealedTurn).toBe(state.turn);
     expect(unitVisibleTo(state, raider, 0)).toBe(true);
+    // player 0's turn comes before the raider's owner's: the next turn's
+    // start still sees it, the one after not
+    state.turn += 1;
+    expect(unitVisibleTo(state, raider, 0)).toBe(true);
     state.turn += 1;
     expect(unitVisibleTo(state, raider, 0)).toBe(false);
   });

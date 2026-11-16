@@ -293,7 +293,7 @@ def scalar_danger(sim, viewer, b=0):
             if row < sim.n_majors:
                 strike += float(sim._gov_mods(row)[12]["crng"][b])
             strike = int(strike // 1) if pool > 0 else 0
-            dcs = float(sim._city_defense_cs(rt, col)[0][b])
+            dcs = float(sim._centre_strength(rt, col)[b])
             if hseat == viewer:
                 own.append((ctr, strike, dcs))
                 continue

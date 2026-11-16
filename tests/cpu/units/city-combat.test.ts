@@ -309,7 +309,7 @@ describe("a city centre's standing strength", () => {
     expect(centreStrength(state, city, false)).toBe(55);
   });
 
-  it('a garrison no stronger than the base and a foreign unit add nothing', () => {
+  it('a garrison no stronger than the base adds nothing; a foreign unit garrisons as well (0x24a180 asks the best defender of any player)', () => {
     const { state, city } = scene();
     raiseBestTrained(state, 1, 'SWORDSMAN');
     expect(centreStrength(state, city)).toBe(25);
@@ -317,7 +317,7 @@ describe("a city centre's standing strength", () => {
     expect(centreStrength(state, city)).toBe(25);
     w.seat = 0;
     state.seats.find((s) => s.seat === 1)!.bestMeleeCS = CITY_START_MELEE_MAJOR;
-    expect(centreStrength(state, city)).toBe(10);
+    expect(centreStrength(state, city)).toBe(20);
   });
 
   it("a city-state's centre: its best melee (from its start melee) - 10, the Palace, +1 per envoy of the seat holding the most", () => {

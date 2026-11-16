@@ -1988,13 +1988,19 @@ class SimMasks:
         mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
         chassis = self._type_stealth[mtype]
         veil = self._promo_flag(mtype, self.unit_promos.gather(1, mslot), "STEALTH")
-        # ...one that attacked is seen for its turn, a barbarian's for good
-        # (`unitVisibleTo`: their player's turn gives back no hidden
-        # visibility)
+        # ...one that attacked is seen for its turn, and by a player whose
+        # turn comes before its owner's through the turn after, a barbarian's
+        # for good (`unitVisibleTo`: their player's turn gives back no hidden
+        # visibility; `turnOrder`)
         rt = self.unit_revealed_turn.gather(1, mslot)
+        owner = self.unit_seat.gather(1, mslot)
+
+        def order(s):
+            return torch.where(s == BARB_SEAT, 3000, torch.where(s == FREE_SEAT, 2000, torch.where(s < 100, s, 1000 + s)))
+        later = order(owner) > order(sc if torch.is_tensor(sc) else torch.full_like(owner, int(sc)))
         hid = ((occ >= 0) & (chassis | veil)
-               & (rt < self.turn) & ~((rt >= 0) & (self.unit_seat.gather(1, mslot) == BARB_SEAT))
-               & (self.unit_seat.gather(1, mslot) != sc))
+               & (rt < self.turn - later.long()) & ~((rt >= 0) & (owner == BARB_SEAT))
+               & (owner != sc))
         if not bool(hid.count_nonzero()):
             return hidden
         tsel = hid.any(dim=0).nonzero(as_tuple=True)[0]

@@ -849,7 +849,11 @@ def poke_stealth(rules, path, PRIVATEER, FRIGATE, DESTROYER, SCOUT):
     assert not bool(sim._stealth_hidden(1)[0, a]), "a seat cannot see its own raider"
     sim.unit_revealed_turn[0, raider] = sim.turn
     assert not hidden(), "the attack stamp did not reveal the hull"
+    # seat 0's turn comes before the raider's owner's: a strike of the turn
+    # before is still seen, one two turns back not
     sim.unit_revealed_turn[0, raider] = sim.turn - 1
+    assert not hidden(), "seat 0 lost the strike of the turn before"
+    sim.unit_revealed_turn[0, raider] = sim.turn - 2
     assert hidden(), "the reveal outlived its turn"
 
     assert int(sim._unit_sight(torch.tensor([DESTROYER]), torch.zeros(1, dtype=torch.long))[0]) == 3

@@ -1205,7 +1205,7 @@ class SimMinorOps:
                 rt = torch.full_like(col, row)
                 wmax = self._walls_max_at(rt, col).long()
                 pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
-                d = self._city_defense_cs(rt, col)[0].to(torch.float64)
+                d = self._centre_strength(rt, col).to(torch.float64)
                 # the centre's entry where the look takes its plot
                 top = torch.where(looked.gather(1, cc.unsqueeze(1)).squeeze(1), torch.where(pool > 0, d, d - 10), torch.zeros_like(d))
                 # its Encampment placed on a plot the look takes: the
@@ -1219,7 +1219,7 @@ class SimMinorOps:
                     if bool(em.any()):
                         stands = torch.where(self.district_complete[bidx, e0],
                                              torch.minimum(self.encamp_outer_hp[bidx, e0].long(), wmax), wmax) > 0
-                        gar = self._garrison_cs(rt, col, self._ROW_SEAT.take(rt), self._holder_strength(rt, col), plot=e0)
+                        gar = self._garrison_cs(rt, col, self._holder_strength(rt, col), plot=e0)
                         own = (self._centre_strength(rt, col, garrisoned=False) + gar).to(torch.float64)
                         top = torch.where(em, torch.maximum(top, torch.where(stands, own, own - 10)), top)
                 cdef = top.clamp(min=0).trunc().long()

@@ -1714,9 +1714,24 @@ class SimTactics:
         if rv_n is not None:
             land_f, wat_f = self._tac_enter(seat, False, foes=False)
             fits = rv_n | torch.where(naval.unsqueeze(1), wat_f[rows], land_f[rows] | (wat_f[rows] & placed.unsqueeze(1)))
+            land_fb, wat_fb = self._tac_enter(seat, False, foes=False, forts=False)
+            ent_fb = torch.where(naval.unsqueeze(1), wat_fb[rows], land_fb[rows] | (wat_fb[rows] & placed.unsqueeze(1)))
             if pf_b is not None:
-                land_fb, wat_fb = self._tac_enter(seat, False, foes=False, forts=False)
-                fits = fits | (pf_b & torch.where(naval.unsqueeze(1), wat_fb[rows], land_fb[rows] | (wat_fb[rows] & placed.unsqueeze(1))))
+                fits = fits | (pf_b & ent_fb)
+            # ...a district of hit points at war too, but to a formation with
+            # a member whose ranged or bombard strength tops its combat
+            # strength (0x586360 at 0x5866c9..0x58671f)
+            fort_f = self._centre_plane()
+            if self._encamp_didx >= 0:
+                fort_f = fort_f | (self.district == self._encamp_didx)
+            fort_f = fort_f & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+            if bool(fort_f[rows].count_nonzero()):
+                cmb_f = self._ai_combat(pre)
+                sh_f = (self._ai_ranged(pre) > cmb_f) | (self._ai_bombard(pre) > cmb_f)
+                sh_fn = sh_f[rows, slots]
+                if bool(mate_on.count_nonzero()):
+                    sh_fn = sh_fn | (mate_on & sh_f[rows, mate.clamp(min=0)])
+                fits = fits | (fort_f[rows] & ~sh_fn.unsqueeze(1) & ent_fb)
         if not zoc:
             stand = stand & fits
         if listed and not zoc:
@@ -5708,7 +5723,7 @@ class SimTactics:
             raw = raw + self._gov_mods(row)[12]["crng"].double().floor().long()
         pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
         ctr = self.city_center[:, row, c].clamp(min=0)
-        out = [(live, ctr, torch.floor(self._city_defense_cs(rt, col)[0]).long(), torch.where(pool > 0, raw, zero))]
+        out = [(live, ctr, torch.floor(self._centre_strength(rt, col)).long(), torch.where(pool > 0, raw, zero))]
         reg = self.city_dist_tile[:, row, c]
         for di in range(reg.shape[1]):
             plot = reg[:, di]
@@ -5722,7 +5737,7 @@ class SimTactics:
                                      torch.minimum(self.encamp_outer_hp[bidx, p0].long(), wmax), wmax) > 0
                 # its city's standing strength and its own plot's garrison
                 # (0x24ae80 with the garrison flag 0, 0x24a180)
-                gar = self._garrison_cs(rt, col, self._ROW_SEAT.take(rt), self._holder_strength(rt, col), plot=p0)
+                gar = self._garrison_cs(rt, col, self._holder_strength(rt, col), plot=p0)
                 d = torch.floor(self._centre_strength(rt, col, garrisoned=False) + gar).long()
                 out.append((placed, p0, d, torch.where(stands, raw, zero)))
             else:

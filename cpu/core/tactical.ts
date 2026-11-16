@@ -27,7 +27,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, atWarWith, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { centreStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool, wallsMax } from './rules';
 import { cityStateAt, minorCity, suzerainOf } from './cityStates';
@@ -489,7 +489,19 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       seenZocs.set(i, v);
       return v;
     },
-    fits: (i) => revealed(i) || enterable(state, unit, state.map.tiles[i], NO_FOES, embarks, true, borderless),
+    // a plot never revealed is listed where the location test under flag 1
+    // lets the unit stand (0x586900 -> 0x586360): a district of hit points at
+    // war too, but to a formation with a member whose ranged or bombard
+    // strength tops its combat strength (0x5866c9..0x58671f; runs/h1_duels1149
+    // t25: the barbarian Scout on 6:12 lays its 10 on city-state 102's centre
+    // 4:12, never revealed, in player 0's map, its planning 4:12 (1/0))
+    fits: (i) => {
+      if (revealed(i)) return true;
+      const t = state.map.tiles[i];
+      const owner = tileSeat(t);
+      const fortAtWar = garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner });
+      return enterable(state, unit, t, NO_FOES, embarks, !fortAtWar || formationShoots, borderless);
+    },
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
@@ -2560,7 +2572,7 @@ export function dangerDistricts(state: GameState, c: City): { plot: number; def:
   const out: { plot: number; def: number; strike: number }[] = [];
   for (const d of c.districts) {
     if (d.type === 'CITY_CENTER') {
-      out.push({ plot: d.tileIndex, def: Math.floor(cityDefenseStrength(state, c)), strike: outerPool(state, c) > 0 ? strike : 0 });
+      out.push({ plot: d.tileIndex, def: Math.floor(centreStrength(state, c)), strike: outerPool(state, c) > 0 ? strike : 0 });
     } else if (d.type === 'ENCAMPMENT') {
       const t = state.map.tiles[d.tileIndex];
       // a placed Encampment not yet built stands behind its city's whole

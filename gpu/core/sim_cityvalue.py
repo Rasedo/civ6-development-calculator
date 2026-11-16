@@ -2117,7 +2117,7 @@ class _MinorFacts:
         sim = self.sim
         hrow = torch.full((sim.B,), self.row, dtype=torch.long, device=sim.device)
         hcol = torch.full((sim.B,), self._slot, dtype=torch.long, device=sim.device)
-        d = torch.floor(sim._city_defense_cs(hrow, hcol, False)[0]).long()
+        d = torch.floor(sim._centre_strength(hrow, hcol, False)).long()
         out = self._bools(False)
         for p in range(sim.n_majors):
             out = out | (sim.civ_alive[:, p] & self._fights(p) & (sim.civ_best_melee[:, p].long() > d))

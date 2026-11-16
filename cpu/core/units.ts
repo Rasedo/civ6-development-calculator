@@ -451,17 +451,17 @@ export function plotUnits(state: GameState, tileIndex: number): Unit[] {
   return arrivalOrder(unitsAt(state, tileIndex));
 }
 
-/** a district plot's best defender of `seat` (0x208b80 with the comparator
- *  0x523d60 over the plot's list in its order, `plotUnits`): its military
- *  unit, not embarked, of the greatest Combat and formation strength
- *  unwounded, the earliest arrival on a tie (runs/h1_duelp1117 Rome t20:
- *  the wounded Warrior 393220 there from t19 over the Warrior 655361 made
- *  there t20) */
+/** a district plot's best defender of `seat`, of any player for NO_SEAT
+ *  (0x208b80 with the comparator 0x523d60 over the plot's list in its order,
+ *  `plotUnits`): its military unit, not embarked, of the greatest Combat and
+ *  formation strength unwounded, the earliest arrival on a tie
+ *  (runs/h1_duelp1117 Rome t20: the wounded Warrior 393220 there from t19
+ *  over the Warrior 655361 made there t20) */
 export function bestDefender(state: GameState, seat: number, plot: number): { unit: Unit; top: number } | null {
   let pick: Unit | undefined;
   let top = -Infinity;
   for (const u of plotUnits(state, plot)) {
-    if (u.seat !== seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
+    if ((seat !== NO_SEAT && u.seat !== seat) || unitDomain(u.type) !== 'military' || u.embarked) continue;
     const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
     if (s > top) {
       top = s;
@@ -632,6 +632,15 @@ export function unitsHostile(
  * A district sees nothing of its own, so only UNITS answer here — which is
  * also why an adjacent CITY does not give the hex away.
  */
+/** a seat's place in the game turn's player order (the players' DoTurns by
+ *  index: the majors, the city-states, the Free Cities 62, the barbarians
+ *  63) */
+function turnOrder(seat: number): number {
+  if (isCiv(seat)) return seat;
+  if (isCityStateSeat(seat)) return 1000 + seat;
+  return isBarbSeat(seat) ? 3000 : 2000;
+}
+
 export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean {
   // CIV6 (Units.xml, UNIT_SPY `TeamVisibility="true"`): a Spy is seen by its
   // own side alone, so no other seat ever targets, shoots or strikes one.
@@ -648,8 +657,12 @@ export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean 
   // that step (0x4e45c8), so theirs stays seen (runs/h1_duels1149 t207-249:
   // the barbarian Nuclear Submarine 2883601 after its strikes of t206 / t207
   // in player 1's and city-state 3's danger maps, none of their units beside
-  // it)
-  if (u.revealedTurn !== undefined && (u.revealedTurn >= state.turn || isBarbSeat(u.seat))) return true;
+  // it); a player whose turn comes before the owner's sees a strike of the
+  // turn before (runs/h1_duels1143 t233-235: city-state 3's Nuclear
+  // Submarine on 2:18, its strikes on player 0's Warriors of t232-234, lays
+  // its 85 in player 0's maps of t233-235 and none at t236)
+  if (u.revealedTurn !== undefined
+    && (isBarbSeat(u.seat) || u.revealedTurn >= state.turn - (turnOrder(u.seat) > turnOrder(seat) ? 1 : 0))) return true;
   const t = state.map.tiles[u.tileIndex];
   for (const v of state.units) {
     if (v.seat !== seat) continue;

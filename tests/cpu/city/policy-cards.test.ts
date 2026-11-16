@@ -5,7 +5,7 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { applyPolicyEffects, computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from '../../../cpu/core/effects';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { cityBuildingYields } from '../../../cpu/core/yields';
-import { centreStrength, cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
+import { centreStrength, cityStrikeStrength, barbarianCombatCS, wallsStrength } from '../../../cpu/core/combat';
 import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
 import { CITY_MIN_STRIKE_CS } from '../../../cpu/data/constants';
@@ -129,7 +129,7 @@ describe('the flat channels', () => {
   it('BASTIONS raises what a city DEFENDS at and what it FIRES at by different halves', () => {
     const state = makeState(makeMap(16, 16));
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
-    const base = cityDefenseStrength(state, city);
+    const base = centreStrength(state, city);
     // a strike leaves from the best Ranged Strength made, at least 3
     const fires = cityStrikeStrength(state, city);
     expect(fires).toBe(CITY_MIN_STRIKE_CS);
@@ -141,11 +141,10 @@ describe('the flat channels', () => {
     grantCivics(state, 'CODE_OF_LAWS', 'DEFENSIVE_TACTICS', 'COLONIALISM');
     expect(computeAdoption(seatOf(state, 0)!.research).policies).toContain('BASTIONS');
     // the Defense half is EFFECT_ADJUST_CITY_OUTER_DEFENSE: no walls, no +6
-    expect(cityDefenseStrength(state, city)).toBe(base);
+    expect(centreStrength(state, city)).toBe(base);
     expect(cityStrikeStrength(state, city)).toBe(fires + 5);
     city.buildings.push('ANCIENT_WALLS');
-    const walled = centreStrength(state, city);
-    expect(cityDefenseStrength(state, city)).toBe(walled + 6);
+    expect(centreStrength(state, city)).toBe(base + wallsStrength(city) + 6);
   });
 
   it('DISCIPLINE only ever runs one way', () => {

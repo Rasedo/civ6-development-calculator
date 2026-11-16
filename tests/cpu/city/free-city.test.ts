@@ -3,7 +3,7 @@ import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { hexRingWalk, neighbors, tilesWithin } from '../../../world/hex';
 import { flipCity, freeCityAllowed, freeCityChassis, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar, transferCity } from '../../../cpu/core/phase';
-import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
+import { meleeAttack, attackTargets, centreStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, rankLuxuries } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
@@ -406,18 +406,18 @@ describe('the Free City step', () => {
 
   it("a Free City stands on its former owner's base, the owner's live best melee", () => {
     const { state, border } = scene(30);
-    const before = cityDefenseStrength(state, border);
+    const before = centreStrength(state, border);
     border.loyalty = 0;
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
     expect(city.formerSeat).toBe(0);
     expect(before).toBe(10);   // an Ancient major's base: max(20, its best melee) - 10
-    expect(cityDefenseStrength(state, city)).toBe(before);
+    expect(centreStrength(state, city)).toBe(before);
     // the former owner's best melee rises: so does the Free City's base
     seatOf(state, 0)!.bestMeleeCS = 45;
-    expect(cityDefenseStrength(state, city)).toBe(35);
+    expect(centreStrength(state, city)).toBe(35);
     city.buildings.push('ANCIENT_WALLS');
-    expect(cityDefenseStrength(state, city)).toBe(35 + BUILDINGS.ANCIENT_WALLS.wallsStrength!);
+    expect(centreStrength(state, city)).toBe(35 + BUILDINGS.ANCIENT_WALLS.wallsStrength!);
   });
 
   it("a capture takes the captured Free City's grants, never handing them to the captor", () => {

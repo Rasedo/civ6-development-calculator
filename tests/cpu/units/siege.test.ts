@@ -6,7 +6,7 @@ import { neighbors } from '../../../world/hex';
 import { outerPool, repairDrip, wallsMax, wallsTier, availableBuildings } from '../../../cpu/core/rules';
 import { applyLumpYield } from '../../../cpu/core/economy';
 import {
-  ASSIST_RAM, ASSIST_TOWER, attackTargets, districtHit, cityDefenseStrength, cityHitClass,
+  ASSIST_RAM, ASSIST_TOWER, attackTargets, districtHit, centreStrength, cityHitClass,
   cityRangedStrength, encampmentDefense, encircled, meleeAttack, rangedAttack, siegeAssist,
   siegeMayShoot,
 } from '../../../cpu/core/combat';
@@ -123,12 +123,12 @@ describe('the walls tiers', () => {
     // Buildings.OuterDefenseStrength: 3 on each wall building
     const { state, city } = war();
     expect(wallsTier(state, city)).toBe(0);
-    const base = cityDefenseStrength(state, city);
+    const base = centreStrength(state, city);
     const seen: number[] = [];
     for (const b of ['ANCIENT_WALLS', 'MEDIEVAL_WALLS', 'RENAISSANCE_WALLS']) {
       city.buildings.push(b);
       seen.push(wallsMax(state, city));
-      expect(cityDefenseStrength(state, city) - base).toBe(3 * wallsTier(state, city));
+      expect(centreStrength(state, city) - base).toBe(3 * wallsTier(state, city));
     }
     expect(seen).toEqual([100, 200, 300]);
   });
@@ -474,12 +474,12 @@ describe('the Encampment perimeter', () => {
     const att3 = spawnUnit(gar.state, 'SWORDSMAN',
       tileAtCoords(gar.state.map, gar.enc.col + 1, gar.enc.row).index, ATK)!;
     const encBefore = encampmentDefense(gar.state, att3, gar.enc)!.defCS;
-    const cityBefore = cityDefenseStrength(gar.state, gar.city);
+    const cityBefore = centreStrength(gar.state, gar.city);
     spawnUnit(gar.state, 'SWORDSMAN', gar.city.centerIndex, 0);
     seatOf(gar.state, 0)!.bestMeleeCS = 20;
     expect(encampmentDefense(gar.state, att3, gar.enc)!.defCS).toBe(encBefore);
     // base max(20, 20) - 10: the Swordsman adds 35 - 10
-    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + 35 - 10);
+    expect(centreStrength(gar.state, gar.city)).toBe(cityBefore + 35 - 10);
   });
 
   it("with the DISTRICT's perimeter gone the whole roll reaches the garrison", () => {
@@ -510,9 +510,9 @@ describe('the Encampment perimeter', () => {
 
   it('the district fights at the city strength the walls tier raises', () => {
     const { state, city } = withEncampment();
-    const before = cityDefenseStrength(state, city);
+    const before = centreStrength(state, city);
     city.buildings.push('MEDIEVAL_WALLS');
-    expect(cityDefenseStrength(state, city) - before).toBe(3);
+    expect(centreStrength(state, city) - before).toBe(3);
   });
 });
 

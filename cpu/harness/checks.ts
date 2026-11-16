@@ -32,7 +32,7 @@ import { spreadFromUnit } from '../core/unitOrders';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, rankLuxuries, refreshParkAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
-import { centreStrength, cityDefenseStrength } from '../core/combat';
+import { centreStrength } from '../core/combat';
 import { minorCity, resolveSuzerains, suzerainMinorSeats } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn, plotPressure } from '../core/phase';
 import { seatGrowth, lumpFood, lumpGrowth } from '../core/seatTurn';
@@ -1330,7 +1330,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         state.units.push(u);
       }
     }
-    const defense = cityDefenseStrength(state, city);
+    const defense = centreStrength(state, city);
     push('city.defense', defense === num((c.districts[0] ?? [])[5] as number),
       num((c.districts[0] ?? [])[5] as number), defense,
       { buildings: city.buildings, districts: city.districts.map((d) => d.type), bestMelee: seatOf(state, city.seat)?.bestMeleeCS,

@@ -5608,13 +5608,14 @@ class SimSeats:
 
     def _best_defender(self, seat: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
         """[B] or [B, K] long — `bestDefender`, a district plot's best
-        defender of `seat` [B] on `plot` [B] or [B, K] (0x208b80 with the
-        comparator 0x523d60 over the plot's list): its military unit, not
-        embarked, of the greatest Combat and formation strength unwounded, the
-        earliest arrival on a tie (`_arrival_key`); the global slot, -1 none"""
+        defender of `seat` [B], of any player where it is -1, on `plot` [B] or
+        [B, K] (0x208b80 with the comparator 0x523d60 over the plot's list):
+        its military unit, not embarked, of the greatest Combat and formation
+        strength unwounded, the earliest arrival on a tie (`_arrival_key`);
+        the global slot, -1 none"""
         flat = plot.dim() == 1
         p = plot.unsqueeze(1) if flat else plot
-        mil = self._occ_class(self._bidx)[0] & (self.unit_seat == seat.unsqueeze(1))
+        mil = self._occ_class(self._bidx)[0] & ((self.unit_seat == seat.unsqueeze(1)) | (seat < 0).unsqueeze(1))
         here = mil.unsqueeze(1) & (self.unit_tile.unsqueeze(1) == p.unsqueeze(2)) & (p >= 0).unsqueeze(2)
         ty = self.unit_type.clamp(min=0, max=self.NU - 1)
         s = (self._type_combat.take(ty)
@@ -14189,9 +14190,10 @@ class SimSeats:
         return gar, form
 
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
-                     seat: torch.Tensor, base: torch.Tensor, plot: torch.Tensor | None = None) -> torch.Tensor:
-        """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of the
-        holder on the centre, a hull included, adds max(0, its Combat and its
+                     base: torch.Tensor, plot: torch.Tensor | None = None) -> torch.Tensor:
+        """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of any
+        player on the centre (0x24a180 asks 0x208b80 for player -1), a hull
+        included, adds max(0, its Combat and its
         formation's strength less its wounded loss in 1/256 (`_wounded_loss`,
         none for a chassis with no wound penalty) - `base`), associated as TS
         writes it. An aircraft and a passenger are no garrison; with several,
@@ -14200,7 +14202,7 @@ class SimSeats:
         else the centre."""
         bidx = self._bidx
         ctr = (self.city_center[bidx, hrow, hcol.clamp(min=0)] if plot is None else plot).clamp(min=0)
-        gslot = self._best_defender(seat, ctr)
+        gslot = self._best_defender(torch.full_like(ctr, -1), ctr)
         gs0 = gslot.clamp(min=0)
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
         gar = gslot >= 0
@@ -14238,11 +14240,11 @@ class SimSeats:
 
     def _city_combat_defense(self, hrow: torch.Tensor, hcol: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`cityCombatDefense`, [B] each: a major's or a Free City's centre
-        defending a fight — its defence (`_city_defense_cs`) with the
-        defending district's terms (`_district_fight_terms`). Returns
+        defending a fight — its standing strength (`_centre_strength`) with
+        the defending district's terms (`_district_fight_terms`). Returns
         `(def_cs, walls_tier)`."""
         hc0 = hcol.clamp(min=0)
-        def_cs, wtier = self._city_defense_cs(hrow, hcol)
+        def_cs, wtier = self._centre_strength(hrow, hcol), self._walls_tier_at(hrow, hcol)
         ctr = self.city_center[self._bidx, hrow, hc0]
         terms = self._district_fight_terms(self._ROW_SEAT.take(hrow), ctr, self.city_hp[self._bidx, hrow, hc0], self._city_max_hp)
         return def_cs + terms, wtier
@@ -14267,11 +14269,12 @@ class SimSeats:
         city-state's row with its one column 0): the holder's base
         (`_holder_strength`), `Districts.CityStrengthModifier` over the city's
         complete, unpillaged districts counted per instance off the tile plane
-        (`_dist_counts`' rule), each wall building's strength while the perimeter
-        stands, the Palace's +3 where
-        the city holds it (`_palace_at`: a capital, a minor's city), the
-        garrison term (`_garrison_cs`) — left out where `garrisoned` is False
-        (the Encampment) — and a city-state's +1 per envoy of the major that
+        (`_dist_counts`' rule), each wall building's strength and a major's
+        outer defence (Bastions) while the perimeter stands, the inner
+        defence: the Palace's +3 where the city holds it (`_palace_at`: a
+        capital, a minor's city) and a major's Redoubt, the garrison term
+        (`_garrison_cs`) — left out where `garrisoned` is False (the
+        Encampment) — and a city-state's +1 per envoy of the major that
         holds the most there (`_minor_most_envoys`). The garrison term is fractional, so the
         strength is float64, summed in TS's order: the integer terms first,
         then the garrison, then the envoys."""
@@ -14281,43 +14284,29 @@ class SimSeats:
         seat = self._ROW_SEAT.take(hrow)
         base = self._holder_strength(hrow, hcol)
         # each wall building built adds its own strength (`wallsStrength`)
-        # while the perimeter stands (`outerPool` above 0)
+        # and a major its outer defence (Bastions) while the perimeter stands
+        # (`outerPool` above 0)
+        major = hrow < self.n_majors
         _pool = torch.minimum(self.city_outer_hp[bidx, hrow, hc0].long(), self._walls_max_at(hrow, hc0).long())
-        cs = base + (self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1) * (_pool > 0).long()
+        outer = torch.where(major, self._fx_at_seat("cdef", hrow.clamp(max=self.n_majors - 1)).long(), torch.zeros_like(base))
+        cs = base + ((self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1) + outer) * (_pool > 0).long()
         live = ((self.tile_seat == seat.unsqueeze(1))
                 & (self.tile_city == self.city_id[bidx, hrow, hc0].unsqueeze(1))
                 & (self.district >= 0) & self.district_complete & ~self.district_pillaged)
         cs = cs + (live.long() * self._d_city_str.take(self.district.clamp(min=0))).sum(dim=1)
         pal = self.city_is_cap[bidx, hrow, hc0] | minor
-        cs = (cs + pal.long() * self._palace_city_cs).to(torch.float64)
+        cs = cs + pal.long() * self._palace_city_cs
+        # the inner defence's Redoubt (`governorSum`), a major's
+        if self.n_governors:
+            cs = cs + self._governor_city_defense(hrow, hcol)
+        cs = cs.to(torch.float64)
         if garrisoned:
-            cs = cs + self._garrison_cs(hrow, hcol, seat, base)
+            cs = cs + self._garrison_cs(hrow, hcol, base)
         if self.S > 0:
             s0 = (hrow - self._CITY_MINOR0).clamp(min=0, max=self.S - 1)
             env = self._minor_most_envoys()[bidx, s0]
             cs = cs + torch.where(minor, env * self._envoy_city_cs, torch.zeros_like(env))
         return cs
-
-    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
-                         garrisoned: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
-        """`cityDefenseStrength` for whichever row holds the city, [B] each:
-        the centre's standing strength (`_centre_strength`) and — for a MAJOR
-        — its government's city-defense effect and CIV6 (Redoubt): "Increase
-        city garrison Combat Strength by 5." Returns `(def_cs, walls_tier)`."""
-        major = hrow < self.n_majors
-        h0 = hrow.clamp(max=self.n_majors - 1)
-        wtier = self._walls_tier_at(hrow, hcol)
-        def_cs = self._centre_strength(hrow, hcol, garrisoned)
-        # Bastions is EFFECT_ADJUST_CITY_OUTER_DEFENSE: paid while the
-        # perimeter stands (`outerPool` above 0)
-        hc0 = hcol.clamp(min=0)
-        _pool = torch.minimum(self.city_outer_hp[self._bidx, hrow, hc0].long(), self._walls_max_at(hrow, hc0).long())
-        def_cs = def_cs + torch.where(major & (_pool > 0), self._fx_at_seat("cdef", h0).to(def_cs.dtype),
-                                      torch.zeros_like(def_cs))
-        if self.n_governors:
-            def_cs = def_cs + torch.where(major, self._governor_city_defense(h0, hcol).to(def_cs.dtype),
-                                          torch.zeros_like(def_cs))
-        return def_cs, wtier
 
     def _hostile_table(self) -> torch.Tensor:
         """[B, HOST_N, HOST_N] — `_seats_hostile` for EVERY (acting seat, other

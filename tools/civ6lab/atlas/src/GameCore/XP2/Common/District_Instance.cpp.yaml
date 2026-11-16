@@ -180,13 +180,14 @@
     - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
     - "C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   context:
     - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's un..."
   review: reviewed
 - addr: 0x24a180
   final: 0x190d90
   kind: function
-  semantics: "a district's defence terms past the base: its garrison first (the best defender on the district's plot, 0x208b80 flags 0x10: its Combat << 8 less the wounded loss 0x522630, less the base, where positive), then the walls (the buildings' OuterDefenseStrength plus city +0x1888), the districts' strength, the envoy term where the owner can receive influence (GetMostTokensReceived 0x44c4b0 times global +0x22c: the most one player holds, not the sum), the Palace (city +0x188c)."
+  semantics: "a district's defence terms past the base, for any district with hit points (the centre and the Encampment alike): its garrison first (the best defender on the district's plot of ANY player, 0x208b80 with defending player -1, attacking player -1, flags 0x10 at 0x24a24c..0x24a275: its Combat << 8 less the wounded loss 0x522630, less the base, where positive), then the walls while the district's perimeter stands (0x24b960; the buildings' OuterDefenseStrength plus city +0x1888, the outer defence, Bastions), the districts' strength, the envoy term where the owner can receive influence (GetMostTokensReceived 0x44c4b0 times global +0x22c: the most one player holds, not the sum), the inner defence (city +0x188c at 0x24aa0d, unconditional: the Palace's PALACE_ADJUST_GARRISON_STRENGTH and the Redoubt's DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH, both MODIFIER_PLAYER_CITIES_ADJUST_INNER_DEFENSE)."
   status: READ
   cases:
     - recording: 1128
@@ -203,6 +204,12 @@
     - recording: 1119
       turn: 112
       value: 1119 t112 an Archer, no   term).
+    - recording: h1_duels1191
+      turn: 159
+      value: Shanghai's centre and its unbuilt Encampment 8:3 both 81 in the record with the Redoubt (the inner defence on the Encampment); the barbarians' map 82 on 8:3
+    - recording: h1_duels1144
+      turn: 118
+      value: "the barbarian Man-At-Arms on Handan's unbuilt Encampment 12:6 garrisons it: the record's Encampment 47, the centre 42; the barbarians' map 48 on 12:6"
   impl:
     - cpu/core/combat.ts:garrisonCS
     - cpu/harness/checks.ts:luxAtRebuild
@@ -223,6 +230,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   context:
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."
@@ -325,6 +333,7 @@
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
   context:
@@ -524,6 +533,7 @@
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: reviewed

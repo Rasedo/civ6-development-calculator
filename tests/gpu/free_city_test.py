@@ -585,7 +585,6 @@ def test_defence_and_strike(rules, path) -> None:
     assert int(sim._holder_strength(hrow, hcol)[B0]) == int(sim._holder_strength(torch.tensor([0]))[B0])
     sim.civ_best_melee[B0, 0] = 45
     assert int(sim._holder_strength(hrow, hcol)[B0]) == 45 - sim._city_base_melee_cut
-    assert int(sim._city_defense_cs(hrow, hcol)[0][B0]) == int(sim._centre_strength(hrow, hcol)[B0])
     # a capture takes the city's grants, never handing them to the captor
     granted = ((sim.unit_alive[B0] & (sim.unit_seat[B0] == FREE_SEAT)
                 & (sim.unit_free_city[B0] == sim.city_id[B0, F, col])).nonzero(as_tuple=True)[0]).tolist()
@@ -601,12 +600,12 @@ def test_defence_and_strike(rules, path) -> None:
         c = revolt(s)
         j = free_slot(s, c)
         if walled:
-            before = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
+            before = int(s._centre_strength(torch.tensor([F]), torch.tensor([j]))[B0])
             wi = RULES["buildings"].index(next(b for b in RULES["buildings"] if b["id"] == "ANCIENT_WALLS"))
             s.city_bldg[B0, F, j, wi] = True
             s._bldg_version += 1
             s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
-            base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
+            base = int(s._centre_strength(torch.tensor([F]), torch.tensor([j]))[B0])
             assert base == before + int(s._b_walls_cs[wi]), (before, base)
         # the Free Cities' own units gone, so only the city can strike (its
         # units' Attack High takes a foe beside their city)

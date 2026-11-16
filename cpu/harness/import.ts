@@ -3011,10 +3011,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (history?.currents.has(`${u.owner}:${u.id}`) && currentsChassis(unit.type)) unit.currents = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
-    // a barbarian stealth unit that has struck stands seen (`unitVisibleTo`:
-    // their turn gives back no forfeited hidden visibility)
+    // a minor's or a barbarian stealth unit that has struck stands seen from
+    // its last strike (`unitVisibleTo`: a barbarian's for good, another's
+    // till its player's turn gives the forfeited hidden visibility back)
     const hider = !!def.stealth || promoFlag(unit, 'STEALTH');
-    const struck = isBarbSeat(seat) && hider ? history?.struck.get(`${u.owner}:${u.id}`) : undefined;
+    const struck = !isCiv(seat) && hider ? history?.struck.get(`${u.owner}:${u.id}`) : undefined;
     if (struck !== undefined) unit.revealedTurn = struck;
     const taken = history?.captives.get(`${u.owner}:${u.id}`);
     if (taken !== undefined && seatOfGame(taken) !== NO_SEAT && seatOfGame(taken) !== unit.seat) unit.originalOwner = seatOfGame(taken);
