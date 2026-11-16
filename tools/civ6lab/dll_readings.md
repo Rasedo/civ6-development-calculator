@@ -19882,3 +19882,60 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   1572872, keeps the tree's id 8585224 as its controller and the tree runs
   on (Recruit takes the Trebuchet 1310722), which the port ends: what
   keeps the controller is unread.
+
+## C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins
+
+- THE LINKS: a node's children are its six neighbours, then its plot's
+  portal's exits (0x77a50 asks the pool's extra-neighbours callback
+  0x271b50: the i-th exit of the portal on the node's plot, 0x884d0 /
+  0x88630 / 0x88530), each through the same validity and cost as a
+  neighbour. A portal stands on every plot beside a tunnelled mountain that
+  is neither a mountain nor water and names every other portal of its
+  mountain range not beside it (`pathPortals`; `portalExits` holds them per
+  map while the tunnels stand, `_tac_portal_exits` per game). `search`
+  (cpu/core/tactical.ts) links them after the six, `_tac_search` as the
+  columns past the six of each node's links.
+- THE STEP'S COST (0x26e920): the rules add into the context's sum (+0x34,
+  0x26ee80) or lower its cap (+0x30, 0x272ca0), and the step costs the sum
+  held under the cap and over the minimum (0x26ec1a..0x26ec38). The terrain
+  rule 0x531790 adds the plot entered's own cost; the river rule 0x5301e0
+  adds MOVEMENT_RIVER_COST where 0x531510 answers; the portal rule 0x530100
+  adds MOVEMENT_PORTAL_COST (2) where the two plots are not adjacent
+  (0x889e0) and the portal on the plot left names the plot entered
+  (0x88880); the route rule 0x52fa40 caps the whole at the dearer of the
+  two plots' routes where both hold one unpillaged, across a river only
+  where both bridge it (0x530e80) — whatever lies between the two plots.
+  So a portal's step between two road plots costs the road's, and one onto
+  a plot with no road its terrain and 2 more (`stepCost`, cpu/core/units.ts;
+  `_tac_portal_cost` in the search and the walk's `_tac_step`,
+  `_road_terms` under `_step_verb`'s `jump`).
+- THE RIVER'S SIDE (0x531510 -> 0x179890): neither plot water nor a city's;
+  then the river bit (+0x38) of the plot LEFT on the DirectionTypes side
+  the plot entered lies on, read off the signs of the axial step at any
+  distance (a row above NORTHEAST, NORTHWEST where q is below 0; the same
+  row EAST or WEST; a row below SOUTHWEST, SOUTHEAST where q is above 0):
+  beside the plot that is the shared edge, and a portal's step reads the
+  edge toward its exit (`riverCrossing` through `meleeCrossesRiver`;
+  `_tac_river_side`).
+- A PORTAL'S STEP IN THE LOG is a `UnitTeleported` row, no `UnitMoved`: the
+  replay walks a unit the pair lost through it where the plot it stood on
+  names the plot entered among its exits (the 'move' decision's `jumps`,
+  cpu/harness/replayActions.ts; `applyPhase`'s move).
+- Confirmed, runs/h1_duels1169 (the Mountain Tunnels 39:20 of t215 and 38:20
+  after it; the portals 37:19, 37:21, 38:21, 39:19): t222 city-state 4's
+  Trader 851974 on 37:19, 2 Movement, plans the exits 39:19, 38:21, 37:21
+  at (1/0), 39:19 holding no road yet; t223 from 39:19 the exit 37:19 at
+  (1/384), both on its Modern road, 38:21 and 37:21 at (1/0), and the water
+  beyond them at turn 2 (the game's own plannings, 13 of its 25 plots
+  through the exits); t225 / t226 player 0's Scout 3342374 on 37:21 lays
+  its 10 on 37:19 and 39:19 in player 1's and city-state 4's danger maps;
+  t227 it jumps to 37:19 (UnitTeleported), lays 28 plots about 35:13..36:16
+  and falls to city-state 4's centre.
+- Open: the exits' order is the portals' creation order — the tunnels in
+  the order built, the plots beside each in DirectionTypes order (t222 the
+  Trader closes 39:19, 38:21, 37:21 at one cost, t223 38:21 before 37:21;
+  0x871e0 appends each new portal to the others' exits) — and ours is
+  ascending, the state holding no build order (C-133); the Trader's reach
+  over the water a hostile land unit's zone lies on (t225 / t226: 38:22 and
+  37:22 flagged in player 0's Scout's zone, six water plots past them at
+  turn 2 in the game's planning, none in ours) (C-133).

@@ -894,7 +894,7 @@ class SimOrders:
                         one = torch.zeros(B, dtype=torch.bool, device=dev)
                         one[b_] = True
                         # SNIPE is `hostileRangedStrike`, NOT `rangedAttack`:
-                        # its city arm floors at 1 HP without the melee counter
+                        # its city arm holds a centre at 0 hit points without the melee counter
                         # and its scope-out keeps a major's fire off another
                         # major's units. It spends the turn itself, and only
                         # when it fired.

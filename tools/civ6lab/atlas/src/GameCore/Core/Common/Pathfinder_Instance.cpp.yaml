@@ -17,6 +17,7 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:from
     - cpu/core/rules.ts:pathPortals
+    - cpu/core/tactical.ts:links
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
@@ -24,6 +25,7 @@
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."
@@ -177,6 +179,7 @@
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:ReachSearch
     - gpu/core/sim_tactics.py:place
+    - cpu/core/tactical.ts:links
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

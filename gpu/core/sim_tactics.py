@@ -121,6 +121,9 @@ class SimTactics:
     _tac_in_pass = False
     _tac_cost_held = None
     _tac_full_held = None
+    # the portals' exits per plot with the portal plane they were read off
+    # (`_tac_portal_exits`)
+    _tac_exits_cache = None
     # the units of the pass open whose moves an order ended (`movesEnded`,
     # 0x56d6f0): [B, merged slots] bool, None outside a pass; a formation
     # holding one moves no more
@@ -568,6 +571,85 @@ class SimTactics:
         for c in sorted(set(waive.tolist()) - {0}):
             out = torch.where((waive == c).unsqueeze(1), self._tac_cost(c)[rows, frm], out)
         return out
+
+    def _tac_portal_exits(self) -> torch.Tensor | None:
+        """[B, T, P] long — `portalExits`: per plot its portal's exits
+        (`_path_portals`, ascending), -1 past them; None where no game holds
+        a portal. Held while the portals stand on the same mountains."""
+        if not self._imp_portal_any:
+            return None
+        plane = self._portal_plane()
+        if not bool(plane.count_nonzero()):
+            return None
+        held = self._tac_exits_cache
+        if held is not None and torch.equal(held[0], plane):
+            return held[1]
+        per = {}
+        for b in plane.any(dim=1).nonzero(as_tuple=True)[0].tolist():
+            per[b] = self._path_portals(b, plane[b].tolist())
+        width = max((len(v) for d in per.values() for v in d.values()), default=0)
+        ex = None
+        if width:
+            ex = torch.full((self.B, self.T, width), -1, dtype=torch.long, device=self.device)
+            for b, d in per.items():
+                for p, links in d.items():
+                    ex[b, p, :len(links)] = torch.tensor(links, dtype=torch.long, device=self.device)
+        self._tac_exits_cache = (plane.clone(), ex)
+        return ex
+
+    def _tac_river_side(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
+        """bool, `frm`'s shape — the river edge of the plot `frm` on the side
+        of the plot `to` at any distance (`riverCrossing`'s side for two
+        plots not beside each other, 0x179890: `_melee_river`'s), in the
+        games `rows` (broadcast against the plots)"""
+        W = self.W
+        frow, trow = frm // W, to // W
+        dq = (to % W - (trow >> 1)) - (frm % W - (frow >> 1))
+        if self.wrap_x:
+            half = W >> 1
+            dq = torch.where(dq > half, dq - W, torch.where(dq < -half, dq + W, dq))
+        dr = trow - frow
+        k = lambda v: torch.full_like(dq, v)  # noqa: E731
+        g = torch.where(dr > 0, torch.where(dq < 0, k(5), k(0)),
+                        torch.where(dr == 0, torch.where(dq > 0, k(1), torch.where(dq < 0, k(4), k(-1))),
+                                    torch.where(dq <= 0, k(3), k(2))))
+        bit = torch.tensor([5, 0, 1, 2, 3, 4], device=dq.device)[g.clamp(min=0)]
+        return (((self.river_mask[rows, frm] >> bit) & 1) > 0) & (g >= 0)
+
+    def _tac_portal_cost(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor, waive: torch.Tensor,
+                         naval: torch.Tensor, hull: torch.Tensor | None) -> torch.Tensor:
+        """[N, P] long — `stepCost` of a portal's step off each row's plot
+        `frm` [N] onto the exits `to` [N, P], in `mp_scale` units: the plot
+        entered's own cost less the mover's waivers (`_tac_waived`, code
+        `waive` [N]), a river on the side of the exit (`_tac_river_side`)
+        and MOVEMENT_PORTAL_COST more; a route at both ends its tier's
+        instead of all three, across a river only where both bridge it; a
+        hull (`naval` [N]) onto a hull's passage (`hull` [N, T]) one Movement
+        in the plot's place; one Movement at most into a city."""
+        r1 = rows.unsqueeze(1)
+        f1 = frm.unsqueeze(1).expand_as(to)
+        entry = self._tac_entry()[r1, to]
+        for c in sorted(set(waive.tolist()) - {0}):
+            entry = entry - (waive == c).long().unsqueeze(1) * self._tac_waived(c)[r1, to]
+        ctr = self._centre_plane()
+        ctr_to = ctr[r1, to]
+        ctr_any = ctr[r1, f1] | ctr_to
+        river = self._tac_river_side(r1, f1, to) & ~ctr_any
+        rr_f, rr_t = self.railroad[r1, f1], self.railroad[r1, to]
+        rd = ((self.road[r1, f1] | rr_f) & (self.road[r1, to] | rr_t)
+              & ~self.route_pillaged[r1, f1] & ~self.route_pillaged[r1, to])
+        tier_f, tier_t = self.road_tier[r1, f1], self.road_tier[r1, to]
+        rail = torch.full_like(entry, self._railroad_mp)
+        step = torch.maximum(torch.where(rr_f, rail, self._road_tier_mp.take(tier_f)),
+                             torch.where(rr_t, rail, self._road_tier_mp.take(tier_t)))
+        bridged = (rr_f | self._road_tier_bridges.take(tier_f)) & (rr_t | self._road_tier_bridges.take(tier_t))
+        route = rd & (bridged | ~river)
+        extra = torch.where(route, torch.zeros_like(entry),
+                            river.long() * (2 * self._mp_scale) + self._portal_mp * self._mp_scale)
+        cost = torch.where(route, step, entry) + extra
+        if hull is not None:
+            cost = torch.where(naval.unsqueeze(1) & hull.gather(1, to), self._mp_scale + extra, cost)
+        return torch.where(ctr_to, cost.clamp(max=self._mp_scale), cost)
 
     def _tac_full(self, pre: str = "barb") -> tuple[torch.Tensor, torch.Tensor]:
         """[B, P] twice — each unit of pool `pre`'s full Movement
@@ -1138,8 +1220,14 @@ class SimTactics:
         # each open node's key (key cost, cost past it, then its order among
         # equals), NONE off the open list
         key = torch.full((N, TN), NONE, dtype=torch.long, device=dev)
-        # each node's links (its children, CvAStar +0x38) by direction
-        linked6 = torch.zeros(N, TN, 6, dtype=torch.bool, device=dev)
+        # each plot's portal's exits (`portalExits`): the extra neighbours a
+        # node links after its six (0x77a50 over 0x271b50), K links a node
+        ex_b = self._tac_portal_exits()
+        ex_n = ex_b[rows] if ex_b is not None else None  # [N, T, K - 6]
+        K = 6 + (ex_n.shape[2] if ex_n is not None else 0)
+        # each node's links (its children, CvAStar +0x38) by direction, then
+        # by exit
+        linked6 = torch.zeros(N, TN, K, dtype=torch.bool, device=dev)
         # the planning's valid wrapper (0x26e570, the start linked from itself
         # too): a plot holding a district whose type has HitPoints (the city
         # centre, the Encampment) of a player at war with the unit's, pillaged
@@ -1199,33 +1287,44 @@ class SimTactics:
 
             link(start.unsqueeze(1), start, torch.ones_like(start).unsqueeze(1), mv[ar, start].unsqueeze(1),
                  torch.ones_like(start, dtype=torch.bool).unsqueeze(1))
-        none6 = torch.full((N, 6), NONE, dtype=torch.long, device=dev)
-        neg6 = torch.full((N, 6), -1, dtype=torch.long, device=dev)
-        big6 = torch.full((N, 6), NONE, dtype=torch.long, device=dev)
+        none6 = torch.full((N, K), NONE, dtype=torch.long, device=dev)
+        neg6 = torch.full((N, K), -1, dtype=torch.long, device=dev)
+        big6 = torch.full((N, K), NONE, dtype=torch.long, device=dev)
+        hull_n = self._hull_pass()[rows] if ex_n is not None and bool(naval.count_nonzero()) else None
+
+        def wide(x: torch.Tensor, fill) -> torch.Tensor:
+            """a per-direction [N, 6] plane over the K links, `fill` on the
+            exits' columns"""
+            if K == 6:
+                return x
+            return torch.cat((x, torch.full((N, K - 6), fill, dtype=x.dtype, device=dev)), dim=1)
         # the formation's domain as the search sets out (+0x278: sea for a
         # unit embarked now), and the owned water plots (`shoreCrossing`)
         emb_now = getattr(self, f"{pre}_unit_emb")[rows, slots]
         own_w_n = (self.water & (self.tile_seat >= 0))[rows]
         def price6(best: torch.Tensor) -> tuple:
             """a step's turns, Movement and cost from each row's node `best`
-            onto its six neighbours (the cost callback 0x26e920 and 0x270dd0):
-            the neighbours, their attack flags, turns, Movement, cost, cliffs,
-            then each step's carry, the child's water as the search takes it,
-            and the children the player never revealed"""
+            onto its six neighbours and its plot's portal's exits (the cost
+            callback 0x26e920 and 0x270dd0): the K children, their attack
+            flags, turns, Movement, cost, cliffs, then each step's carry,
+            the child's water as the search takes it, and the children the
+            player never revealed"""
             b1n = best.unsqueeze(1)
             bg, bm, bt = g.gather(1, b1n), mv.gather(1, b1n), tn.gather(1, b1n)  # [N, 1]
             # the node's plot (a turn-end node's its plot's)
             best = best % T
             b1 = best.unsqueeze(1)
             nb = neigh[best]  # [N, 6]
+            if ex_n is not None:
+                nb = torch.cat((nb, ex_n[ar, best]), dim=1)  # [N, K]
             nbc = nb.clamp(min=0)
             if rv_n is not None:
                 unrev6 = ~rv_n.gather(1, nbc)
                 blind6 = unrev6 & (~rv_n.gather(1, b1) & (best != start).unsqueeze(1))
             else:
-                unrev6 = torch.zeros(N, 6, dtype=torch.bool, device=dev)
+                unrev6 = torch.zeros(N, K, dtype=torch.bool, device=dev)
                 blind6 = unrev6
-            cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
+            cst = wide((self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols], 0)
             fw = water_n.gather(1, b1)  # [N, 1]
             # no shore crossing where the step's water plot is owned and not
             # one the sea took and the formation embarked as the search sets
@@ -1244,7 +1343,7 @@ class SimTactics:
                 # one Movement at most into a city
                 tw = water_n.gather(1, nbc)
                 tr = (fw != tw) & (nb >= 0)
-                dock = self._embark_waived(best.unsqueeze(1).expand(-1, 6), nbc, rows) | hx
+                dock = self._embark_waived(best.unsqueeze(1).expand(-1, K), nbc, rows) | hx
                 tcost = torch.where(tw, torch.full_like(cst, self._mp_scale), entry_n.gather(1, nbc))
                 # the embark and disembark rules run for a formation that
                 # may embark alone (+0x338, `shoreStep`): one that may not
@@ -1256,33 +1355,37 @@ class SimTactics:
                 # embark and disembark tests 0x52fe90 / 0x52fb90 run on a
                 # revealed child, `search`); a hull or a water walker crosses
                 # no shore (`cliffBlocksStep`)
-                cliff6 = (cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1) & ~unrev6
+                cliff6 = (wide(cliffs_b[rows, best][:, cols], False) & tr & ~waive_cliff.unsqueeze(1) & ~unrev6
                           & ~(naval | ww_n).unsqueeze(1))
             # a hull's step costs one Movement; its strike ashore, or its step
             # onto land it never revealed, the plot's own cost (`stepCost`: no
             # transition for a hull)
             a6 = atk_n.gather(1, nbc) & (nb >= 0)
             ashore = (a6 | unrev6) & ~water_n.gather(1, nbc)
-            cst = torch.where(naval.unsqueeze(1), torch.where(ashore, cost_b[rows, best][:, cols], self._mp_scale), cst)
+            cst = torch.where(naval.unsqueeze(1), torch.where(ashore, wide(cost_b[rows, best][:, cols], 0), self._mp_scale), cst)
+            if K > 6:
+                # a portal's step (`stepCost` between two plots not beside
+                # each other)
+                cst = torch.cat((cst[:, :6], self._tac_portal_cost(rows, best, nbc[:, 6:], waive, naval, hull_n)), dim=1)
             cst = torch.div(cst * _FIX, self._mp_scale, rounding_mode="floor")
             fresh = bm <= 0
             pw = wt.gather(1, b1n)  # [N, 1]
             tw6 = water_n.gather(1, nbc)
-            wet6 = torch.where(blind6, pw.expand(-1, 6), tw6)
+            wet6 = torch.where(blind6, pw.expand(-1, K), tw6)
             # a new turn sets out on the pool of the plot entered (0x26e920 at
             # 0x26ea6d..0x26ea86), of the plot left where the plot entered
             # lies in a zone of control (0x26ea88..0x26eaa2)
-            sea6 = torch.where((fw != wet6) & zt.gather(1, nbc), fw.expand(-1, 6), wet6)
+            sea6 = torch.where((fw != wet6) & zt.gather(1, nbc), fw.expand(-1, K), wet6)
             full6 = torch.where(sea6, full_s.unsqueeze(1), full_l.unsqueeze(1))
-            pm = torch.where(fresh, full6, bm.expand(-1, 6))
-            turns = (bt + fresh.long()).expand(-1, 6)
+            pm = torch.where(fresh, full6, bm.expand(-1, K))
+            turns = (bt + fresh.long()).expand(-1, K)
             # the parent's carry on top (0x26e920); a shore crossing carries
             # the Movement left above the new domain's full Movement
             # (0x530420 / 0x530240); between two unrevealed plots no rule
             # runs: the parent's carry, else one Movement
             crp = cr.gather(1, b1n)
             cst = cst + crp
-            cst = torch.where(blind6, torch.where(crp > 0, crp, _FIX).expand(-1, 6), cst)
+            cst = torch.where(blind6, torch.where(crp > 0, crp, _FIX).expand(-1, K), cst)
             cross = (fw != tw6) & (nb >= 0) & (~naval & ~ww_n & embarks).unsqueeze(1) & ~hx & ~blind6
             max_to = torch.where(wet6, full_s.unsqueeze(1), full_l.unsqueeze(1))
             carry6 = torch.where(cross & (pm > max_to), pm - max_to, torch.zeros_like(pm))
@@ -1382,7 +1485,7 @@ class SimTactics:
                 lk = m.unsqueeze(1) & linked6[ar, p] & (nb >= 0) & (nb != par[ar, p].unsqueeze(1))
                 if link is not None:
                     link(nbc, p, turns, moves, lk)
-                for j in range(6):
+                for j in range(K):
                     k = nbc[:, j]
                     bet = lk[:, j] & (gn[:, j] < g[ar, k])
                     if not bool(bet.count_nonzero()):
@@ -1587,7 +1690,7 @@ class SimTactics:
                     lv_t = torch.where(grp & (sb_all <= mj1), lv_all, -1).max(dim=1).values.clamp(min=0)
                     return t, torch.where(head, lv_h, lv_t)
 
-                for j in range(6):
+                for j in range(K):
                     new = new6[:, j]
                     upo = upo6[:, j]
                     cl = cl6[:, j]
@@ -1651,7 +1754,7 @@ class SimTactics:
                 kx.scatter_(1, torch.where(nb >= 0, nbc, b1), NONE)
                 hi_rest = torch.where(kx < NONE, kx, -1).max(dim=1).values
                 tie6 = t0.clone()
-                for j in range(6):
+                for j in range(K):
                     new = new6[:, j]
                     upo = upo6[:, j]
                     ins = new | upo
@@ -1684,29 +1787,29 @@ class SimTactics:
                 gx = torch.where(new6, gn, neg6)
                 lo_g0 = torch.div(lo, _KEY_SHIFT, rounding_mode="floor")
                 hi_g0 = torch.div(hi, _KEY_SHIFT, rounding_mode="floor")
-                cmin = torch.cat((lo_g0.unsqueeze(1), gi[:, :5]), dim=1).cummin(dim=1).values
+                cmin = torch.cat((lo_g0.unsqueeze(1), gi[:, :K - 1]), dim=1).cummin(dim=1).values
                 hi_g0 = torch.where(hi >= 0, hi_g0, -1)
-                cmax = torch.cat((hi_g0.unsqueeze(1), gx[:, :5]), dim=1).cummax(dim=1).values
-                open_j = torch.cat(((lo < NONE).unsqueeze(1), ins6[:, :5]), dim=1).long().cummax(dim=1).values.bool()
+                cmax = torch.cat((hi_g0.unsqueeze(1), gx[:, :K - 1]), dim=1).cummax(dim=1).values
+                open_j = torch.cat(((lo < NONE).unsqueeze(1), ins6[:, :K - 1]), dim=1).long().cummax(dim=1).values.bool()
                 lo_gj = cmin
                 inr = new6 & open_j & (gn >= lo_gj) & (gn <= cmax)
                 head = (gn - lo_gj).abs() <= (gn - cmax).abs()
                 steps = (inr | upo6).long().cumsum(dim=1) + seq.unsqueeze(1)
                 tie6 = torch.where(new6, torch.where(inr, torch.where(head, -steps, steps), 0),
                                    torch.where(upo6, steps, t0))
-                seq = steps[:, 5]
+                seq = steps[:, K - 1]
                 nk6 = gn * _KEY_SHIFT + tie6 + _TIE_OFF
                 hi = torch.maximum(hi, torch.where(new6, nk6, neg6).max(dim=1).values)
 
             def put(t: torch.Tensor, vals: torch.Tensor, m: torch.Tensor = chg) -> None:
-                t.scatter_(1, torch.where(m, nbc, b1n), torch.where(m, vals, t.gather(1, b1n).expand(-1, 6)))
+                t.scatter_(1, torch.where(m, nbc, b1n), torch.where(m, vals, t.gather(1, b1n).expand(-1, K)))
 
             put(g, gn)
             put(mv, moves)
             put(tn, turns)
             put(cr, carry6)
             put(wt, wet6)
-            put(par, bn.unsqueeze(1).expand(-1, 6))
+            put(par, bn.unsqueeze(1).expand(-1, K))
             put(tie, tie6)
             put(st, torch.ones_like(s0), new6)
             put(key, nk6, ins6)
@@ -1882,7 +1985,8 @@ class SimTactics:
         step its plot's own cost and the embarking's (waived at a Harbor, a
         coastal city centre or by `ign_shore`), a land step the held plane's
         (under each row's waiver code `waive`); one Movement at most into a
-        city."""
+        city; a step between two plots not beside each other a portal's
+        (`_tac_portal_cost`)."""
         naval = self.unit_naval.take(utype)
         fw = self.water[rows, frm]
         tw = self.water[rows, to]
@@ -1899,7 +2003,13 @@ class SimTactics:
                                     torch.full_like(trans, self._embark_transition_mp))
         trans = torch.where(ctr[rows, to], trans.clamp(max=self._mp_scale), trans)
         cost = torch.where(fw & tw, mp1, torch.where(fw != tw, trans, land))
-        return torch.where(naval, mp1, cost)
+        cost = torch.where(naval, mp1, cost)
+        # a portal's step: the two plots not beside each other
+        jump = (frm != to) & (self.pair_dist[frm, to].to(torch.long) > 1)
+        if bool(jump.count_nonzero()):
+            hull = self._hull_pass()[rows] if bool((naval & jump).count_nonzero()) else None
+            cost = torch.where(jump, self._tac_portal_cost(rows, frm, to.unsqueeze(1), waive, naval, hull).squeeze(1), cost)
+        return cost
 
     def _owned_exit(self, rows: torch.Tensor, frm: torch.Tensor) -> torch.Tensor:
         """[R] bool — `shoreCrossing`'s exception: the step leaves an owned

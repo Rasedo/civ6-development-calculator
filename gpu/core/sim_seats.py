@@ -14565,9 +14565,13 @@ class SimSeats:
         u_type = self.unit_type.gather(1, gs1).squeeze(1)
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
         river_mp = (2 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+        # a portal's step (`stepCost`): the two plots not beside each other,
+        # `dir_i` no direction of it
+        dcl = dest.clamp(min=0)
+        jump = ok & (here >= 0) & (dest >= 0) & (hc != dcl) & (self.pair_dist[hc, dcl].to(torch.long) > 1)
         terr, riv = self._road_terms(here, dest, river_mp, u_type, u_promos,
                                      self.unit_seat.gather(1, gs1).squeeze(1),
-                                     self.unit_alpine.gather(1, gs1).squeeze(1))
+                                     self.unit_alpine.gather(1, gs1).squeeze(1), jump)
         land_cost = self._mp_scale + terr + riv
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
@@ -14581,9 +14585,9 @@ class SimSeats:
             waive = (naval | self.unit_water_walk.take(_ut)
                      | self._promo_flag(_ut, u_promos, "CLIFFS"))
             own = self.tile_seat == self.unit_seat.gather(1, gs1)
-            ok = ok & ~self._cliff_block_dirs(
+            ok = ok & ~(self._cliff_block_dirs(
                 hc.unsqueeze(1), self.neigh[hc].unsqueeze(1), own, waive.unsqueeze(1),
-            )[:, 0].gather(1, dir_i.unsqueeze(1)).squeeze(1)
+            )[:, 0].gather(1, dir_i.unsqueeze(1)).squeeze(1) & ~jump)
         emb = self.unit_emb.gather(1, gs1).squeeze(1)
         dc1 = dest.clamp(min=0).unsqueeze(1)
         to_water = self.wpass.gather(1, dc1).squeeze(1)
@@ -14605,8 +14609,10 @@ class SimSeats:
         # walker's own domain): the two plots' water differing, none where
         # the water plot is one the sea took
         crossing = (from_water != to_water) & walker & ~torch.where(from_water, sub_f, sub_t)
+        # (a hull's portal step into a hull's passage: the river and the
+        # portal on its one Movement)
         base_step = torch.where(
-            to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
+            to_water, self._mp_scale + jump.long() * riv, land_cost)
         if bool(crossing.count_nonzero()):
             # A TRANSITION pays no river charge: a river is an edge between
             # two LAND tiles, so stepping off the water crosses none.
@@ -16207,7 +16213,7 @@ class SimSeats:
         self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre[rows].to(self.citystate_hp.dtype)
         if atk_kind == "barb":
             # CIV6: barbarians never capture a city — their assault leaves the
-            # minor standing at 1 HP, `_hostile_ranged_strike`'s own floor.
+            # minor standing at 1 HP.
             self.citystate_hp[rows, citystate_sc[rows]] = \
                 self.citystate_hp[rows, citystate_sc[rows]].clamp(min=1)
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
@@ -16523,12 +16529,12 @@ class SimSeats:
             hr_, hc_ = hrow.take(rows), hcol.take(rows)
             outer = self.city_outer_hp[rows, hr_, hc_]
             self.city_outer_hp[rows, hr_, hc_] = outer - wall.take(rows)
-            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre.take(rows)).clamp(min=1)
+            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre.take(rows)).clamp(min=0)
             self.city_last_hit[rows, hr_, hc_] = self.turn
             self._free_raid_signal(city_att, hrow, hcol, a_seat)
             _chp = self.city_hp[_bidx, hrow, hcol]
             self._award_city_xp(city_att, atk_kind, u, _type_p[:, u], a_seat,
-                                torch.where(_chp <= 1,
+                                torch.where(_chp <= 0,
                                             torch.full_like(_chp, XP_CITY_FELLED),
                                             torch.full_like(_chp, XP_CITY_ATTACK)))
         # A district's defenses answer next, before any unit on the tile: the
@@ -16552,7 +16558,7 @@ class SimSeats:
         # CIV6: a minor's city is a CITY to ranged fire too — a barbarian
         # (`alwaysHostile`) needs no war, a major's SNIPE asks
         # `cityStateAttackable`'s own clauses (a declared war, or a war with
-        # its suzerain), the roll floors the minor at 1 HP.
+        # its suzerain), the roll takes the minor to 0 hit points at most.
         if self.S > 0 and bool(_rest.count_nonzero()):
             _cst = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
             _csgate = (self.citystate_alive[:, :self.S] if row is None
@@ -16573,10 +16579,10 @@ class SimSeats:
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
-            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=1)
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=0)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, _type_p[:, u], a_seat,
-                                torch.where(_cshp <= 1,
+                                torch.where(_cshp <= 0,
                                             torch.full_like(_cshp, XP_CITY_FELLED),
                                             torch.full_like(_cshp, XP_CITY_ATTACK)))
         # THE UNIT ARM, the last fallback: with every row already resolved
@@ -16656,7 +16662,7 @@ class SimSeats:
         One roll, no retaliation, no advance. City-first over a MILITARY
         garrison, then the fallback chain meleeAttack uses (a MAJOR centre,
         then a CITY-STATE centre), then the units on the tile. Ranged fire
-        never captures: a centre floors at 1 HP until melee finishes it, and a
+        never captures: a centre holds at 0 hit points until melee takes it, and a
         LONE hostile civilian TAKES THE ROLL rather than being taken.
 
         This is NOT `hostileRangedStrike`: that one is the AUTONOMOUS strike
@@ -16736,12 +16742,12 @@ class SimSeats:
             hr, sl = hrow[rr], slot[rr]
             outer = self.city_outer_hp[rr, hr, sl]
             self.city_outer_hp[rr, hr, sl] = outer - wall[rr]
-            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre[rr]).clamp(min=1)  # ranged never captures
+            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre[rr]).clamp(min=0)  # ranged never captures
             self.city_last_hit[rr, hr, sl] = self.turn
             self._free_raid_signal(city_att, hrow, slot, aseat)
             _chp = self.city_hp[bidx, hrow, slot]
             self._award_city_xp(city_att, atk_kind, u, a_type[:, u], aseat,
-                                torch.where(_chp <= 1,
+                                torch.where(_chp <= 0,
                                             torch.full_like(_chp, XP_CITY_FELLED),
                                             torch.full_like(_chp, XP_CITY_ATTACK)))
         if bool(cs_att.count_nonzero()):
@@ -16766,10 +16772,10 @@ class SimSeats:
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
-            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=1)
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=0)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, a_type[:, u], aseat,
-                                torch.where(_cshp <= 1,
+                                torch.where(_cshp <= 0,
                                             torch.full_like(_cshp, XP_CITY_FELLED),
                                             torch.full_like(_cshp, XP_CITY_ATTACK)))
         if bool(enc_att.count_nonzero()):

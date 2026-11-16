@@ -194,6 +194,22 @@ export function pathPortals(map: GameMap): Map<number, number[]> {
   return out;
 }
 
+const NO_EXITS: Map<number, number[]> = new Map();
+const exitsHeld = new WeakMap<GameMap, { key: string; exits: Map<number, number[]> }>();
+
+/** `pathPortals` of the map as its portals stand now, held while they stand
+ *  on the same mountains: what a unit's path reads at every node it closes */
+export function portalExits(map: GameMap): Map<number, number[]> {
+  let key = '';
+  for (const t of map.tiles) if (t.improvement && portalAt(t)) key += `${t.index},`;
+  if (!key) return NO_EXITS;
+  const held = exitsHeld.get(map);
+  if (held && held.key === key) return held.exits;
+  const exits = pathPortals(map);
+  exitsHeld.set(map, { key, exits });
+  return exits;
+}
+
 /**
  * CIV6 (`Improvements_XP2.BuildOnAdjacentPlot`: the Mountain Tunnel, Qhapaq
  * Ñan, the Ski Resort): "Can only be built on an adjacent Mountain tile."

@@ -29,7 +29,7 @@ import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
 import { centreStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageTakenExpected, defenderBase, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
-import { encampOuterPool, outerPool, wallsMax } from './rules';
+import { encampOuterPool, outerPool, portalExits, wallsMax } from './rules';
 import { cityStateAt, minorCity, suzerainOf } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, losDisk, unitSight } from './fog';
@@ -151,9 +151,10 @@ function heldCostsOf(state: GameState, unit: Unit, mayEmbark: boolean): Int32Arr
 }
 
 /** a search's step: the formation's domain is its unit's as the search sets
- *  out (`shoreCrossing`'s sea) */
+ *  out (`shoreCrossing`'s sea); a portal's step (`di` below 0) is held by
+ *  no direction */
 function stepCostHeld(state: GameState, unit: Unit, from: Tile, to: Tile, di: number, held: Int32Array | null, mayEmbark: boolean): number {
-  if (!held) return stepCost(state, unit, from, to, mayEmbark, !!unit.embarked);
+  if (!held || di < 0) return stepCost(state, unit, from, to, mayEmbark, !!unit.embarked);
   const at = from.index * 6 + di;
   if (held[at] < 0) held[at] = stepCost(state, unit, from, to, mayEmbark, !!unit.embarked);
   return held[at];
@@ -757,6 +758,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     return v;
   };
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates, dest);
+  const exits = portalExits(map);
   // a plot of a district with hit points of a player at war (0x26e570's
   // district attack: DistrictInfo +0x58 / +0x5c)
   const districtAttack = (t: Tile) => garrisonDistrict(state, t) && unitsHostile(state, unit, { seat: tileSeat(t) });
@@ -872,9 +874,17 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // an attack it strikes from there all the same
     const zoned = !zoc && !standToAttack && best !== start && ground.seenZoc(best.tile);
     const from = map.tiles[best.tile];
-    for (let di = 0; di < DIRECTION_TYPES.length; di++) {
-      const d = DIRECTION_TYPES[di];
-      const to = neighborTile(map, from, d);
+    // the node's children (0x77a50): its six neighbours, then its plot's
+    // portal's exits (the extra neighbours 0x271b50: `portalExits`), each by
+    // the same validity and cost — the step's own cost MOVEMENT_PORTAL_COST
+    // more (`stepCost`) (runs/h1_duels1169 t225: player 0's Scout 3342374 on
+    // 37:21 beside the Mountain Tunnel 38:20 lays its 10 on the exits 37:19
+    // and 39:19 in player 1's and city-state 4's danger maps)
+    const jumps = exits.get(best.tile);
+    const links = DIRECTION_TYPES.length + (jumps ? jumps.length : 0);
+    for (let li = 0; li < links; li++) {
+      const di = li < DIRECTION_TYPES.length ? li : -1;
+      const to = di >= 0 ? neighborTile(map, from, DIRECTION_TYPES[di]) : map.tiles[jumps![li - DIRECTION_TYPES.length]];
       if (!to) continue;
       // a plot the player never revealed is entered whatever it holds: the
       // step's validity (0x2720a0 at 0x272372..0x27242e) tests the location

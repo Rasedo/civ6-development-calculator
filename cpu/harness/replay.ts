@@ -46,7 +46,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
   seatPhase, worldCongress, holdBankruptDisband, completeResearchNow, applySeatPolicies, holdCompletions } from '../core/phase';
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
-import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
+import { availableBuildings, canPlaceWonder, portalExits, validImprovements, wallsMax } from '../core/rules';
 import { arrive, arriveAll, embarksOn, grantFeatureAbilities, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitsHostile, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
@@ -4923,10 +4923,24 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // Giant's Causeway, finds it, and dies to a barbarian later in the
         // turn); the units record t+1 holds walk at `syncUnits`
         const u = unitOf(ctx, d.unit);
-        if (!u || !d.path?.length || b.units.some((r) => `${r.owner}:${r.id}` === d.unit)) break;
+        if (!u || b.units.some((r) => `${r.owner}:${r.id}` === d.unit)) break;
+        // ...a portal's step among them, which the log names a teleport: one
+        // from the plot it stood on to an exit of that plot's portal
+        // (runs/h1_duels1169 t227: player 0's Scout 3342374 goes 37:21 ->
+        // 37:19 through the Mountain Tunnel 38:20 and falls to city-state
+        // 4's centre there)
+        const steps = [...(d.path ?? [])];
+        let through = 0;
+        for (const j of d.jumps ?? []) {
+          const left = j.at + through > 0 ? steps[j.at + through - 1] : u.tileIndex;
+          if (!portalExits(state.map).get(left)?.includes(j.plot)) continue;
+          steps.splice(j.at + through, 0, j.plot);
+          through += 1;
+        }
+        if (!steps.length) break;
         u.fortifyTurns = 0;
-        for (const p of d.path) revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
-        u.tileIndex = d.path[d.path.length - 1];
+        for (const p of steps) revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+        u.tileIndex = steps[steps.length - 1];
         // ...embarked or ashore as that plot leaves it (runs/h1_duels1164
         // t187 / t189: player 0's Warrior walks onto the Coast of 15:14 and
         // falls to city-state 3's Ironclad there, laying its embarked 15 in

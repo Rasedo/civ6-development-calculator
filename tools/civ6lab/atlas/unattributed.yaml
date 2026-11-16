@@ -1124,7 +1124,11 @@
     - recording: h1_duely1124
       turn: 112
       value: "the Builder 5111833 / Man-At-Arms 4784141 formation fights (its Man-At-Arms): its move order passes seen units at war after its first turn"
-  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:from]
+  impl:
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:from
+    - cpu/core/tactical.ts:links
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
   context:
@@ -1943,8 +1947,10 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl: [cpu/core/units.ts:stepCost]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...20's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420..."
   context:
@@ -3485,10 +3491,12 @@
     - gpu/core/sim_masks.py:_road_terms
     - gpu/core/sim_tactics.py:_tac_step_cost
     - cpu/core/units.ts:roadStep
+    - cpu/core/units.ts:stepCost
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The step's route term (0x52fa40, in the cost chain of 0x26e920): both plots carry an unpillaged route; where the step c..."
@@ -3513,6 +3521,7 @@
     - cpu/core/tactical.ts:blind
     - gpu/core/sim_tactics.py:price6
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:links
   readings:
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -3558,6 +3567,7 @@
     - cpu/core/tactical.ts:search
     - gpu/core/sim_tactics.py:_tac_search
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:links
   readings:
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -3607,6 +3617,16 @@
     - "...9 + 0x180 + domain × 4]); the barbarians' land units none. The step: into a city ≤ 1 (0x531660, 0x272ca0), no river crossing at a city or water (0x531510); the embark 0x530420 / dise..."
     - ...te +0x398 picks the callback. Set, the step is priced by 0x270be0 (the movement rules 0x531660 .. 0x530240, no zone call); clear, by 0x270980, which under no flag 0x800 asks the zone...
   review: reviewed
+- addr: 0x531790
+  final: 0x379200
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...he sum held under the cap and over the minimum (0x26ec1a..0x26ec38). The terrain rule 0x531790 adds the plot entered's own cost; the river rule 0x5301e0 adds MOVEMENT_RIVER_COST wher...
+  review: imported
 - addr: 0x533e50
   final: 0x37b5a0
   kind: function

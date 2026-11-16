@@ -187,6 +187,7 @@
     - gpu/core/sim_tactics.py:borderless
     - cpu/core/tactical.ts:attack
     - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:exits
   readings:
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
@@ -248,6 +249,7 @@
     - cpu/core/tactical.ts:wet
     - cpu/core/tactical.ts:sea
     - cpu/core/tactical.ts:all
+    - cpu/core/units.ts:stepCost
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: a river crossing's Movement — READ"
@@ -271,6 +273,7 @@
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
     - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -282,6 +285,7 @@
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
@@ -802,11 +806,22 @@
   cases:
     - recording: c108_t225_20261108T115945Z
       value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
-  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+    - recording: h1_duels1169
+      turn: 222
+      value: city-state 4's Trader 851974 on 37:19 plans the exits 39:19, 38:21 and 37:21 of the Mountain Tunnels 38:20 / 39:20 at turn 1, the game's own planning
+  impl:
+    - cpu/core/rules.ts:pathPortals
+    - gpu/core/sim_masks.py:_path_portals
+    - cpu/core/rules.ts:portalExits
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_portal_exits
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:jumps
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   context:
     - ...a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, chil...
   review: reviewed
@@ -953,6 +968,7 @@
     - cpu/core/tactical.ts:f
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:attack
+    - cpu/core/tactical.ts:links
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"

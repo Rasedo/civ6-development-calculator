@@ -6,14 +6,22 @@
 - addr: 0x530100
   final: 0x377d00
   kind: function
-  semantics: "the movement cost's portal term, the one reader of MOVEMENT_PORTAL_COST (GlobalParameters +0x508, 2): in the cost callbacks' rule chain (0x26e920 at 0x26ebfb, 0x270980, 0x270be0) after the river term 0x5301e0; where the plot left and the plot entered are not adjacent (0x889e0) and the plot left holds a portal (0x884d0 -> 0x88680) whose exits name the plot entered (0x88880), the step's cost takes the parameter << 8 more (0x26ee80). The unit pathfinder (search, _tac_search) links no portal."
-  status: PARTLY
+  semantics: "the movement cost's portal term, the one reader of MOVEMENT_PORTAL_COST (GlobalParameters +0x508, 2): in the cost callbacks' rule chain (0x26e920 at 0x26ebfb, 0x270980, 0x270be0) after the river term 0x5301e0; where the plot left and the plot entered are not adjacent (0x889e0) and the plot left holds a portal (0x884d0 -> 0x88680) whose exits name the plot entered (0x88880), the step's sum takes the parameter << 8 more (0x26ee80); the step's cost is the rules' sum held under their cap (0x26e920 at 0x26ec1a..0x26ec38), so a route on both plots (0x52fa40 through 0x272ca0) caps the portal's term with the rest."
+  status: READ
   cases:
     - recording: h1_duels1169
       turn: 225
-      value: player 0's Scout 3342374 on 37:21 beside the Mountain Tunnel 38:20 lays its 10 on the exits 37:19 and 39:19 in player 1's and city-state 4's danger maps (ours 0 on both), and stands on 37:19 at t227
+      value: player 0's Scout 3342374 on 37:21 beside the Mountain Tunnel 38:20 lays its 10 on the exits 37:19 and 39:19 in player 1's and city-state 4's danger maps, and stands on 37:19 at t227
+    - recording: h1_duels1169
+      turn: 223
+      value: city-state 4's Trader 851974 on 39:19 plans the exit 37:19 at (1/384), both plots on its Modern road, and the exits 38:21 and 37:21, no road, at (1/0); t222 from 37:19 the exit 39:19, no road yet, at (1/0)
+  impl:
+    - cpu/core/units.ts:stepCost
+    - gpu/core/sim_tactics.py:_tac_portal_cost
+    - gpu/core/sim_masks.py:_road_terms
   readings:
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   context:
     - ...AD (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported
     - "- A PORTAL STEP'S COST (0x530100, in the cost callbacks' rule chain 0x26e920 at 0x26ebfb, 0x270980, 0x270be0, after the..."
@@ -28,6 +36,7 @@
     - "C-95: a river crossing's Movement — READ"
     - "C-95: a river crossing's Movement"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Its one reader is the movement cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when t..."
@@ -182,6 +191,7 @@
   impl: [cpu/core/units.ts:routeApplies]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...unpillaged route; where the step crosses a river (0x531510) both routes must bridge it (0x530e80: +0x4d & 6 == 4) or no route term applies (the terrain and the river pay); the step cos..."
@@ -289,6 +299,7 @@
     - "C-95: a river crossing's Movement — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...T 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COS..."
   context:

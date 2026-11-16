@@ -32,7 +32,7 @@ export const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W, DIRECTION_TYPES } from '../../world/hex';
 import { isWater, isImpassable, isMountain, hullPassage, hullTile, naturalWonderAt, isCoastalLand } from '../../world/query';
-import { canRemoveFeature, portalAt, type RuleResult } from './rules';
+import { canRemoveFeature, portalAt, PORTAL_MP, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
@@ -299,11 +299,15 @@ export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { ty
 }
 
 /** does the step cross a river (0x531510): never where either plot is water
- *  or a city's */
+ *  or a city's; else the river edge of the plot left on the side of the plot
+ *  entered (0x179890, the side at any distance: a portal's step reads the
+ *  edge toward its exit, `meleeCrossesRiver`'s side) */
 function riverCrossing(state: GameState, from: Tile, to: Tile): boolean {
   if (isWater(to) || isWater(from)) return false;
   if (from.district === 'CITY_CENTER' || to.district === 'CITY_CENTER') return false;
-  return crossesRiver(state.map, from, to);
+  if (from.riverMask === 0) return false;
+  const d = directionTo(state.map, from, to);
+  return d >= 0 ? (from.riverMask & (1 << d)) !== 0 : meleeCrossesRiver(state.map, from, to);
 }
 
 /**
@@ -1406,13 +1410,25 @@ function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean, sea: 
  *  Move To Safety takes 5:10, AI_Planning.csv). `mayEmbark` the formation's
  *  flag, the unit's own where it moves alone; `sea` the formation's domain
  *  (`shoreCrossing`): a walker's own step leaves water embarked, a search
- *  passes its unit's as it sets out. */
+ *  passes its unit's as it sets out. A step between two plots that are not
+ *  beside each other is a portal's (the pathfinder links none other,
+ *  `pathPortals`): MOVEMENT_PORTAL_COST more (the portal term 0x530100 after
+ *  the river's: the two plots not adjacent, 0x889e0, the portal left naming
+ *  the plot entered among its exits, 0x88880), the whole capped as any step
+ *  by the route the two plots both carry (0x52fa40 through 0x272ca0, the
+ *  step's cost the rules' sum held under their cap: 0x26e920 at
+ *  0x26ec1a..0x26ec38) (runs/h1_duels1169 t223: city-state 4's Trader 851974
+ *  on 39:19 plans the exit 37:19 at (1/384), both on its Modern road, and
+ *  the exits 38:21 and 37:21, no road, at (1/0); t222 from 37:19 the exit
+ *  39:19, its road not yet laid, at (1/0); the game's own plannings). */
 export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile,
   mayEmbark = canEmbark(state, unit), sea = embarksOn(from)): number {
   const transition = shoreStep(unit.type, from, to, mayEmbark, sea);
   let cost: number;
-  if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
-  else {
+  if (!transition) {
+    cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
+    if (from !== to && hexDistance(state.map, from.col, from.row, to.col, to.row) > 1 && !routeApplies(state, from, to)) cost += PORTAL_MP * MP_SCALE;
+  } else {
     // the embark rule 0x530420 (land to water) and the disembark 0x530240
     // waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (the City
     // Center, the Harbor and its replacements) stands at the step's FROM or

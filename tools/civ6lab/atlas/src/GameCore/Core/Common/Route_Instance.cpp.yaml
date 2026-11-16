@@ -38,6 +38,7 @@
   impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed
 - addr: 0x884d0
   final: 0x63c70
@@ -51,6 +52,7 @@
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed
 - addr: 0x88530
   final: 0x63b90
@@ -63,6 +65,7 @@
   impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed
 - addr: 0x88630
   kind: function
@@ -74,6 +77,7 @@
   impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed
 - addr: 0x88680
   final: 0x63cb0
@@ -94,9 +98,15 @@
   final: 0x63e60
   kind: function
   semantics: "(portal, plot coordinates): whether the portal's exits name the plot; asked by the movement cost's portal term 0x530100 of the portal on the plot left."
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duels1169
+      turn: 223
+      value: city-state 4's Trader 851974 on 39:19 pays the portal's 2 onto the exits 38:21 and 37:21, planned at (1/0)
+  impl: [cpu/core/units.ts:stepCost, gpu/core/sim_tactics.py:_tac_portal_cost]
   readings:
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   context:
     - ...) and the plot left holds a portal whose exits name the plot entered (0x884d0, 0x88680, 0x88880), the step's cost takes MOVEMENT_PORTAL_COST (GlobalParameters +0x508, 2) << 8 more (...
   review: reviewed
@@ -110,9 +120,15 @@
     - recording: h1_duely1124
       turn: 112
       value: the attack child's refusal beside the start in 0x2720a0 (no recorded refusal found)
-  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:from]
+  impl:
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:from
+    - cpu/core/tactical.ts:links
+    - cpu/core/units.ts:stepCost
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   review: reviewed

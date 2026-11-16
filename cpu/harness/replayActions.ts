@@ -91,8 +91,11 @@ export type Decision = Base & (
   | { kind: 'governors'; player: number }
   | { kind: 'war'; player: number; other: number; war: boolean }
   | { kind: 'routes'; player: number }
-  /** `path`: the plots the log's `UnitMoved` steps entered, in order */
-  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[] }
+  /** `path`: the plots the log's `UnitMoved` steps entered, in order;
+   *  `jumps`: of a unit the pair lost, the plots its `UnitTeleported` rows
+   *  entered, each after `at` of the path's steps (a portal's step is logged
+   *  so) */
+  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[]; jumps?: { at: number; plot: number }[] }
   | { kind: 'unitNew'; player: number; unit: string; type: number; plot: number; why: 'trained' | 'other' }
   | { kind: 'unitGone'; player: number; unit: string; why: 'founded' | 'consumed' | 'lost' }
   | { kind: 'capture'; player: number; city: number }
@@ -649,6 +652,7 @@ export class RecordedActions implements ActionSource {
     const log = new Map<string, Keyed>();
     const out0: Decision[] = [];
     const paths = new Map<string, number[]>();
+    const jumps = new Map<string, { at: number; plot: number }[]>();
     let removed: string | null = null;
     const put = (kind: string, key: string, d: Decision) => {
       if (!log.has(kind)) log.set(kind, new Map());
@@ -693,6 +697,10 @@ export class RecordedActions implements ActionSource {
       else if (name !== 'UnitPromoted') picking = null;
       if (name === 'UnitActivityChanged') acting.set(n(r, 0), `${n(r, 0)}:${n(r, 1)}`);
       if (name === 'UnitMoved' || name === 'UnitTeleported') stand.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
+      if (name === 'UnitTeleported') {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        jumps.set(k, [...(jumps.get(k) ?? []), { at: paths.get(k)?.length ?? 0, plot: n(r, 3) * W + n(r, 2) }]);
+      }
       if (name === 'UnitGreatPersonActivated') {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         const at = stand.get(k);
@@ -1269,7 +1277,14 @@ export class RecordedActions implements ActionSource {
       const u1 = units1.get(k);
       const owner = u0 && !u1 ? u0.owner : !u0 && u1 ? u1.owner : null;
       if (owner === null) continue;
-      out.push({ kind: 'move', phase: phaseOf(owner), player: owner, unit: k, plot: path[path.length - 1], path });
+      out.push({ kind: 'move', phase: phaseOf(owner), player: owner, unit: k, plot: path[path.length - 1], path,
+        ...(u0 && !u1 && jumps.has(k) ? { jumps: jumps.get(k) } : {}) });
+    }
+    // ...and a unit the pair lost that the log teleports and never steps
+    for (const [k, tele] of jumps) {
+      const u0 = a.units.find((x) => unitKey(x) === k);
+      if (moved.has(k) || paths.get(k)?.length || !u0 || units1.has(k)) continue;
+      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: tele[tele.length - 1].plot, jumps: tele });
     }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();

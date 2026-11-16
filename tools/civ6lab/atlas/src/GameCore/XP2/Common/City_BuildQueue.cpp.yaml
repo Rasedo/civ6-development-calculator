@@ -704,9 +704,20 @@
 - addr: 0x179890
   final: 0xfd3a0
   kind: function
-  status: PARTLY
+  semantics: "(map, plot A's x / y, plot B's x / y): the DirectionTypes side of A on which B lies at any distance, off the signs of the axial step (q = x - floor(y / 2), wrapped by half the width under the map's wrap +0x40): a row above NORTHEAST, NORTHWEST where q is below 0; the same row EAST or WEST, -1 on the plot itself; a row below SOUTHWEST, SOUTHEAST where q is above 0. The river test 0x531510 reads the plot left's river bit +0x38 on that side, a portal's step between two plots not adjacent included."
+  status: READ
+  cases:
+    - recording: h1_duels1169
+      turn: 223
+      value: city-state 4's Trader 851974 on 39:19, no river edge, plans the exit 37:19 two plots west at its Modern road's (1/384)
+  impl:
+    - cpu/core/units.ts:meleeCrossesRiver
+    - gpu/core/sim_masks.py:_melee_river
+    - gpu/core/sim_tactics.py:_tac_river_side
+    - cpu/core/units.ts:riverCrossing
   readings:
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+    - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x60) is adjacent (0x823c0) to the city's plot with the river bit of their direction (0x179890, plot +0x38) — the across-the-river trait; 1.0 for a minor."

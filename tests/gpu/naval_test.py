@@ -329,12 +329,12 @@ def poke_quadrireme_city(rules, path, QUAD):
     sim._apply_seat_unit_actions(0, order(sim, qslot, 6 + d))
     assert int(sim.city_hp[0, r + 1, j]) < hp0, "bombard dealt no damage to the city"
     assert bool(sim.city_alive[0, r + 1, j]), "a ranged bombard must never capture"
-    # at 1 HP the floor holds — the city survives and stays at 1
+    # a shot takes the centre's last hit point and no more — the city stands at 0
     sim.city_hp[0, r + 1, j] = 1
     sim._apply_seat_unit_actions(0, order(sim, qslot, 6 + d))
-    assert int(sim.city_hp[0, r + 1, j]) == 1, "ranged bombard must floor city HP at 1"
-    assert bool(sim.city_alive[0, r + 1, j]), "floored city must remain alive (no ranged capture)"
-    print(f"  4 quadrireme bombards a city OK (hp {hp0}->{int(sim.city_hp[0, r + 1, j]) if False else '..'}->floored at 1, no capture)")
+    assert int(sim.city_hp[0, r + 1, j]) == 0, "ranged bombard must take the city to 0 hit points"
+    assert bool(sim.city_alive[0, r + 1, j]), "a city at 0 hit points must remain alive (no ranged capture)"
+    print(f"  4 quadrireme bombards a city OK (hp {hp0}->{int(sim.city_hp[0, r + 1, j]) if False else '..'}->held at 0, no capture)")
 
 
 def poke_seat0_naval(rules, path, GALLEY, WARRIOR):

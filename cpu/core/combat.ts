@@ -2741,7 +2741,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   );
   // Ranged units CAN bombard cities — same fallback
   // chain as meleeAttack (seat city, then city-state center), the district's
-  // two draws (`districtHit`), no retaliation. Ranged fire never captures: the city holds at 1 HP
+  // two draws (`districtHit`), no retaliation. Ranged fire never captures: it takes the centre to 0 hit points, where it holds
   // until melee takes it.
   //
   // CITY-FIRST, unconditionally, like meleeAttack: the CITY defends its own
@@ -2765,12 +2765,12 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const diff = (rangedCityAtkCS(state, attacker, targetIndex, civCity.holder.seat, relCity) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, civCity.city), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngrc', targetIndex);
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
-    civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
+    civCity.city.hp = Math.max(0, civCity.city.hp - split.centre);
     civCity.city.lastHitTurn = state.turn;
     if (civCity.city.seat === FREE_SEAT) freeRaidSignal(state, civCity.city.centerIndex, attacker.seat);
     warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { dCity: true });
     spendAttack(attacker, true);
-    awardCityXp(state, attacker, civCity.city.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+    awardCityXp(state, attacker, civCity.city.hp <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return ok;
   }
   const encampR = encampmentDefense(state, attacker, target);
@@ -2793,11 +2793,11 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csDiff = (rangedCityAtkCS(state, attacker, targetIndex, cityState.seat, relCity) - defCS);
     const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_MAX_HP) - csSplit.centre);
+    cityState.hp = Math.max(0, (cityState.hp ?? CITY_MAX_HP) - csSplit.centre);
     cityState.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { dCity: true });
     spendAttack(attacker, true);
-    awardCityXp(state, attacker, cityState.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+    awardCityXp(state, attacker, cityState.hp <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return ok;
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
@@ -2908,12 +2908,12 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const diff = (rangedCityAtkCS(state, attacker, targetIndex, held!.holder.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, enemyCity), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngc', targetIndex);
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
-    enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
+    enemyCity.hp = Math.max(0, enemyCity.hp - split.centre);
     enemyCity.lastHitTurn = state.turn;
     if (enemyCity.seat === FREE_SEAT) freeRaidSignal(state, enemyCity.centerIndex, attacker.seat);
     warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { dCity: true });
     spendAttack(attacker, true);
-    awardCityXp(state, attacker, enemyCity.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+    awardCityXp(state, attacker, enemyCity.hp <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return true;
   }
   const encampV = encampmentDefense(state, attacker, target);
@@ -2924,8 +2924,8 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     return true;
   }
   // CIV6: a minor's city is a CITY to ranged fire too — `cityStateAttackable`
-  // answers, the walls take their share first, and the hit floors it at
-  // 1 HP like any centre (only melee finishes a city).
+  // answers, the walls take their share first, and the hit takes it to
+  // 0 hit points at most, as any centre (only melee takes a city).
   const csHere = cityStateAt(state, targetIndex);
   if (csHere && csHere.centerIndex === targetIndex && cityStateAttackable(state, csHere, unitSeat(attacker))) {
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
@@ -2934,11 +2934,11 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const diff = (rangedCityAtkCS(state, attacker, targetIndex, csHere.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
-    csHere.hp = Math.max(1, (csHere.hp ?? CITY_MAX_HP) - split.centre);
+    csHere.hp = Math.max(0, (csHere.hp ?? CITY_MAX_HP) - split.centre);
     csHere.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { dCity: true });
     spendAttack(attacker, true);
-    awardCityXp(state, attacker, csHere.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+    awardCityXp(state, attacker, csHere.hp <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return true;
   }
   // A RANGED unit does not engage another civ's units — the ranged-vs-civ
@@ -3286,7 +3286,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   cityState.hp = (cityState.hp ?? CITY_MAX_HP) - fall.dealt;
   cityState.lastHitTurn = state.turn;
   // CIV6: barbarians never capture a city — their assault leaves the minor
-  // standing at 1 HP, `hostileRangedStrike`'s own city floor.
+  // standing at 1 HP.
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
   attacker.hp -= fall.taken;
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,

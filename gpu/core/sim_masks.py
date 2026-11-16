@@ -2734,9 +2734,14 @@ class SimMasks:
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river_mp: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
-                    useat: torch.Tensor | None = None, alpine: torch.Tensor | None = None):
+                    useat: torch.Tensor | None = None, alpine: torch.Tensor | None = None,
+                    jump: torch.Tensor | None = None):
         """The (terrain, river) MP terms a step pays, route-aware —
-        the `moveCostInto` + `riverCharge` twin. A ROUTE-to-ROUTE step ignores
+        the `moveCostInto` + `riverCharge` twin, with `stepCost`'s portal
+        term where `jump` (the two plots not beside each other): the river
+        read on the side of the exit (`_tac_river_side`) in `river_mp`'s
+        place, and MOVEMENT_PORTAL_COST off a route beside the river's term.
+        A ROUTE-to-ROUTE step ignores
         the terrain penalty entirely ("roads let a unit pass through Woods or
         Hills as if it were flat") and pays its own tier's published cost
         instead, which for a RAILROAD at both ends is `railroad_mp`. Every tier
@@ -2749,8 +2754,8 @@ class SimMasks:
         is nobody's. `tmove` is the mover-free schedule, so each waived charge
         is subtracted back out here.
 
-        The pair returned is (what the step costs BEYOND a plain point, river)
-        — the caller adds the plain point itself."""
+        The pair returned is (what the step costs BEYOND a plain point, the
+        river's and a portal's) — the caller adds the plain point itself."""
         dc = dest.clamp(min=0)
         d1 = dc.unsqueeze(1)
         tm = self.tmove.gather(1, d1).squeeze(1)
@@ -2796,11 +2801,16 @@ class SimMasks:
                            self._road_tier_mp.take(tier)).max(dim=1).values
         bridged = (rr | self._road_tier_bridges.take(tier)).all(dim=1)
         ctr = self._centre_plane().gather(1, ends).any(dim=1)
+        if jump is not None and bool(jump.count_nonzero()):
+            side = self._tac_river_side(torch.arange(frm.shape[0], device=frm.device), frm.clamp(min=0), dc)
+            river_mp = torch.where(jump, side.long() * (2 * self._mp_scale), river_mp)
         route = rd & (bridged | (river_mp == 0) | ctr)
         terr = torch.where(route, step - self._mp_scale, tm)
         riv = torch.where(route | ctr, torch.zeros_like(river_mp), river_mp)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
+        if jump is not None:
+            riv = riv + (jump & ~route).long() * (self._portal_mp * self._mp_scale)
         return terr, riv
 
     def _religious_zeal(self, utype: torch.Tensor, useat: torch.Tensor) -> torch.Tensor:
