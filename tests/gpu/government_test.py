@@ -231,9 +231,9 @@ def main() -> None:
     #    and the DELETED unsourced magnitudes staying deleted.
     ui = {u["id"]: i for i, u in enumerate(rj["units"])}
     oli, fas = gov_idx["OLIGARCHY"], gov_idx["FASCISM"]
-    bt = sim._gov_ucs_by_type
+    bt = sim._gov_ucs_by_type + sim._gov_ucsa_by_type
     for uid, o_want, f_want in (("WARRIOR", 4, 5), ("SPEARMAN", 4, 5), ("GALLEY", 4, 5),
-                                ("ARCHER", 0, 5), ("CATAPULT", 0, 5),
+                                ("ARCHER", 0, 5), ("CATAPULT", 0, 5), ("WARRIOR_MONK", 4, 0),
                                 ("SETTLER", 0, 0), ("TRADER", 0, 0)):
         assert float(bt[oli, ui[uid]]) == o_want, f"OLIGARCHY {uid}: want {o_want}"
         assert float(bt[fas, ui[uid]]) == f_want, f"FASCISM {uid}: want {f_want}"
@@ -271,7 +271,7 @@ def main() -> None:
     def ucs(sim_, uid, seat_t, attacking=True):
         return int(sim_._gov_unit_cs(torch.full((sim_.B,), ui[uid], dtype=torch.long), seat_t, attacking)[0])
 
-    for uid, want in (("WARRIOR", 5), ("ARCHER", 5), ("GALLEY", 5), ("SETTLER", 0), ("TRADER", 0)):
+    for uid, want in (("WARRIOR", 5), ("ARCHER", 5), ("GALLEY", 5), ("WARRIOR_MONK", 0), ("SETTLER", 0), ("TRADER", 0)):
         assert ucs(simc, uid, s0) == want, f"FASCISM _gov_unit_cs {uid}: want {want}"
         assert ucs(simc, uid, s0, False) == 0, f"FASCISM _gov_unit_cs {uid} defending: want 0"
     cs_seat = torch.full((simc.B,), 100, dtype=torch.long)
@@ -280,7 +280,7 @@ def main() -> None:
     simc._gov_ucsa_by_type[fas] = simc._gov_ucsa_by_type[oli]
     simc._eff_version += 1
     simc._gov_cat_version += 1
-    for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("ARCHER", 0), ("SETTLER", 0)):
+    for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("WARRIOR_MONK", 4), ("ARCHER", 0), ("SETTLER", 0)):
         assert ucs(simc, uid, s0) == want, f"OLIGARCHY-row _gov_unit_cs {uid}: want {want}"
 
     # 12) The specialty-district walk arms, borrowed onto the adopted row:

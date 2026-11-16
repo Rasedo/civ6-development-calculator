@@ -31,13 +31,14 @@ export const PROMO_CLASSES = [
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
-/** the classes a `CS_VS_*` mask can address, in BIT order — the wire's own
- *  numbering, so a new class appends and never renumbers an exported mask.
- *  APOSTLE and MONK are never targets. */
+/** the classes a `CS_VS_*` mask or a government's or card's class list can
+ *  address, in BIT order — the wire's own numbering, so a new class appends
+ *  and never renumbers an exported mask. MONK is the Warrior Monk's
+ *  CLASS_WARRIOR_MONK; APOSTLE is never a target. */
 const TARGET_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED',
-  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER', 'NAVAL_CARRIER', 'MONK',
 ] as const;
 export const CLASS_BIT: Readonly<Record<string, number>> = Object.fromEntries(
   TARGET_CLASSES.map((c, i) => [c, 1 << i]),

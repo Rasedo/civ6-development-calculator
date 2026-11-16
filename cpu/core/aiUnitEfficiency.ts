@@ -17,11 +17,11 @@
  */
 import { AI_UNITS } from '../data/aiBuildTables';
 import {
-  COMBAT_BOMBARD_VS_UNIT, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT,
+  COMBAT_BOMBARD_VS_UNIT, COMBAT_MAX_HIT_POINTS,
 } from '../data/constants';
 import type { AiUnitRow } from './aiCityBuild';
 import type { AiModifier, AiRequirementSet } from './aiModifiers';
-import { damageExpected } from './combat';
+import { damageTakenExpected } from './combat';
 
 type CombatType = 'COMBAT_MELEE' | 'COMBAT_RANGED' | 'COMBAT_BOMBARD';
 
@@ -110,17 +110,6 @@ function domainTerm(att: AiUnitRow, def: AiUnitRow, ct: string): number {
   return 0;
 }
 
-/** the damage one side takes (0x51a240 -> 0x519090 under the simulation
- *  flag): a side of base strength 0 takes COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT
- *  of its hit points; a side of strength 0 takes them all, a side struck at
- *  strength 0 the least; else the law's expectation */
-function damageTo(base: number, own: number, foe: number): number {
-  if (base <= 0) return Math.trunc((COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT * COMBAT_MAX_HIT_POINTS) / 100);
-  if (own === 0) return COMBAT_MAX_HIT_POINTS;
-  if (foe === 0) return COMBAT_MINIMUM_DAMAGE;
-  return damageExpected(foe - own);
-}
-
 /** an air unit's strike on a unit (0x203cb0, no interceptor, no anti-air
  *  cover): an air target fought in the dogfight at Combat, any other at
  *  RangedCombat or Bombard, whichever is larger (Combat on a tie); the
@@ -138,7 +127,7 @@ function airStrike(p: AiUnitRow, t: AiUnitRow): [number, number] {
   const tBase = !fighter(t) && t.antiAir > 0 ? t.antiAir : t.combat;
   const pS = pBase + ownStrength(p) + combatModifiers(p, t, ct) + domainTerm(p, t, ct);
   const tS = tBase + ownStrength(t);
-  return [answers ? damageTo(pBase, pS, tS) : 0, damageTo(tBase, tS, pS)];
+  return [answers ? damageTakenExpected(pBase, pS, tS) : 0, damageTakenExpected(tBase, tS, pS)];
 }
 
 /** one simulated blow of `a` on `b`: [a's damage, b's] */
@@ -148,12 +137,12 @@ function blow(a: AiUnitRow, b: AiUnitRow): [number, number] {
   const aBase = ct === 'COMBAT_RANGED' ? a.rangedCombat : ct === 'COMBAT_BOMBARD' ? a.bombard : a.combat;
   const aS = aBase + ownStrength(a) + combatModifiers(a, b, ct) + domainTerm(a, b, ct);
   const bS = b.combat + ownStrength(b);
-  let dB = damageTo(b.combat, bS, aS);
+  let dB = damageTakenExpected(b.combat, bS, aS);
   if (ct !== 'COMBAT_MELEE') return [0, dB];
   // the melee result (0x206960): the attacker's damage the law's the other
   // way; a support defender falls whole; where both would fall the attacker
   // is left at 1 HP (its overshoot no larger than the defender's)
-  let dA = damageTo(aBase, aS, bS);
+  let dA = damageTakenExpected(aBase, aS, bS);
   if (b.support) dB = COMBAT_MAX_HIT_POINTS;
   if (dA >= COMBAT_MAX_HIT_POINTS && dB >= COMBAT_MAX_HIT_POINTS) dA = COMBAT_MAX_HIT_POINTS - 1;
   return [dA, dB];

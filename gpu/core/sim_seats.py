@@ -13523,7 +13523,14 @@ class SimSeats:
                          + self._era_matchup_cs(def_civ_u, at)
                          + self._gdr_armor_cs(d_type, def_civ_u, at)
                          + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
-        return atk_e, def_e, d_emb
+        return atk_e, self._baseless_support_def(d_type, d_emb, def_e), d_emb
+
+    def _baseless_support_def(self, d_type: torch.Tensor, d_emb: torch.Tensor, def_e: torch.Tensor) -> torch.Tensor:
+        """`defenderCS`' first test: a defender of the support class of no
+        base strength and no anti-air strength defends at 0, no term taken"""
+        dt = d_type.clamp(min=0, max=self.NU - 1)
+        bare = self._type_support.take(dt) & ~d_emb & (self._type_combat.take(dt) == 0) & ~(self._type_anti_air.take(dt) > 0)
+        return torch.where(bare, torch.zeros_like(def_e), def_e)
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """`meleeAttackInner`'s unit arm — the ONE melee-vs-unit
@@ -14848,6 +14855,10 @@ class SimSeats:
                  - self._wound(a_hp[:, u], a_type[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
                  + rel.to(def_cs.dtype)
+                 + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True,
+                                            alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u],
+                                            fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u],
+                                            combat_tile=tc).to(def_cs.dtype)
                  + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
                                      self.unit_naval[at0] | a_emb[:, u], at0).to(def_cs.dtype)
                  + (self._congress_unit_cs(at0, a_seat[:, u])
@@ -15674,7 +15685,8 @@ class SimSeats:
         column `u` of pool `atk_kind` — the city ranged strength, the
         formation's, convoy's, fuel's and chassis' terms, its wound, its
         promotions; a major's religion adder and aura inside the ranged
-        strength's parentheses; Congress, government and the roster's"""
+        strength's parentheses; its abilities' terms as an assault takes
+        them (`_chassis_ability_cs`); Congress, government and the roster's"""
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -15692,6 +15704,10 @@ class SimSeats:
             # stands — before the aura add, as the TS assembly orders them
             atk_e = atk_e + self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval, ut0).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, vs_district=True,
+                                                 alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u],
+                                                 fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u],
+                                                 combat_tile=tgt).to(atk_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                          + self._gov_unit_cs(ut0, a_seat, True)).to(atk_e.dtype)
         atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True,
@@ -16398,7 +16414,7 @@ class SimSeats:
                          + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
         atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
                          + self._gov_unit_cs(at, a_seat, True)).to(atk_e.dtype)
-        return atk_e, def_e
+        return atk_e, self._baseless_support_def(d_type, d_emb, def_e)
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int,
                                row: int | None = None) -> torch.Tensor:
@@ -16616,6 +16632,12 @@ class SimSeats:
         enc_att = att & ~city_t & enc_t
         cs_att = att & ~city_t & ~enc_t & cs_t
         rel_city = self._rel_atk_cs(aseat, tgt).to(atk_base.dtype)
+        # a centre's attacker takes its religion's adder and its abilities'
+        # terms (`rangedCityAtkCS`)
+        ctr_city = rel_city + self._chassis_ability_cs(
+            aseat, at0, a_tile[:, u], vs_district=True,
+            alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u],
+            fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tgt).to(atk_base.dtype)
         # both city arms split the roll by the attacker's hit class
         _klass = self._hit_class(at0, True)
 
@@ -16629,7 +16651,7 @@ class SimSeats:
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             _wmax = self._walls_tier_hp[_wtier]
             wall, centre = self._district_hit(city_att,
-                                              atk_base - atk_rs0 + _rs + _cpromo + rel_city
+                                              atk_base - atk_rs0 + _rs + _cpromo + ctr_city
                                               + self._roster_cs(aseat, at0, a_tile[:, u], hseat, None, True,
                                                                 getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                                                 getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
@@ -16660,7 +16682,7 @@ class SimSeats:
             _cs_rs = self._city_ranged_strength(at0, aseat)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             cs_wall, cs_centre = self._district_hit(cs_att,
-                                                    atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city
+                                                    atk_base - atk_rs0 + _cs_rs + _cpromo + ctr_city
                                                     + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True,
                                                                       getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                                                       getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
@@ -16743,6 +16765,7 @@ class SimSeats:
                              + self._era_matchup_cs(_ucs_seat, at0)
                              + self._gdr_armor_cs(d_type, _ucs_seat, at0)
                              + self._governor_territory_cs(_ucs_seat, tgt)).to(def_e.dtype)
+            def_e = self._baseless_support_def(d_type, d_emb, def_e)
             def_hp0 = self.unit_hp[bidx, ds0]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt,
                                       parts=(atk_e, def_e, at0, aseat, d_type, d_seat))

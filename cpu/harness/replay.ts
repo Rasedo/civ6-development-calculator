@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { arrive, arriveAll, embarksOn, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, embarksOn, grantFeatureAbilities, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -106,7 +106,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, bindPerson, engineFeature, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, bindPerson, engineFeature, engineRowOf, formationRows, promotionId, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -1504,11 +1504,27 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // 6:12 in their turn)
   const start = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const startDamage = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, num(r.damage)]));
+  const placed = new Map<string, { at: number; dug: number }>(b.units.map((r) => [`${r.owner}:${r.id}`, { at: r.y * ctx.W + r.x, dug: num(r.fortify) }]));
   for (const c of copy.units) {
     const u = twin.get(c);
     const key = u ? keyOf.get(u) ?? '' : '';
     const at = u && (!isBarbSeat(u.seat) || !before.has(u)) && open !== undefined ? last.get(key) ?? start.get(key) : undefined;
-    if (at !== undefined) c.tileIndex = at;
+    // ...holding the ability a natural wonder beside that plot grants for
+    // good (runs/h1_duels1132 t72: player 1's Archer 655367 steps onto 9:15
+    // beside the Giant's Causeway in its turn, the barbarian Archer 2424847's
+    // planned blow on it 35, its shot back 65)
+    if (at !== undefined) {
+      c.tileIndex = at;
+      grantFeatureAbilities(copy, c);
+      // ...and, where the log placed it this turn and record t+1 holds it
+      // there, dug in as that plot grants and that record holds, no further
+      // (runs/h1_duels1152 t43: player 1's Warrior 393220 steps onto its
+      // Great Wall 33:10, two turns dug in under the barbarian Archers'
+      // planned blows, 25 and 17; h1_duels1165 t139: its Bombard 4063258
+      // onto the Great Wall 6:16, none)
+      const then = placed.get(key);
+      if (last.has(key) && then && then.at === at) c.fortifyTurns = Math.min(plotFortification(copy, at), then.dug);
+    }
     // ...with the damage it holds then: the blows of the players before
     // them landed, its own turn's pillage heal and the turn's end heal not
     // (runs/h1_duely1121 t157: the Line Infantry 4128797 on 9:12 at 38 after
@@ -1641,9 +1657,17 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     twin.set(c, u);
     if (isBarbSeat(u.seat)) acting.add(c.id);
   }
+  // (dug in as that record holds it, its own turn's steps not yet taken:
+  // runs/h1_duels1140 t85 the Archer 2228248 on 10:11 at no turn, the two its
+  // step onto the Great Wall 12:12 gives it record t+1's)
+  const startDug = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, num(r.fortify)]));
   for (const [c, u] of twin) {
     const at = from.get(u);
-    if (at !== undefined) c.tileIndex = at;
+    if (at === undefined) continue;
+    c.tileIndex = at;
+    const key = keyOf.get(u) ?? '';
+    const dug = ctx.undug.has(key) ? undefined : startDug.get(key);
+    if (dug !== undefined && isBarbSeat(c.seat)) c.fortifyTurns = dug;
   }
   // a land unit those plots leave on water stands embarked (runs/h1_duely1127
   // t148: player 0's Warrior 5439559 on the coast's 30:16, struck by the
@@ -4893,7 +4917,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the pick is the player's; the experience that earned it is the
         // record's battles' (`combat`), so the unit holds the record's
         const u = unitOf(ctx, d.unit);
-        const name = (ctx.cat.unitPromotions ?? [])[d.promotion]?.replace(/^PROMOTION_/, '');
+        const name = promotionId(ctx.cat, d.promotion);
         if (!u || !name) { count(ctx, 'promote', 'refused', d.player); break; }
         const k = unitPromoRows(u).findIndex((p) => p.id === name);
         u.xp = Math.max(u.xp ?? 0, d.xp);

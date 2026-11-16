@@ -232,13 +232,14 @@
     - cpu/data/constants.ts:damageRaw
     - gpu/core/sim_init.py:__init__
     - cpu/core/combat.ts:damageExpected
-    - cpu/core/aiUnitEfficiency.ts:damageTo
+    - cpu/core/combat.ts:damageTakenExpected
   readings:
     - "H-1: the draws per event (`dll_rng.py`)"
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
+    - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...mbat: one \"Unit Combat Damage\" draw rand(COMBAT_MAX_EXTRA_DAMAGE 12) per damage figure (0x519090; the preview takes the midpoint 6, no draw); \"Unit Capture Chance\" on a capture; an int..."

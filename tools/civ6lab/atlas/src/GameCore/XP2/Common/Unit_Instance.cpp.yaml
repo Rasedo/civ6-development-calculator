@@ -238,6 +238,17 @@
   context:
     - "...type, its +0x890 clear, in no formation; 0x536da0 with the unit: no anti-air strength (0x56d940), not of the air, its Units_XP2 row's CanFormMilitaryFormation, not UseMaxMeleeTrainedS..."
   review: imported
+- addr: 0x56d960
+  final: 0x3a3340
+  kind: function
+  name: GetAntiAirCombat
+  status: PARTLY
+  readings:
+    - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...defender of formation class 1 whose GetCombat (0x56dc90, dl 0) and GetAntiAirCombat (0x56d960) are both 0 defends at 0, no term taken. `defenderCS`, `_baseless_support_def`. In the..."
+  review: imported
 - addr: 0x56d9f0
   final: 0x3a33d0
   kind: function
@@ -383,6 +394,7 @@
     - cpu/core/opsOrders.ts:targetStrength
     - cpu/core/combat.ts:defenderCS
     - gpu/core/sim_seats.py:_melee_unit_strengths
+    - cpu/core/combat.ts:defenderBase
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
@@ -409,6 +421,7 @@
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:

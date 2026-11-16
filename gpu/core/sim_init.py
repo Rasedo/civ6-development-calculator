@@ -3277,15 +3277,14 @@ class SimInit:
             self._gov_gpp = torch.tensor(
                 [[float(x) for x in r["gpp"]] for r in _govs],
                 dtype=torch.float64, device=device)
-            # unitCombatCS [promotion-class mask, allCombat, cs, attacking
-            # only] — the PROMOTION-class axis (`governmentUnitCS`):
-            # Oligarchy names MELEE, ANTICAV and NAVAL_MELEE; Fascism's `all`
-            # arm reaches every combat unit's attack.
+            # unitCombatCS [promotion-class mask, cs, attacking only] — the
+            # PROMOTION-class axis (`governmentUnitCS`): Oligarchy names
+            # MELEE, ANTICAV, NAVAL_MELEE and MONK; Fascism every class its
+            # abilities' TypeTags name, on the unit's attack.
             _gucs = [r["unitCombatCS"] for r in _govs]
             self._gov_ucs_mask = torch.tensor([int(x[0]) for x in _gucs], dtype=torch.long, device=device)
-            self._gov_ucs_allc = torch.tensor([bool(x[1]) for x in _gucs], dtype=torch.bool, device=device)
-            self._gov_ucs_cs = torch.tensor([float(x[2]) for x in _gucs], dtype=torch.float64, device=device)
-            self._gov_ucs_att = torch.tensor([bool(x[3]) for x in _gucs], dtype=torch.bool, device=device)
+            self._gov_ucs_cs = torch.tensor([float(x[1]) for x in _gucs], dtype=torch.float64, device=device)
+            self._gov_ucs_att = torch.tensor([bool(x[2]) for x in _gucs], dtype=torch.bool, device=device)
             self._gov_xppct = torch.tensor([float(r["xpPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_wwpct = torch.tensor([float(r["wwPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
@@ -3324,7 +3323,7 @@ class SimInit:
                 + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
                 + self._gov_gpp.abs().sum()
-                + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
+                + (self._gov_ucs_cs.abs() * (self._gov_ucs_mask != 0).double()).sum()
                 + self._gov_xppct.abs().sum()
                 + self._gov_wwpct.abs().sum() + (self._gov_gppmult - 1).abs().sum()
                 + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
@@ -3477,9 +3476,8 @@ class SimInit:
             # the civic that RETIRES the card; -1 = it never leaves the pool
             _pucs = [r["unitCombatCS"] for r in _pols]
             self._pol_ucs_mask = torch.tensor([int(x[0]) for x in _pucs], dtype=torch.long, device=device)
-            self._pol_ucs_allc = torch.tensor([bool(x[1]) for x in _pucs], dtype=torch.bool, device=device)
-            self._pol_ucs_cs = torch.tensor([float(x[2]) for x in _pucs], dtype=torch.float64, device=device)
-            self._pol_ucs_att = torch.tensor([bool(x[3]) for x in _pucs], dtype=torch.bool, device=device)
+            self._pol_ucs_cs = torch.tensor([float(x[1]) for x in _pucs], dtype=torch.float64, device=device)
+            self._pol_ucs_att = torch.tensor([bool(x[2]) for x in _pucs], dtype=torch.bool, device=device)
             self._pol_xppct = torch.tensor([float(r["xpPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_wwpct = torch.tensor([float(r["wwPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gppmult = torch.tensor([float(r["gppMult"]) for r in _pols], dtype=torch.float64, device=device)
@@ -3512,7 +3510,7 @@ class SimInit:
                 + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
                 + self._pol_gpp.abs().sum()
-                + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
+                + (self._pol_ucs_cs.abs() * (self._pol_ucs_mask != 0).double()).sum()
                 + self._pol_xppct.abs().sum()
                 + self._pol_wwpct.abs().sum() + (self._pol_gppmult - 1).abs().sum()
                 + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
@@ -4584,6 +4582,7 @@ class SimInit:
         self._dmg_max_extra = int(cb["dmgMaxExtra"])
         self._dmg_min = int(cb["dmgMin"])
         self._dmg_max = int(cb["dmgMax"])
+        self._dmg_baseless = int(cb["dmgBaseless"])
         # EMBARK: the Classical embarked pool, the rungs that raise it, the
         # Mathematics rung every hull and passenger reads, and the
         # embark/ocean tech gate indices (Shipbuilding embarks every land
@@ -4684,22 +4683,22 @@ class SimInit:
         self._type_melee = torch.tensor([bool(u["melee"]) for u in ru], dtype=torch.bool, device=device)
         self._type_anticav = torch.tensor([bool(u["antiCavalry"]) for u in ru], dtype=torch.bool, device=device)
         # the per-TYPE flat Combat Strength each government/policy row grants
-        # (`_gov_unit_cs`): a promotion-class mask hit, or the all-combat
-        # arm, both gated on the chassis carrying any strength at all; the
-        # rows paid wherever the unit fights (`ucst`) apart from those paid on
-        # its attack alone (`ucsa`)
+        # (`_gov_unit_cs`): a hit of the row's class mask on the bit the
+        # chassis' promotion class presents (`classBitOf`), gated on the
+        # chassis carrying any strength at all; the rows paid wherever the
+        # unit fights (`ucst`) apart from those paid on its attack alone
+        # (`ucsa`)
         _pcls = self.rules_dev.u_promo_class
-        _pbit = torch.where(_pcls >= 0, torch.ones_like(_pcls) << _pcls.clamp(min=0), torch.zeros_like(_pcls))
+        _pbit = torch.where(_pcls >= 0, self.rules_dev.promo_class_bit.to(_pcls.device).take(_pcls.clamp(min=0)),
+                            torch.zeros_like(_pcls))
         _pcbt = self._type_combat > 0
         if self._ngov:
-            _ghit = (((self._gov_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
-                     | self._gov_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
+            _ghit = ((self._gov_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0) & _pcbt.unsqueeze(0)
             _gall = self._gov_ucs_cs.unsqueeze(1) * _ghit.double()
             self._gov_ucs_by_type = _gall * (~self._gov_ucs_att).double().unsqueeze(1)
             self._gov_ucsa_by_type = _gall * self._gov_ucs_att.double().unsqueeze(1)
         if self._npol:
-            _phit = (((self._pol_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
-                     | self._pol_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
+            _phit = ((self._pol_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0) & _pcbt.unsqueeze(0)
             _pall = self._pol_ucs_cs.unsqueeze(1) * _phit.double()
             self._pol_ucs_by_type = _pall * (~self._pol_ucs_att).double().unsqueeze(1)
             self._pol_ucsa_by_type = _pall * self._pol_ucs_att.double().unsqueeze(1)

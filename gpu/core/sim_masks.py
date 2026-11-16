@@ -379,6 +379,17 @@ class SimMasks:
         roll = torch.full(diff.shape, self._dmg_max_extra // 2, dtype=torch.long, device=self.device)
         return self._damage_raw(roll, diff).clamp(min=self._dmg_min, max=self._dmg_max)
 
+    def _damage_taken_expected(self, base: torch.Tensor, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """`damageTakenExpected`: the damage one side of a unit's blow takes
+        at the law's expectation — a side of base strength `base` 0 or less
+        takes `_dmg_baseless`; else, on the strengths in 1/256, a side struck
+        at strength 0 (`own`) the maximum, a striker at 0 (`foe`) the least,
+        any other the law's"""
+        out = self._damage_expected(foe - own)
+        out = torch.where(js_round(foe.to(torch.float64) * 256) == 0, torch.full_like(out, self._dmg_min), out)
+        out = torch.where(js_round(own.to(torch.float64) * 256) == 0, torch.full_like(out, self._dmg_max), out)
+        return torch.where(base <= 0, torch.full_like(out, self._dmg_baseless), out)
+
     def _damage_raw(self, roll: torch.Tensor, diff: torch.Tensor) -> torch.Tensor:
         """`damageRaw`: the law's value before its clamp for the draw `roll`
         and the strength difference `diff`"""

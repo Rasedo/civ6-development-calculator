@@ -18759,3 +18759,62 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
 - Open: runs/h1_duels1157 t13 43:23 / 43:22 and the passed runs/h1_duels1180
   t46 / runs/h1_duels1184 t29 plots stand as before (their regions
   unchanged by the records).
+
+## C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins
+
+- THE DAMAGE ONE SIDE TAKES (0x51a240 -> 0x519090 under the simulation
+  flag): a side whose base strength (GetCombat 0x56dc90) is 0 or less takes
+  COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT of COMBAT_MAX_HIT_POINTS; else 0x519090
+  reads the two strengths in 1/256: a side struck at strength 0 (its +4
+  word) takes its +8 word, COMBAT_MAX_HIT_POINTS, a striker at strength 0
+  (its +0 word) deals the +0x1c word, COMBAT_MINIMUM_DAMAGE; any other the
+  law's. `damageTakenExpected` (cpu/core/combat.ts), `_damage_taken_expected`
+  (gpu/core/sim_masks.py), in `predictBlow` / `_predict_blow` and the unit
+  efficiencies (`aiUnitEfficiency.ts`).
+- A SUPPORT DEFENDER (0x51f070 at 0x51f0a0..0x51f0ca): a defender of
+  formation class 1 whose GetCombat (0x56dc90, dl 0) and GetAntiAirCombat
+  (0x56d960) are both 0 defends at 0, no term taken. `defenderCS`,
+  `_baseless_support_def`. In the melee result (0x206960 at
+  0x206be8..0x206c02) a defender of that class takes the game's maximum hit
+  points whatever the law gave: `predictBlow`'s melee arm.
+- A RANGED SHOT ON A DISTRICT (0x51d670, the one composer of a unit's
+  attack on a district, melee or ranged): the modifier lists it walks are
+  the unit's own, so an ability's strength with no requirement (the Spear of
+  Fionn's 5) rides a shot at a centre or an Encampment as it rides an
+  assault. `rangedCityAtkCS` takes `chassisAbilityCS`; `_city_ranged_atk_cs`,
+  `_ranged_strike_encampment` and `_ranged_attack`'s centre arms take
+  `_chassis_ability_cs`.
+- THE CLASSES A GOVERNMENT'S ABILITY REACHES are its TypeTags (install
+  UnitAbilities.xml, Expansion1_UnitAbilities.xml): ABILITY_OLIGARCHY_MELEE_BUFF
+  and its legacy card name CLASS_WARRIOR_MONK beside the melee, anti-cavalry
+  and naval melee classes; ABILITY_FASCISM_ATTACK_BUFF and its legacy card
+  name neither CLASS_WARRIOR_MONK nor the carrier's class.
+  `GOVERNMENTS.OLIGARCHY / FASCISM` `unitCombatCS.classes`,
+  `_gov_ucs_by_type` / `_gov_ucsa_by_type` on `promo_class_bit`.
+- Confirmed: runs/h1_duels1158 t159-164 the barbarian Scout 3014670 on
+  player 1's Siege Tower, dealt 100 / taken 1, the blow back 65 / 1 (29 rows
+  gone); runs/h1_duels1161 t155-156 player 2's Field Cannon on the barbarian
+  Battering Ram, 65 and 65 / 1 (32); runs/h1_duels1144 t106-112 the
+  barbarian Archers on player 0's embarked Scouts, the blow back 100 / 1
+  (17); runs/h1_duels1124 t248 the Nuclear Submarine 6488092 on player 1's
+  Military Engineer, 65 (12); runs/h1_duels1152 t32-53 the barbarian Archer
+  1441809 (its CombatLog rows +5 on every shot since it passed the Giant's
+  Causeway 33:19) on city-state 3's centre 28:16, 20 (58 rows of t41-46
+  gone, 72 of t27-46); runs/h1_duels1157 t172-176 player 1's Warrior Monks
+  under Fascism strike back at their 40 (71).
+- THE REPLAY'S COPY OF THE BARBARIANS' TURN (cpu/harness/replay.ts
+  `barbarianAi`, cpu/harness/import.ts `promotionId`): another player's unit
+  the log placed before their turn opens holds the ability a natural wonder
+  beside that plot grants (runs/h1_duels1132 t72 player 1's Archer 655367 on
+  9:15 beside the Giant's Causeway, 23 rows) and is dug in as that plot
+  grants and record t+1 holds (runs/h1_duels1152 t43 its Warrior 393220 on
+  the Great Wall 33:10, two turns; runs/h1_duels1165 t139 its Bombard
+  4063258 on the Great Wall 6:16, none); a barbarian put back on the first
+  record's plot is dug in as that record holds it (runs/h1_duels1140 t85 the
+  Archer 2228248); a Warrior Monk's promotion is its class' row
+  (PROMOTION_MONK_SHADOW_STRIKE the engine's SHADOW_STRIKE), so its pick's
+  50 hit points land (runs/h1_duels1145 t158 the Monk 4456449 at 32 damage
+  under the barbarians' planning, 146 rows of t156-176 gone).
+- Open: which units the placement's grant reaches (0x586d40 at 0x5877f7 /
+  0x5878cf): `arrive` gives every land military unit the plot's turns, the
+  game's Bombard on a Great Wall none (C-125).

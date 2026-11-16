@@ -11,6 +11,7 @@ import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { spawnUnit } from '../../../cpu/core/units';
 import { seatOf, setTileOwner, BARB_SEAT } from '../../../cpu/core/seats';
 import { GOVERNMENTS, type PolicyEffects } from '../../../cpu/data/policies';
+import { CLASS_BIT } from '../../../cpu/data/promotions';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 // The GS government rows, sourced from each page's own infobox. What a row
@@ -44,14 +45,21 @@ describe('the sourced government rows', () => {
   it('ships each page INHERENT bonus in effects', () => {
     expect(GOVERNMENTS.AUTOCRACY.effects).toEqual({ yieldsPerGovBuilding: 1 });
     expect(GOVERNMENTS.OLIGARCHY.effects).toEqual(
-      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } });
+      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE', 'MONK'], cs: 4 } });
     expect(GOVERNMENTS.CLASSICAL_REPUBLIC.effects).toEqual(
       { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } });
     expect(GOVERNMENTS.MONARCHY.effects).toEqual({ housingPerWallLevel: 1, favorPerBuilding: { building: 'RENAISSANCE_WALLS', favor: 2 } });
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
       { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
-    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5, attacking: true }, wwPct: 20 });
+    expect(GOVERNMENTS.FASCISM.effects).toEqual({
+      unitCombatCS: {
+        classes: ['RECON', 'MELEE', 'RANGED', 'SIEGE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV',
+          'NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'AIR_FIGHTER', 'AIR_BOMBER'],
+        cs: 5, attacking: true,
+      },
+      wwPct: 20,
+    });
     expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ governorPerCitizen: { production: 0.6 } });
     // CIV6 (Democracy, GS): "Your Trade Routes to an Ally or Suzerain's city
     // provide +4 Food and +4 Production for both cities. Alliance Points with
@@ -77,11 +85,11 @@ describe('the sourced government rows', () => {
 });
 
 describe('governmentUnitCS — the promotion-class axis', () => {
-  it('OLIGARCHY pays +4 to MELEE, ANTICAV and NAVAL_MELEE and nothing else', () => {
+  it('OLIGARCHY pays +4 to MELEE, ANTICAV, NAVAL_MELEE and MONK and nothing else', () => {
     borrowingRow(GOVERNMENTS.OLIGARCHY.effects, () => {
       const state = makeState();
       adopt(state);
-      for (const type of ['WARRIOR', 'SPEARMAN', 'GALLEY']) {
+      for (const type of ['WARRIOR', 'SPEARMAN', 'GALLEY', 'WARRIOR_MONK']) {
         expect(governmentUnitCS(state, { type, seat: 0 }, false), type).toBe(4);
       }
       for (const type of ['ARCHER', 'HORSEMAN', 'CATAPULT', 'SETTLER', 'BUILDER']) {
@@ -93,13 +101,14 @@ describe('governmentUnitCS — the promotion-class axis', () => {
     });
   });
 
-  it('FASCISM pays +5 to every combat unit attacking, none defending and no civilian', () => {
+  it('FASCISM pays +5 to the combat classes its TypeTags name attacking, none defending, no Warrior Monk and no civilian', () => {
     const state = makeState();
     adopt(state, 'TOTALITARIANISM'); // the only unlocked tier-3 => FASCISM
     for (const type of ['WARRIOR', 'ARCHER', 'GALLEY', 'CATAPULT']) {
       expect(governmentUnitCS(state, { type, seat: 0 }, true), type).toBe(5);
       expect(governmentUnitCS(state, { type, seat: 0 }, false), type).toBe(0);
     }
+    expect(governmentUnitCS(state, { type: 'WARRIOR_MONK', seat: 0 }, true)).toBe(0);
     expect(governmentUnitCS(state, { type: 'SETTLER', seat: 0 }, true)).toBe(0);
     expect(governmentUnitCS(state, { type: 'TRADER', seat: 0 }, true)).toBe(0);
   });
@@ -239,7 +248,9 @@ describe('the prodBoost targets', () => {
     adopt(state, 'TOTALITARIANISM');
     const mods = getModifiers(state, 0);
     expect(mods.wwPct).toBe(20);
-    expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5, attacking: true }]);
+    const fascist = (['RECON', 'MELEE', 'RANGED', 'SIEGE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV',
+      'NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'AIR_FIGHTER', 'AIR_BOMBER'] as const).reduce((m, c) => m | CLASS_BIT[c], 0);
+    expect(mods.unitCombatCS).toEqual([{ classMask: fascist, cs: 5, attacking: true }]);
     // and Fascism's flat bonus: "+50% Production toward Units", every unit
     expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0.5);
   });

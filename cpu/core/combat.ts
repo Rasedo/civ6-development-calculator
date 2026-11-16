@@ -34,7 +34,7 @@ import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, t
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -859,12 +859,16 @@ export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean
  *  nor the planning's simulation hands one (0x206960 at 0x206a78..0x206b29
  *  under its third argument, 0x791470's 0x205720(1, 1)): runs/h1_duelq1121
  *  t78 player 0's embarked Warrior 589826 on the Reef 30:20 takes 45 and 53
- *  from the barbarian Galleys at 15 + 3. */
+ *  from the barbarian Galleys at 15 + 3. A unit of the support class of no
+ *  base strength and no anti-air strength defends at 0, no term taken
+ *  (0x51f070 at 0x51f0a0..0x51f0ca). */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number,
                            vs?: { attacker: Unit; melee: boolean; stands?: number }): number {
   const tile = state.map.tiles[defTileIndex];
+  const base = defenderBase(state, defender);
+  if (UNITS[defender.type]?.support && base === 0 && !((UNITS[defender.type]?.antiAir ?? 0) > 0)) return 0;
   return (
-    (defender.embarked ? embarkedDefenseCS(state, defender.seat) : (UNITS[defender.type]?.combat ?? 0)) + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs) +
+    base + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs) +
     // CIV6 (Garrison Commander): "Units defending within the city's territory
     // get +5 Combat Strength" — the GOVERNED city's own tiles, whoever stands
     // on them, so a foreign attacker's target gets it and the attacker does not.
@@ -895,6 +899,12 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     gdrArmorCS(state, defender, vs?.attacker.type) +
     congressUnitCS(state, defender) + governmentUnitCS(state, defender, false)
   );
+}
+
+/** a defender's base strength (GetCombat 0x56dc90 with dl 0): an embarked
+ *  unit's its owner's era's, any other its Combat */
+export function defenderBase(state: GameState, defender: Unit): number {
+  return defender.embarked ? embarkedDefenseCS(state, defender.seat) : (UNITS[defender.type]?.combat ?? 0);
 }
 
 /** CIV6 (Reinforced Armor Plating): "+10 Combat Strength when defending
@@ -938,6 +948,25 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
  *  COMBAT_MAX_EXTRA_DAMAGE / 2 instead of a draw, nothing is drawn */
 export function damageExpected(strengthDiff: number): number {
   return damageOf(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(strengthDiff));
+}
+
+/** THE DAMAGE ONE SIDE OF A UNIT'S BLOW TAKES at the law's expectation
+ *  (0x51a240 -> 0x519090 under the simulation flag): a side of base
+ *  strength (`base`, GetCombat's) 0 or less takes
+ *  COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT of COMBAT_MAX_HIT_POINTS; else, on the
+ *  two strengths in 1/256, a side struck at strength 0 (`own`) takes
+ *  COMBAT_MAX_HIT_POINTS and a striker at strength 0 (`foe`) deals
+ *  COMBAT_MINIMUM_DAMAGE, any other the law's
+ *  (runs/h1_duels1144 t100: player 0's embarked Scout on 7:5 strikes the
+ *  barbarian Archer 2818067, whose plot is coastal land, at its Combat 10 less
+ *  the amphibious 10
+ *  — back dealt 100 / back taken 1 on its three spots; the Archer
+ *  3014681 inland 50 / 18, 44 / 20) */
+export function damageTakenExpected(base: number, own: number, foe: number): number {
+  if (base <= 0) return Math.trunc((COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT * COMBAT_MAX_HIT_POINTS) / 100);
+  if (Math.round(own * 256) === 0) return COMBAT_MAX_HIT_POINTS;
+  if (Math.round(foe * 256) === 0) return COMBAT_MINIMUM_DAMAGE;
+  return damageExpected(foe - own);
 }
 
 /** ONE "Unit Combat Damage" draw through the damage law, `finish` taking the
@@ -1681,14 +1710,21 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
   );
 }
 
-/** A ranged attacker's strength against a city centre (the city arms of
- *  `rangedAttack` and `hostileRangedStrike`): its ranged strength against
- *  a district (`cityRangedStrength`), the attacker's own adders, `rel` its religion's adder, and the roster term
- *  toward the city's holder `holder`. */
-export function rangedCityAtkCS(state: GameState, attacker: Unit, holder: number, rel: number): number {
+/** A ranged attacker's strength against the district on `targetIndex`, a
+ *  city centre or an Encampment (the district arms of `rangedAttack` and
+ *  `hostileRangedStrike`; the district attack's composer 0x51d670, one for a
+ *  melee and a ranged attack): its ranged strength against a district
+ *  (`cityRangedStrength`), the attacker's own adders, `rel` its religion's
+ *  adder, its abilities' terms as an assault takes them (`chassisAbilityCS`:
+ *  runs/h1_duels1152 t32-53 the barbarian Archer 1441809, +5 on every shot of
+ *  its CombatLog rows since it passed the Giant's Causeway 33:19, plans
+ *  city-state 3's centre 28:16 at 20), and the roster term toward the
+ *  district's holder `holder`. */
+export function rangedCityAtkCS(state: GameState, attacker: Unit, targetIndex: number, holder: number, rel: number): number {
   return cityRangedStrength(state, attacker) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker)
     + chassisAttackCS(attacker) - woundPenalty(attacker)
     + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + rel
+    + chassisAbilityCS(state, attacker, attacker.tileIndex, { vsDistrict: true, combatTile: targetIndex })
     + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true)
     + rosterCS(state, attacker, holder, null, true);
 }
@@ -1723,7 +1759,7 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
   const outer = outerPool(state, shape);
   const ranged = !!UNITS[attacker.type]?.ranged;
   const atkCS = ranged
-    ? rangedCityAtkCS(state, attacker, shape.seat, isCiv(attacker.seat) ? religionAttackCS(state, attacker, targetIndex) : 0)
+    ? rangedCityAtkCS(state, attacker, targetIndex, shape.seat, isCiv(attacker.seat) ? religionAttackCS(state, attacker, targetIndex) : 0)
     : assaultAtkCS(state, attacker, targetIndex);
   const assist = ranged ? 0 : siegeAssist(state, attacker, targetIndex, wallsTier(state, shape));
   const words = districtBlowWords(atkCS - defCS, outer, wallsMax(state, shape), CITY_MAX_HP, cityHitClass(attacker.type, ranged), assist);
@@ -1765,7 +1801,7 @@ export function predictDistrictExchange(state: GameState, attacker: Unit, target
   const outer = encampOuter(state, tile);
   const ranged = !!UNITS[attacker.type]?.ranged;
   const atkCS = ranged
-    ? rangedCityAtkCS(state, attacker, tileSeat(tile), isCiv(attacker.seat) ? religionAttackCS(state, attacker, targetIndex) : 0)
+    ? rangedCityAtkCS(state, attacker, targetIndex, tileSeat(tile), isCiv(attacker.seat) ? religionAttackCS(state, attacker, targetIndex) : 0)
     : assaultAtkCS(state, attacker, targetIndex);
   const assist = ranged || !shape ? 0 : siegeAssist(state, attacker, targetIndex, wallsTier(state, shape));
   const words = districtBlowWords(atkCS - def.defCS, outer, shape ? wallsMax(state, shape) : 0, ENCAMPMENT_HP, cityHitClass(attacker.type, ranged), assist);
@@ -1878,12 +1914,7 @@ function encampSplit(state: GameState, tile: Tile, attacker: Unit, diff: number,
 function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: number,
                                 defCS: number, relCity: number, key: string): void {
   const tile = state.map.tiles[tileIndex];
-  const diff = ((cityRangedStrength(state, attacker) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker)
-    - woundPenalty(attacker)
-    + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] })
-    + relCity + generalAuraCS(state, attacker, attacker.tileIndex)
-    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true)
-    + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS);
+  const diff = rangedCityAtkCS(state, attacker, tileIndex, tileSeat(tile), relCity) - defCS;
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, diff, true, key));
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { dCity: true });
   spendAttack(attacker, true);
@@ -2145,8 +2176,10 @@ function retreatPlot(state: GameState, u: Unit): number {
  *  flag IsCoastalLand 0x82a10 of the combat's plot — a lake's shore none:
  *  runs/h1_duelq1124 t91 city-state 2's Man-At-Arms 1310723 embarked on the
  *  lake 9:10 takes no Attack Medium Priority claim on the barbarian Archer
- *  on 8:7, the Builder beside it under Attack Civilian as logged). */
-export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, stands = targetIndex): { atk: number; def: number } {
+ *  on 8:7, the Builder beside it under Attack Civilian as logged). `atkBase`
+ *  that own strength, the base the damage the attacker takes is read on
+ *  (`damageTakenExpected`). */
+export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, stands = targetIndex): { atk: number; def: number; atkBase: number } {
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
@@ -2171,7 +2204,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
     + allianceWarCS(state, attacker.seat, defender.seat)
     + rosterCS(state, attacker, defender.seat, defender.hp, false)
     + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker, true);
-  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true, stands }) };
+  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true, stands }), atkBase: own };
 }
 
 /** THE TWO STRENGTHS of a ranged blow on a unit from where the attacker
@@ -2707,7 +2740,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (civCity && unitsHostile(state, attacker, { seat: civCity.holder.seat })) {
     const defCS = cityCombatDefense(state, civCity.city);
     const outer = outerPool(state, civCity.city);
-    const diff = (rangedCityAtkCS(state, attacker, civCity.holder.seat, relCity) - defCS);
+    const diff = (rangedCityAtkCS(state, attacker, targetIndex, civCity.holder.seat, relCity) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, civCity.city), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngrc', targetIndex);
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
@@ -2735,7 +2768,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
     const csOuter = outerPool(state, csShape);
     const defCS = minorCombatDefense(state, cityState);
-    const csDiff = (rangedCityAtkCS(state, attacker, cityState.seat, relCity) - defCS);
+    const csDiff = (rangedCityAtkCS(state, attacker, targetIndex, cityState.seat, relCity) - defCS);
     const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
     cityState.hp = Math.max(1, (cityState.hp ?? CITY_MAX_HP) - csSplit.centre);
@@ -2850,7 +2883,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemyCity) {
     const defCS = cityCombatDefense(state, enemyCity);
     const outer = outerPool(state, enemyCity);
-    const diff = (rangedCityAtkCS(state, attacker, held!.holder.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
+    const diff = (rangedCityAtkCS(state, attacker, targetIndex, held!.holder.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, enemyCity), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngc', targetIndex);
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
@@ -2876,7 +2909,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
     const csOuter = outerPool(state, csShape);
     const defCS = minorCombatDefense(state, csHere);
-    const diff = (rangedCityAtkCS(state, attacker, csHere.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
+    const diff = (rangedCityAtkCS(state, attacker, targetIndex, csHere.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_MAX_HP) - split.centre);

@@ -10,7 +10,7 @@
 import type { ArmyRecord, City, CityState, GameState, Seat, Tile, Unit, UnitPool } from './types';
 import { DIRECTION_TYPES, RING_DIRS, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
-import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
+import { COMBAT_BOMBARD_VS_UNIT, COMBAT_MAX_HIT_POINTS, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, FORMATION_MAX, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { condemnHeretic, formationCivicIn, mergeFormation } from './game';
@@ -27,7 +27,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, atWarWith, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { centreStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { centreStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageTakenExpected, defenderBase, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool, wallsMax } from './rules';
 import { cityStateAt, minorCity, suzerainOf } from './cityStates';
@@ -2208,7 +2208,12 @@ function targetUnit(state: GameState, e: Target): Unit | null {
  *  (runs/h1_duelq1128 t30 the barbarian Warrior 2031630 on 14:15, three of
  *  its own beside it and one beside its spot 14:13, keeps that spot against
  *  player 1's Warrior on 15:12 under the exchange filter, Move 14 13 as
- *  logged) */
+ *  logged). Each side's damage is the law's on its base strength and the
+ *  two strengths (`damageTakenExpected`); in melee a defender of
+ *  FORMATION_CLASS_SUPPORT takes its whole hit points (0x206960 at
+ *  0x206be8..0x206c02): runs/h1_duels1158 t159-164 the barbarian Scout
+ *  3014670 on player 1's Siege Tower dealt 100 / taken 1, the Tower's blow
+ *  back on it back dealt 65 / back taken 1 */
 export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number, stands = at): { dealt: number; taken: number } {
   // the combat's kind from its members (0x211cc0 -> 0x209550): RANGED or
   // BOMBARD where that strength tops the attacker's combat strength as the
@@ -2217,14 +2222,15 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
   // Skirmisher 2293776 on 21:8 strikes back in melee, the barbarian Galley
   // 720906's back taken 65 / back dealt 14)
   const st = aiStrengths(state, attacker);
+  const base = defenderBase(state, defender);
   if (st.ranged > st.melee || st.bombard > st.melee) {
     const s = rangedUnitStrengths(state, attacker, at, defender);
-    return { dealt: damageExpected(s.atk - s.def), taken: 0 };
+    return { dealt: damageTakenExpected(base, s.def, s.atk), taken: 0 };
   }
   if (unitDomain(defender.type) === 'civilian') return { dealt: 0, taken: 0 };
   const s = meleeUnitStrengths(state, attacker, at, defender, stands);
-  const dealt = damageExpected(s.atk - s.def);
-  const taken = defender.embarked ? 0 : damageExpected(s.def - s.atk);
+  const dealt = unitDomain(defender.type) === 'support' ? COMBAT_MAX_HIT_POINTS : damageTakenExpected(base, s.def, s.atk);
+  const taken = defender.embarked ? 0 : damageTakenExpected(s.atkBase, s.atk, s.def);
   const dOver = dealt - healthOf(defender);
   const aOver = taken - healthOf(attacker);
   if (dOver < 0 || aOver < 0) return { dealt, taken };

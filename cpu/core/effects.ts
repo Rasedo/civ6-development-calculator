@@ -434,7 +434,7 @@ export interface Modifiers {
   /** the percent added to every city's Tourism (`seatTourismPct`) */
   tourismPct: number;
   yieldPctPerSuzerain: Partial<Yields>;
-  unitCombatCS: { classMask: number; all: boolean; cs: number; attacking: boolean }[];
+  unitCombatCS: { classMask: number; cs: number; attacking: boolean }[];
   xpPct: number;
   wwPct: number;
   gppMult: number;
@@ -816,8 +816,8 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   addPartial(mods.yieldPctPerSuzerain, fx.yieldPctPerSuzerain);
   if (fx.unitCombatCS) {
     let mask = 0;
-    for (const c of fx.unitCombatCS.classes ?? []) mask |= CLASS_BIT[c] ?? 0;
-    mods.unitCombatCS.push({ classMask: mask, all: !!fx.unitCombatCS.all, cs: fx.unitCombatCS.cs, attacking: !!fx.unitCombatCS.attacking });
+    for (const c of fx.unitCombatCS.classes) mask |= CLASS_BIT[c] ?? 0;
+    mods.unitCombatCS.push({ classMask: mask, cs: fx.unitCombatCS.cs, attacking: !!fx.unitCombatCS.attacking });
   }
   if (fx.xpPct) mods.xpPct += fx.xpPct;
   if (fx.wwPct) mods.wwPct += fx.wwPct;
@@ -1478,7 +1478,8 @@ export function eraMatchupCS(state: GameState, unit: { seat: number }, foeType: 
 /** CIV6 (Oligarchy, Fascism): the government's and cards' flat Combat
  *  Strength for one unit — "All land melee, anti-cavalry, and naval melee
  *  class units gain +4 Combat Strength" (the PROMOTION-class axis: MELEE,
- *  ANTICAV, NAVAL_MELEE) — read beside `congressUnitCS` at every roll that
+ *  ANTICAV, NAVAL_MELEE, MONK — each row's classes its ability's TypeTags)
+ *  — read beside `congressUnitCS` at every roll that
  *  composes a unit's strength; a row whose modifier stands under an
  *  attacker's requirement set (Fascism's FASCISM_REQUIREMENTS,
  *  PLAYER_IS_ATTACKER_REQUIREMENTS) only where the unit is `attacking`
@@ -1492,7 +1493,7 @@ export function governmentUnitCS(state: GameState, unit: { type: string; seat: n
   const bit = classBitOf(unit.type);
   let cs = 0;
   for (const r of getModifiers(state, unit.seat).unitCombatCS) {
-    if ((r.attacking && !attacking) || !(r.all || (bit & r.classMask) !== 0)) continue;
+    if ((r.attacking && !attacking) || (bit & r.classMask) === 0) continue;
     cs += r.cs;
   }
   return cs;

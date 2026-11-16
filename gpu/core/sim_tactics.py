@@ -2982,16 +2982,29 @@ class SimTactics:
         ranged = (self._ai_ranged()[rows, a_slot] > cmb) | (self._ai_bombard()[rows, a_slot] > cmb)
         dealt = torch.zeros(rows.numel(), dtype=torch.long, device=self.device)
         taken = torch.zeros_like(dealt)
+        # each side's damage on its base strength (`damageTakenExpected`):
+        # the defender's its Combat, an embarked one's its era's; the melee
+        # attacker's its Combat, its era's embarked off coastal land
+        dt = g.unit_type.gather(1, d_slot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        d_base = torch.where(g.unit_emb.gather(1, d_slot.unsqueeze(1)).squeeze(1), g._embarked_def_cs(d_seat).long(),
+                             self._type_combat.take(dt).long())
         if not bool(ranged.all()):
             ma, md, d_emb = cls._melee_unit_strengths(g, major, a_slot, tiles, d_slot, d_seat)
-            # in melee none either way on a civilian defender (`predictBlow`)
-            dt = g.unit_type.gather(1, d_slot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            at = g.unit_type.gather(1, a_slot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            a_off = g.unit_emb.gather(1, a_slot.unsqueeze(1)).squeeze(1) \
+                & ~g.coastal_land.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
+            a_seat = g.unit_seat.gather(1, a_slot.unsqueeze(1)).squeeze(1)
+            a_base = torch.where(a_off, g._embarked_def_cs(a_seat).long(), self._type_combat.take(at).long())
+            # in melee none either way on a civilian defender, a support one
+            # takes its whole hit points (`predictBlow`)
             d_civ = self._dom_civilian(dt)
-            dealt = torch.where(ranged | d_civ, dealt, self._damage_expected(ma - md))
-            taken = torch.where(ranged | d_emb | d_civ, taken, self._damage_expected(md - ma))
+            mdl = torch.where(self._type_support.take(dt), torch.full_like(dealt, self._dmg_max),
+                              self._damage_taken_expected(d_base, md, ma))
+            dealt = torch.where(ranged | d_civ, dealt, mdl)
+            taken = torch.where(ranged | d_emb | d_civ, taken, self._damage_taken_expected(a_base, ma, md))
         if bool(ranged.any()):
             ra, rd = cls._ranged_unit_strengths(g, not major, a_slot, tiles, d_slot, d_seat)
-            dealt = torch.where(ranged, self._damage_expected(ra - rd), dealt)
+            dealt = torch.where(ranged, self._damage_taken_expected(d_base, rd, ra), dealt)
         return dealt, taken
 
     def _barbarian_tactics(self, acting: torch.Tensor) -> None:

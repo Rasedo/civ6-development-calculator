@@ -184,10 +184,10 @@ export interface PolicyEffects {
   /** the fraction each yield gains per city-state this seat is suzerain of
    *  (EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY) */
   yieldPctPerSuzerain?: Partial<Yields>;
-  /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
-   *  covers every combat unit instead; `attacking` only on the unit's own
+  /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`), the
+   *  classes the ability's TypeTags name; `attacking` only on the unit's own
    *  attack (a modifier under an attacker's requirement set) */
-  unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number; attacking?: boolean };
+  unitCombatCS?: { classes: PromoClass[]; cs: number; attacking?: boolean };
   /** percentage POINTS joining every experience award's building percentage */
   xpPct?: number;
   /** the Overall war-weariness percent (EFFECT_ADJUST_WAR_WEARINESS Amount, signed) joining every accrual this seat scores */
@@ -1656,10 +1656,12 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       { yieldsPerGovBuilding: 1 },
       '+1 to all yields per government building in a city.'),
     // CIV6 (GS) INHERENT: "All land melee, anti-cavalry, and naval melee
-    // class units gain +4 Combat Strength." The three are PROMOTION classes
+    // class units gain +4 Combat Strength." ABILITY_OLIGARCHY_MELEE_BUFF's
+    // and the legacy card's TypeTags CLASS_MELEE, CLASS_ANTI_CAVALRY,
+    // CLASS_NAVAL_MELEE and CLASS_WARRIOR_MONK, as PROMOTION classes
     // (`UNIT_PROMO_CLASS`), so the Galley rides NAVAL_MELEE.
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W],
-      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } },
+      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE', 'MONK'], cs: 4 } },
       '+4 combat strength for melee and anti-cavalry units.'),
     // CIV6 (GS) INHERENT: +1 Housing and +1 Amenity in every city with a
     // specialty district (CITY_HAS_1_SPECIALTY_DISTRICT), the cards' shape.
@@ -1702,11 +1704,23 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength" —
     // ABILITY_FASCISM_ATTACK_BUFF's FASCISM_ATTACK_BUFF under
     // FASCISM_REQUIREMENTS (PLAYER_IS_ATTACKER_REQUIREMENTS), its legacy card's
-    // FASCISM_LEGACY_ATTACK_BUFF under the same: the unit's attack alone.
+    // FASCISM_LEGACY_ATTACK_BUFF under the same: the unit's attack alone, on
+    // the classes both abilities' TypeTags name (CLASS_RECON, _MELEE, _RANGED,
+    // _SIEGE, the cavalry and chariots, _ANTI_CAVALRY, _NAVAL_MELEE,
+    // _NAVAL_RANGED, _NAVAL_RAIDER, _AIRCRAFT) as promotion classes: no
+    // Warrior Monk, no carrier (runs/h1_duels1157 t172-179: player 1's Warrior
+    // Monks strike back at their 40 alone).
     // FASCISM_WAR_WEARINESS Overall Amount 20 adds 20 to the war-weariness
     // percent (0xbe35b0), whatever its text ("War Weariness reduced by 15%") says.
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
-      { unitCombatCS: { all: true, cs: 5, attacking: true }, wwPct: 20 },
+      {
+        unitCombatCS: {
+          classes: ['RECON', 'MELEE', 'RANGED', 'SIEGE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV',
+            'NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'AIR_FIGHTER', 'AIR_BOMBER'],
+          cs: 5, attacking: true,
+        },
+        wwPct: 20,
+      },
       '+5 combat strength for all units attacking; +20% war weariness.'),
     // CIV6 (GS) INHERENT: "+2 Amenities in all cities, and +2 Culture per
     // Specialty District." Its flat bonus (`GOV_BONUS`) is the -3 Combat

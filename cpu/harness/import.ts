@@ -2157,6 +2157,13 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   h.last = rec;
 }
 
+/** the engine's id of the catalog's unit promotion `p`: its type less
+ *  PROMOTION_, a Warrior Monk's less its class' MONK_ too
+ *  (PROMOTION_MONK_SHADOW_STRIKE is the engine's SHADOW_STRIKE) */
+export function promotionId(cat: Catalog, p: number): string | undefined {
+  return cat.unitPromotions?.[p]?.replace(/^PROMOTION_(MONK_)?/, '');
+}
+
 /** a natural wonder's ability for good (`grantFeatureAbilities`; Alpine
  *  Training beside the Matterhorn, `History.alpine`, the Spear of Fionn beside
  *  the Giant's Causeway, `History.fionn`): a unit the record finds on a plot
@@ -3008,7 +3015,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // the promotions it holds, as its own class list's bits
     const rows = unitPromoRows(unit);
     for (const p of u.promotions ?? []) {
-      const k = rows.findIndex((r) => r.id === cat.unitPromotions?.[p]?.replace(/^PROMOTION_/, ''));
+      const k = rows.findIndex((r) => r.id === promotionId(cat, p));
       if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
     }
     const act = history?.activities.get(`${u.owner}:${u.id}`);
