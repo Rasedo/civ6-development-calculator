@@ -222,6 +222,23 @@
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
     - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
+- addr: 0x7389f0
+  final: 0x4dc9d0
+  kind: function
+  name: formationPairOf
+  semantics: "a unit's planned formation pair (args: the operation, the unit id, out partner, out plot): over the teams (+0x230, 0x118 each) and each team's pairs (+0xd0, count +0xe0, 0x10 each: rider id, escort id, the rider's plot), the first pair whose rider (+0) or escort (+4) is the unit — the rider tested first within a pair — gives the other id and the pair's plot; false where none names it."
+  status: READ
+  cases:
+    - recording: h1_duels1156
+      turn: 79
+      value: "Barbarian City Assault's Man-At-Arms 3342364 (escort, 13:4) found first in the operation's units: its MOVE_TO for the rider's plot 13:2 (UnitOperations line 5140), its partner the Battering Ram 3735584 SWAP_UNITS Can't Start, MOVE_TO 13:4 (5141..5143), UnitEnterFormation 3735584 with 3342364"
+  impl:
+    - cpu/core/operations/nodes.ts:makeFormation
+    - gpu/core/sim_barbops.py:_bop_form_exec
+    - cpu/core/operations/nodes.ts:execute
+  readings:
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
+  review: reviewed
 - addr: 0x738f20
   kind: function
   name: teamUpdate

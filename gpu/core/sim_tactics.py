@@ -5000,7 +5000,13 @@ class SimTactics:
                 for u in torch.unique(u_b[fire]).tolist():
                     self._hostile_ranged_strike(fire & (u_b == u), tt.clamp(min=0), "barb", u)
                 self._tac_move_to(hi & (rng == 0), u_b, tt)
-            done[bidx[has], u_b[has]] = True
+            # the spot's move keeps the unit's moves: one with Movement left
+            # stays on the list for the moves after
+            kept = st & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_mp[bidx, u_b] > 0)
+            if self._tac_moves_ended is not None:
+                kept &= ~self._tac_moves_ended[bidx, u_b + self.POOL_LO["barb"]]
+            fin = has & ~kept
+            done[bidx[fin], u_b[fin]] = True
 
         if rows.numel():
             self._tac_attack_civilians(live, done, ai, reach_at, tg, order, npass)

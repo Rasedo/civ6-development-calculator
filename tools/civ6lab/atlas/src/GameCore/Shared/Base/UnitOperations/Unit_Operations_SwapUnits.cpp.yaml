@@ -19,6 +19,7 @@
     - gpu/core/sim_minorops.py:_mops_swap
     - gpu/core/sim_minorops.py:end_moves
     - cpu/core/tactical.ts:canAct
+    - cpu/core/operations/nodes.ts:execute
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
@@ -29,6 +30,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...

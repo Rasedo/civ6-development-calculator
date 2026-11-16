@@ -454,7 +454,8 @@ def what_builds(g: Game, a) -> None:
         for label, x in ((f"record t{g.turn}", c), (f"record t{g.turn + 1}", nxt)):
             if x:
                 print(f"  {label}: queue [{'; '.join(queue_item(g, q) for q in x.get('queue') or []) or 'empty'}] progress {x.get('queueProgress')} production {x.get('productionYield')} "
-                      f"food {x.get('food')}+{x.get('foodSurplus')} districts {[g.name('districts', d[0], 'DISTRICT_') + f'@{d[1]}:{d[2]}' for d in x.get('districts') or []]}")
+                      f"food {x.get('food')}+{x.get('foodSurplus')} districts {[g.name('districts', d[0], 'DISTRICT_') + f'@{d[1]}:{d[2]}' for d in x.get('districts') or []]} "
+                      f"buildings {[g.name('buildings', b[0], 'BUILDING_') + (' pillaged' if b[1] else '') for b in x.get('buildings') or []]}")
         if g.db:
             for row in g.log("City_BuildQueue", "turn = ? AND city LIKE ?", (g.turn, f"%{short}%")):
                 print("  City_BuildQueue: " + cells(row)[:a.wide])

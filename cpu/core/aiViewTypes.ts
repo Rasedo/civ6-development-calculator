@@ -19,6 +19,9 @@ export interface AiMapPlotView {
   impassable: boolean;
   /** the seat whose territory holds it, -1 for none */
   owner: number;
+  /** the engine's id of the city whose territory holds it (plot vt +0x30
+   *  +0xc), -1 for none and for a city-state's one city */
+  ownerCity: number;
   /** a district stands on it, a city centre included */
   district: boolean;
   /** a city centre stands on it, any seat's */
@@ -256,6 +259,11 @@ export interface AiView extends AiValueView {
    *  ABILITY_ENABLE_WALL_ATTACK and their promotion-class twins, the Siege
    *  Tower's and the Battering Ram's) */
   wallsAbility(unitId: number): boolean;
+  /** the city on the plot keeps a walls ability off its walls: its owner's
+   *  Urban Defenses (Player_Cities +0xf4; the Free Cities' record +0x1c) or
+   *  its own PreventBypassOuterDefenses / PreventMeleeAttackOuterDefenses
+   *  (City +0x2a10 / +0x2a70: the Castle's, the Star Fort's, the Tsikhe's) */
+  wallsShut(plot: number): boolean;
   /** the seat's tactical target list */
   attackTargets(seat: number): readonly AiAttackTargetView[];
   // THE ASSAULT EXECUTIONS' VIEW

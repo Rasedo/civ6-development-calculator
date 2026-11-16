@@ -4130,6 +4130,7 @@
     - cpu/harness/replay.ts:c
     - cpu/core/operations/assault.ts:siegeAttack
     - cpu/core/aiCityTrees.ts:Ctx
+    - cpu/core/operations/nodes.ts:execute
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -6682,12 +6683,14 @@
     - cpu/core/tactical.ts:Pass
     - gpu/core/sim_tactics.py:_tac_on_list
     - cpu/core/tactical.ts:strike
+    - cpu/core/tactical.ts:s
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
     - "...stable) move onto it (0x773270: 0x56c690, 0x962190 flag 0x10; done 0x56d6f0, 0x570b40, 0x77d180), ranged ones strike (0x964a40)."

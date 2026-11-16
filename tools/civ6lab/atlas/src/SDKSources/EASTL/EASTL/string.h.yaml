@@ -42,6 +42,7 @@
   readings:
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-96: the unit value's unit count and the founding Production"
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
   context:
     - ...te::Value 0xaa740; build queue +0x1f0 is the yield type, set at the city's construction 0x1baa90 -> 0x17d210). The founding city's first City Analysis reads it before the Palace lands...
   review: reviewed

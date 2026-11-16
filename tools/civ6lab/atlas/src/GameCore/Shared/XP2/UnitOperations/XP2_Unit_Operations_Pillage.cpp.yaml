@@ -1,0 +1,14 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0xa50680
+  final: 0x74c1a0
+  kind: function
+  name: pillageCanStart
+  semantics: "UNITOPERATION_PILLAGE's CanStart (XP2; the unit, the plot, a test-only byte, the tooltip list): the unit able to pillage (0x51afd0); the plot not impassable (+0x3a bit 3); an owned plot's owner at war with the unit's player (0x469cd0), a barbarian's tribe's standing with that owner (0x147c20 above 0) asking 0x8e3270 on its type; Movement left (0x56c690); an improvement unpillaged (+0x4d bit 0) and not the one 0x8e3250 / 0x362130 name, else a completed, unpillaged district of a row without +0xe1 bit 4; with the test-only byte true; else Movement of GetMaxMoves or of the parameter at +0x550 / +0x558 (unit +0x18bb), LOC_HUD_UNIT_ACTION_PILLAGE_REQUIRES_MOVEMENT otherwise."
+  status: PARTLY
+  readings:
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
+  review: reviewed

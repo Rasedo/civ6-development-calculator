@@ -4012,6 +4012,10 @@ export const WALLS_TIER_HP = [0, 100, 200, 300, 400];
  * current and future cities and their Encampment districts". */
 export const URBAN_DEFENSES_TECH = 'STEEL';
 export const WALLS_TIER_URBAN = 4;
+/** the Medieval Walls' tier (BUILDING_CASTLE): from it up a city's walls
+ *  carry PreventMeleeAttackOuterDefenses (the Castle's, the Star Fort's and
+ *  the Tsikhe's modifiers) or stand as Urban Defenses */
+export const WALLS_TIER_CASTLE = 2;
 /** GlobalParameters COMBAT_HEAL_OUTER_DEFENSES_COOLDOWN (3, +0x1d8): a city
  * damaged in game turn t may run Repair Outer Defenses from t + 3
  * (`repairAvailable`). A strike in a player's turn dates from that turn

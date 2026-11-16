@@ -745,7 +745,11 @@ function pillageHere(ctx: OpsContext, id: number): void {
 /** per target of the seat's list — an improvement (Pillage Improvements),
  *  a passive district (Pillage Districts), a goody hut (Get Goody Huts), each
  *  kind unless the node's flag says false — on the land of the operation's
- *  target's owner:
+ *  target's city (the plot's owning city, plot vt +0x30 +0xc, the target's:
+ *  runs/h1_duels1156 t63 the raid on 10:9's Archer on 11:8 pillages its
+ *  Campus while its Warrior on 9:6 passes by the Quarry of the city 8:6,
+ *  both of player 1; runs/h1_duels1148 t79 two Men-At-Arms pillage 14:10
+ *  and 13:11, both 13:10's):
  *  of the teams' members on land or at sea off it, with no bombard
  *  strength, in no formation, with Movement left, that may pillage (a goody
  *  hut any), standing on it (one off it is passed by, 0x811786..0x811838:
@@ -763,12 +767,12 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
   const goodies = flag(node, 'Get Goody Huts', true);
   const v0 = ctx.view();
   const P = v0.plots();
-  const owner = op.target >= 0 ? P[op.target].owner : -1;
+  const city = op.target >= 0 ? P[op.target] : null;
   const now = (id: number) => ctx.view().units(ctx.seat).find((x) => x.id === id);
   for (const g of v0.attackTargets(ctx.seat)) {
     const goody = g.type === 'GOODY';
     if (!((improvements && g.type === 'IMPROVEMENT') || (districts && g.type === 'PASSIVE_DISTRICT') || (goodies && goody))) continue;
-    if (owner >= 0 && P[g.plot].owner !== owner) continue;
+    if (city && city.owner >= 0 && (P[g.plot].owner !== city.owner || P[g.plot].ownerCity !== city.ownerCity)) continue;
     let best: AiUnitView | null = null;
     for (const t of op.teams) {
       for (const id of t.members) {
@@ -843,10 +847,14 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
   const v = ctx.view();
   // the walls' own units first (0x812027..0x812219): each member with
   // Movement left that holds a walls ability goes to its planning's first
-  // plot one from the city it reaches this turn, its turn done
+  // plot one from the city it reaches this turn, its turn done; none where
+  // the city keeps a walls ability off (`wallsShut`, 0x811f48..0x81201b:
+  // runs/h1_duels1140 t85 the raid on Handan 13:14, its Castle standing,
+  // takes the Battering Ram 2883611 and its Warrior to a slot)
+  const shut = v.wallsShut(target);
   for (const id of opUnits(op)) {
     const u = now(id);
-    if (!u || u.movesLeft <= 0 || !v.wallsAbility(id)) continue;
+    if (shut || !u || u.movesLeft <= 0 || !v.wallsAbility(id)) continue;
     const spot = v.planSpot(id, target, 1, false, 1);
     if (spot < 0) continue;
     ctx.log(`${op.def}, Operation Siege City, ${u.type} ${xy(v, u.plot)}, Move ${xy(v, spot)}`);

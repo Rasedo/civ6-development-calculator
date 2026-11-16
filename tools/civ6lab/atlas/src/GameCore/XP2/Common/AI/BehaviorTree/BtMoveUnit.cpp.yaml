@@ -6,14 +6,18 @@
 - addr: 0x7ee630
   final: 0x556710
   kind: function
-  semantics: "Make Formation's execution: with Destroy Formations each of the operation's units in a formation of more than one (+0x1fb8 +0x738 > 1) takes UNITCOMMAND_EXIT_FORMATION (0x94bc70; CanDo +0x48, Do +0x58; 0x7ee7b0..0x7ee817); else each planned pair (0x73b8a0) walks its escort to the civilian (0x962030) and, met there, the civilian takes UNITCOMMAND_ENTER_FORMATION with its partner (0x94bbe0, 0x7eead4..0x7eeb11): a formation of the units' own that outlives the operation."
+  semantics: "Make Formation's execution: with Destroy Formations each of the operation's units in a formation of more than one (+0x1fb8 +0x738 > 1) takes UNITCOMMAND_EXIT_FORMATION (0x94bc70; CanDo +0x48, Do +0x58; 0x7ee7b0..0x7ee817); else each of the operation's units in turn (0x6092c0) that a planned pair names (0x7389f0, rider or escort): off the pair's plot (the rider's) its turn done (0x570b40) and its MOVE_TO there (0x962030); then its partner, off the unit's plot, its turn done, UNITOPERATION_SWAP_UNITS onto it (0x972880) and its MOVE_TO there (0x7ee963..0x7eea7a); met, the civilian takes UNITCOMMAND_ENTER_FORMATION with its partner (0x94bbe0, 0x7eead4..0x7eeb11): a formation of the units' own that outlives the operation."
   status: READ
   cases:
     - recording: h1_duely1128
       turn: 37
       value: UnitEnterFormation 3014684 with 1114128 as the capture's Escort Worker To Camp ticks Make Formation 1; Change Target INVALID ends the operation and the pair moves as one t38-50
+    - recording: h1_duels1156
+      turn: 79
+      value: Barbarian City Assault's Man-At-Arms 3342364 on 13:4 takes its MOVE_TO for 13:2 and stays; its Battering Ram 3735584 there fails its SWAP_UNITS, walks to 13:4 and enters its formation (the Ram's and the Man-At-Arms' rows on 13:4 as the game's)
   impl:
     - cpu/core/operations/nodes.ts:makeFormation
+    - gpu/core/sim_barbops.py:_bop_partner_walk
     - gpu/core/sim_barbops.py:_bop_capture_tick
     - cpu/core/operations/nodes.ts:formedOf
     - cpu/core/operations/nodes.ts:execute
@@ -24,6 +28,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
   context:
     - ...the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0...
   review: reviewed

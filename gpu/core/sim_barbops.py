@@ -35,6 +35,9 @@ _S, _R, _F = 1, 2, 3
 _SIEGE_DIRS = (5, 0, 1, 2, 3, 4)
 # a tree's id: the pool's generation over its slot (`treeSlot`)
 _TREE_SLOT = 0x10000
+# the Medieval Walls' tier (`WALLS_TIER_CASTLE`): from it up a city's walls
+# carry PreventMeleeAttackOuterDefenses or stand as Urban Defenses
+_WALLS_TIER_CASTLE = 2
 
 
 def _node_data(node: dict, name: str):
@@ -502,11 +505,28 @@ class SimBarbOps:
         # the executions in node order
         ex1 = start1 & pair
         if bool(ex1.any()):
-            move = ex1 & (self.barb_unit_tile[bidx, esc_] != civ_plot)
-            self._tac_move_to(move, esc_, civ_plot.clamp(min=0), strike=False)
-            # met there, the captive enters its formation
-            # (UNITCOMMAND_ENTER_FORMATION), which outlives the operation
-            meet = ex1 & (self.barb_unit_tile[bidx, esc_] == self.barb_unit_tile[bidx, csc])
+            # the team in its order, the captive then its captor
+            # (`_bop_form_exec`): the captive's partner walks to it, then the
+            # captor off the captive's plot of the update walks there and the
+            # captive, off the captor's plot, walks to it; met, the captive
+            # enters its formation (UNITCOMMAND_ENTER_FORMATION), which
+            # outlives the operation
+            done = ctx["done"]
+            tile = self.barb_unit_tile
+            cpos = civ_plot.clamp(min=0)
+            go1 = ex1 & self.barb_unit_alive[bidx, csc]
+            off = go1 & (tile[bidx, csc] != civ_plot)
+            done[bidx[off], csc[off]] = True
+            self._tac_move_to(off, csc, cpos, strike=False)
+            self._bop_partner_walk(go1, esc_, tile[bidx, csc].clamp(min=0), done)
+            meet = ex1 & (tile[bidx, esc_] == tile[bidx, csc])
+            self.barb_unit_escorted[bidx[meet], csc[meet]] = True
+            go2 = ex1 & self.barb_unit_alive[bidx, esc_]
+            off = go2 & (tile[bidx, esc_] != civ_plot)
+            done[bidx[off], esc_[off]] = True
+            self._tac_move_to(off, esc_, cpos, strike=False)
+            self._bop_partner_walk(go2, csc, tile[bidx, esc_].clamp(min=0), done)
+            meet = ex1 & ~meet & (tile[bidx, esc_] == tile[bidx, csc])
             self.barb_unit_escorted[bidx[meet], csc[meet]] = True
         # Defend Units 5 (a member released stays in the capture's team)
         self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx)
@@ -785,15 +805,15 @@ class SimBarbOps:
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
         self._bop_defend_exec(m & mk1, team, self.tribe_op_plot[:, k], pct1, rng1, ctx)
-        self._bop_form_exec(gather, fpairs)
+        self._bop_form_exec(gather, fpairs, ctx)
         self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][2], ar13, ready, ctx)
         self._bop_attack_units(march, k, ctx)
-        self._bop_form_exec(march, fpairs)
+        self._bop_form_exec(march, fpairs, ctx)
         self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][2], ar17, ready, ctx)
         self._bop_siege(ass & (s19 == _S), k, ctx)
         self._bop_attack_city(ass & ~fail18, k, ctx)
         self._bop_attack_units(on23, k, ctx)
-        self._bop_form_exec(on23, fpairs)
+        self._bop_form_exec(on23, fpairs, ctx)
         self._bop_pillage(on23, k, ctx)
         self._bop_move_exec(on23 & (goal2 >= 0), k, goal2, tr.ass_moves[2][2], ar24, ready, ctx)
         # the assault's Notify Owner: no city to a list (a bribed tribe's alone)
@@ -853,22 +873,82 @@ class SimBarbOps:
             pairs.append((j, e, plot))
         return near, pairs
 
-    def _bop_form_exec(self, on: torch.Tensor, pairs: list) -> None:
-        """MAKE FORMATION's execution (0x7ee630) in the games `on`: each
-        pair's escort walks to its rider's plot, and met there, the two in no
-        formation, the rider enters the escort's (UNITCOMMAND_ENTER_FORMATION)"""
+    def _bop_partner_walk(self, go: torch.Tensor, partner: torch.Tensor, here: torch.Tensor, done: torch.Tensor) -> None:
+        """Make Formation's partner (0x7ee630 at 0x7ee963..0x7eea7a): the
+        barbarians' unit at slot `partner` [B] alive and off `here` [B] in
+        the games `go`: its turn done, its swap onto `here` (`swapUnits`: a
+        fighter with its own fighter there beside it, both with Movement
+        left, `_tac_swap`) and its walk there"""
         bidx = self._bidx
-        for j, e, plot in pairs:
-            go = on & (e >= 0)
+        tile, alive = self.barb_unit_tile, self.barb_unit_alive
+        poff = go & alive[bidx, partner] & (tile[bidx, partner] != here)
+        if not bool(poff.any()):
+            return
+        done[bidx[poff], partner[poff]] = True
+        pt = tile[bidx, partner].clamp(min=0)
+        occ = self.military_at[bidx, here]
+        other = (occ.clamp(min=0) - self.POOL_LO["barb"]).clamp(min=0, max=self.barb_unit_mp.shape[1] - 1)
+        ut_p = self.barb_unit_type[bidx, partner].clamp(min=0, max=self.NU - 1)
+        sw = (poff & (self.pair_dist[pt, here].to(torch.long) == 1) & (occ >= 0)
+              & (self.unit_seat[bidx, occ.clamp(min=0)] == BARB_SEAT) & (self.barb_unit_mp[bidx, partner] > 0)
+              & (self.barb_unit_mp[bidx, other] > 0) & ~self._type_civilian.take(ut_p) & ~self._type_support.take(ut_p))
+        if bool(sw.any()):
+            self._tac_swap(sw, partner, pt, here, occ, "barb", BARB_SEAT)
+        self._tac_move_to(poff & alive[bidx, partner] & (tile[bidx, partner] != here), partner, here, strike=False)
+
+    def _bop_form_exec(self, on: torch.Tensor, pairs: list, ctx: dict) -> None:
+        """MAKE FORMATION's execution (0x7ee630) in the games `on`: each of
+        the pairs' units in the team's order (`barb_unit_join`), the first
+        pair naming it as rider or escort: off the pair's plot (the rider's)
+        its turn done and its walk there; then its partner, off the unit's
+        plot, its turn done, its swap onto it (a fighter with its own fighter
+        there beside it, both with Movement: `_tac_swap`) and its walk there;
+        met, the two in no formation, the rider enters the escort's
+        (UNITCOMMAND_ENTER_FORMATION)"""
+        pairs = [p for p in pairs if bool((on & (p[1] >= 0)).any())]
+        if not pairs:
+            return
+        bidx = self._bidx
+        dev = self.device
+        done = ctx["done"]
+        tile = self.barb_unit_tile
+        alive = self.barb_unit_alive
+        js = torch.stack([torch.full_like(e, j) for j, e, _ in pairs], dim=1)  # [B, K]
+        es = torch.stack([e for _, e, _ in pairs], dim=1)
+        ps = torch.stack([p for _, _, p in pairs], dim=1)
+        valid = es >= 0
+        K = js.shape[1]
+        units = torch.cat((js, es), dim=1)
+        uvalid = torch.cat((valid, valid), dim=1)
+        big = 1 << 40
+        key = torch.where(uvalid, self.barb_unit_join.gather(1, units.clamp(min=0)).clamp(min=0), torch.full_like(units, big))
+        order = key.argsort(dim=1, stable=True)
+        ks = torch.arange(K, device=dev).unsqueeze(0)
+        prev =torch.full((self.B,), -1, dtype=torch.long, device=dev)
+        for r in range(2 * K):
+            u = units.gather(1, order[:, r].unsqueeze(1)).squeeze(1)
+            okr = uvalid.gather(1, order[:, r].unsqueeze(1)).squeeze(1) & (u != prev)
+            prev = torch.where(okr, u, prev)
+            match = valid & ((js == u.unsqueeze(1)) | (es == u.unsqueeze(1)))
+            k = torch.where(match, ks, torch.full_like(ks, K)).min(dim=1).values
+            kc = k.clamp(max=K - 1).unsqueeze(1)
+            uc = u.clamp(min=0)
+            go = on & okr & (k < K) & alive[bidx, uc]
             if not bool(go.any()):
                 continue
-            ec = e.clamp(min=0)
-            self._tac_move_to(go & (self.barb_unit_tile[bidx, ec] != plot), ec, plot.clamp(min=0), strike=False)
-            js = torch.full_like(e, j)
-            meet = (go & self.barb_unit_alive[bidx, ec] & self.barb_unit_alive[:, j]
-                    & (self.barb_unit_tile[bidx, ec] == self.barb_unit_tile[:, j])
-                    & (self._tac_mate(bidx, js, "barb") < 0) & (self._tac_mate(bidx, ec, "barb") < 0))
-            self.barb_unit_escorted[:, j] |= meet
+            rider = js.gather(1, kc).squeeze(1)
+            esc = es.gather(1, kc).squeeze(1)
+            plot = ps.gather(1, kc).squeeze(1)
+            partner = torch.where(rider == u, esc, rider).clamp(min=0)
+            off = go & (tile[bidx, uc] != plot)
+            done[bidx[off], uc[off]] = True
+            self._tac_move_to(off, uc, plot.clamp(min=0), strike=False)
+            self._bop_partner_walk(go, partner, tile[bidx, uc].clamp(min=0), done)
+            rc = rider.clamp(min=0)
+            ec = esc.clamp(min=0)
+            meet = (go & alive[bidx, ec] & alive[bidx, rc] & (tile[bidx, ec] == tile[bidx, rc])
+                    & (self._tac_mate(bidx, rc, "barb") < 0) & (self._tac_mate(bidx, ec, "barb") < 0))
+            self.barb_unit_escorted[bidx[meet], rc[meet]] = True
 
     # -- Operation Defend Units ----------------------------------------------
 
@@ -1257,7 +1337,7 @@ class SimBarbOps:
         `join`, player `seat`) against the target `tplot` in the games `on`:
         per IMPROVEMENT, PASSIVE_DISTRICT or GOODY entry of the list (each
         kind unless the node's flag says false) in its order on the ground of
-        the target's owner, of the living members with Movement left, in no
+        the target's city (its owner and owning city), of the living members with Movement left, in no
         formation and with no bombard strength (a ship's not for a water plot; a goody hut any,
         else one that fights), standing on it (one off it is passed by),
         with a whole Movement and its planning holding the plot within two
@@ -1271,7 +1351,8 @@ class SimBarbOps:
         rowof, res, tg, done = ctx["rowof"], ctx["res"], ctx["tg"], ctx["done"]
         owner = torch.where(tplot >= 0, self.tile_seat.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1),
                             torch.full_like(tplot, -1))
-        ground = (owner.unsqueeze(1) < 0) | (self.tile_seat == owner.unsqueeze(1))
+        ocity = self.tile_city.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1)
+        ground = (owner.unsqueeze(1) < 0) | ((self.tile_seat == owner.unsqueeze(1)) & (self.tile_city == ocity.unsqueeze(1)))
         nil = torch.zeros_like(ground)
         imp = (tg["ok"] == 9) & ground if improvements else nil
         dis = ((tg["dk"] & 2) > 0) & ground if districts else nil
@@ -1370,6 +1451,22 @@ class SimBarbOps:
         passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
         return (tgt >= 0) & (ctr >= 0) & (on_ctr | ~(passable & ~held).any(dim=1))
 
+    def _bop_walls_tier(self, plot: torch.Tensor) -> torch.Tensor:
+        """[B] long — `wallsTier` of the city whose centre stands on `plot`
+        [B] (-1 none): a major's or the Free Cities' (`_walls_tier_at` on its
+        row and slot), a city-state's (`_minor_walls_tier_at`); 0 off any
+        centre"""
+        pc = plot.clamp(min=0).unsqueeze(1)
+        ctr = self._centre_seat_plane().gather(1, pc).squeeze(1)
+        ctr = torch.where(plot >= 0, ctr, torch.full_like(ctr, -1))
+        hcol = self.centre_slot_at.gather(1, pc).squeeze(1).clamp(min=0)
+        tier = self._walls_tier_at(self._holder_row(ctr), hcol)
+        if self.S > 0:
+            csx = self.citystate_at.gather(1, pc).squeeze(1)
+            minor = (csx >= 0) & (ctr >= 0)
+            tier = torch.where(minor, self._minor_walls_tier_at(csx.clamp(min=0, max=self.S - 1)), tier)
+        return torch.where(ctr >= 0, tier, torch.zeros_like(tier))
+
     def _op_siege(self, on: torch.Tensor, mem: torch.Tensor, target: torch.Tensor, join: torch.Tensor, ctx: dict,
                   seat: int = BARB_SEAT, pre: str = "barb") -> None:
         """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) for
@@ -1402,12 +1499,14 @@ class SimBarbOps:
         # the walls' own units first (`wallsAbility`): each member in join
         # order with Movement left whose type holds a walls ability goes to
         # its planning's first plot one from the city it reaches this turn
-        # (any Movement), its turn done
-        if self._siege_support_any and bool(on.any()):
+        # (any Movement), its turn done; none where the city keeps a walls
+        # ability off (`wallsShut`: its walls tier the Castle's or above)
+        shut = self._bop_walls_tier(target) >= _WALLS_TIER_CASTLE
+        if self._siege_support_any and bool((on & ~shut).any()):
             one = torch.ones(B, dtype=torch.long, device=dev)
             for r in range(int(nmem.max())):
                 us = order[:, r]
-                m = (on & (r < nmem) & getattr(self, f"{pre}_unit_alive")[bidx, us]
+                m = (on & ~shut & (r < nmem) & getattr(self, f"{pre}_unit_alive")[bidx, us]
                      & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0) & (self._type_siege_support.take(ut[bidx, us]) > 0))
                 if not bool(m.any()):
                     continue

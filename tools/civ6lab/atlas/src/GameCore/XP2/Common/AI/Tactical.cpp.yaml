@@ -305,6 +305,7 @@
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
   review: reviewed
 - addr: 0x773030
   final: 0x505020
@@ -434,12 +435,15 @@
   final: 0x505fa0
   kind: function
   name: moveOrFortify
-  semantics: "move or fortify: a unit on the plot that may fortify (0x56ef30) takes the Fortify order on its queue, any other the MoveTo (flag 0x10); its flag clear, its moves end (0x56d6f0 at 0x7740b6); its turn done (0x570b40)."
+  semantics: "move or fortify: a unit on the plot that may fortify (0x56ef30) takes the Fortify order on its queue, any other the MoveTo (flag 0x10); its flag clear, its moves end (0x56d6f0 at 0x7740b6); a unit with no Movement then leaves the move's list (0x77d180 at 0x7740dd), one with Movement left (the flag set) stays on it for the moves after; its turn done (0x570b40)."
   status: READ
   cases:
     - recording: h1_duelp1117
       turn: 2
       value: "barbarian Spearman 65536 Barb. Camp Defense at its camp: Started, two segment rows, 0 -> 1; t3 orders again 1 -> 2, SENTRY (cityState / barb.fortify trace t1-30: 164 of 165)"
+    - recording: h1_duels1163
+      turn: 42
+      value: the camp 42:12's Spearman 65536 goes for its strike's spot 41:11 on player 4's Archer 41:10 (two turns off), Barb. Camp Defense AT 42:12, then Wander Move To 42:11; h1_duels1187 t22, h1_duels1179 t51 / t54 alike
   impl:
     - cpu/core/tactical.ts:moveOrFortify
     - gpu/core/sim_tactics.py:_tac_move_or_fortify
@@ -447,7 +451,9 @@
     - cpu/core/tactical.ts:plunderTraders
     - cpu/core/units.ts:fortifyOrder
     - cpu/core/tactical.ts:defendCamps
+    - cpu/core/tactical.ts:s
   readings:
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"

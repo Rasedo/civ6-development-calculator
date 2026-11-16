@@ -121,6 +121,15 @@
   context:
     - "...ge is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives 100; ranged 50 unless the uni..."
   review: reviewed
+- addr: 0x51afd0
+  final: 0x3680b0
+  kind: function
+  name: canPillageUnit
+  semantics: "a unit able to pillage (the rules instance 0x51b2c0, the unit): one that fights (GetCombat 0x56dc90 with 0, GetRangedCombat 0x56e3e0 or GetBombardCombat 0x56daa0 above 0), embarked (0x8be30) only with +0x18c3, and not of domain 1 (+0x650); asked by Operation Pillage's member loop (0x811779) and the pillage operation's CanStart (0xa506ac)."
+  status: PARTLY
+  readings:
+    - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
+  review: reviewed
 - addr: 0x51bba0
   final: 0x368a70
   kind: function

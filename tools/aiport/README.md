@@ -69,7 +69,7 @@ turns before `<from>`.
     python tools/aiport/show.py 1171 38 --player 2 --what research,contracts,trees
     python tools/aiport/show.py 1171 38 --unit 458754            # its rows at every site, its planning, blows, AI_Tactical rows, its AStar_GC.log searches for a plot and its own events in the record's order
     python tools/aiport/show.py 1154 122 --player 63 --what danger --plot 10:5
-    python tools/aiport/show.py 1171 38 --city AKKAD              # queue at T and T+1, AI_CityBuild lines, logged value tables
+    python tools/aiport/show.py 1171 38 --city AKKAD              # queue, districts and buildings at T and T+1, AI_CityBuild lines, logged value tables
     python tools/aiport/show.py 1171 38 --player 2                # events: every log row and record event of the turn
     python tools/aiport/show.py 1190 97 --player 3 --what record   # the record's own fields of its cities and of the player, T -> T+1 where they differ
 

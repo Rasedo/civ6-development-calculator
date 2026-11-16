@@ -676,10 +676,18 @@ const makeFormation: BtHandler<OpsContext> = {
   },
   // Destroy Formations: each of the operation's units in a formation of
   // more than one leaves it (UNITCOMMAND_EXIT_FORMATION, 0x7ee7b0..0x7ee817);
-  // else the escort walks to the civilian's plot and, met there, the
-  // civilian enters its formation (UNITCOMMAND_ENTER_FORMATION, 0x7eead4:
-  // runs/h1_duely1128 t37 UnitEnterFormation 3014684 with 1114128, the
-  // capture's tree's Make Formation before its Change Target ends it)
+  // else each of the operation's units in turn (0x6092c0) that a planned
+  // pair holds, as rider or escort (0x7389f0, the first pair naming it):
+  // off the pair's plot (the rider's) its turn done (0x570b40) and its
+  // move order there (0x962030); then its partner, off the unit's plot, its
+  // turn done, UNITOPERATION_SWAP_UNITS onto it (0x972880) and its move
+  // order there; met, the rider enters the escort's formation
+  // (UNITCOMMAND_ENTER_FORMATION, 0x7eead4: runs/h1_duely1128 t37
+  // UnitEnterFormation 3014684 with 1114128, the capture's tree's Make
+  // Formation before its Change Target ends it; runs/h1_duels1156 t79
+  // Barbarian City Assault's Man-At-Arms 3342364 on 13:4 takes its order
+  // for 13:2 and stays, its Battering Ram 3735584 there fails its swap and
+  // walks to 13:4, UnitEnterFormation)
   execute(node, run, ctx) {
     const { op } = ctx;
     if (dataBool(node, 'Destroy Formations')) {
@@ -689,12 +697,28 @@ const makeFormation: BtHandler<OpsContext> = {
       return;
     }
     const pairs = (run.mem[node.index].pairs as [number, number, number][] | undefined) ?? [];
-    for (const [civ, escort, plot] of pairs) {
-      const e = ctx.view().units(ctx.seat).find((u) => u.id === escort);
-      if (e && e.plot !== plot) moveTo(ctx, e, plot);
-      const v = ctx.view();
-      const a = v.units(ctx.seat).find((u) => u.id === civ);
-      const b = v.units(ctx.seat).find((u) => u.id === escort);
+    const find = (id: number) => ctx.view().units(ctx.seat).find((u) => u.id === id);
+    for (const id of opUnits(op)) {
+      const pair = pairs.find(([civ, escort]) => civ === id || escort === id);
+      if (!pair) continue;
+      const [civ, escort, plot] = pair;
+      const partner = civ === id ? escort : civ;
+      const u = find(id);
+      if (!u) continue;
+      if (u.plot !== plot) {
+        ctx.endTurn?.(id);
+        moveTo(ctx, u, plot);
+      }
+      const here = find(id)?.plot ?? NO_PLOT;
+      const p = find(partner);
+      if (p && p.plot !== here) {
+        ctx.endTurn?.(partner);
+        ctx.swap?.(partner, here);
+        const q = find(partner);
+        if (q && q.plot !== here) moveTo(ctx, q, here);
+      }
+      const a = find(civ);
+      const b = find(escort);
       if (a && b && a.plot === b.plot && !a.mates.length && !b.mates.length) ctx.enterFormation?.(civ);
     }
   },

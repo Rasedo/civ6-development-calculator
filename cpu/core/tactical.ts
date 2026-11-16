@@ -2961,7 +2961,8 @@ const onList = (state: GameState, pass: Pass, u: Unit) => !(pass.listedFrom ?? p
  * beside it that its own unit holds is no step), and plunders the Trader or
  * condemns the heretics on its plot, and from where it stands shoots the
  * target (0x964a40) or goes for the target's plot with the attack flag
- * (0x962190, flag 0x10), the push emptying its queue
+ * (0x962190, flag 0x10), the push emptying its queue, and with Movement
+ * left it stays for the moves after
  * (runs/h1_duelq1128 t31-34: the Spearman 589832 of the camp 30:6 goes out
  * to 31:7 for the spot 32:8 its Warrior holds, to 33:8 striking player 4's
  * Archer, and on to 34:9 under "Barb. Camp Defense" rows AT 30:6).
@@ -2987,6 +2988,16 @@ function defendCamps(state: GameState, pass: Pass): void {
           if (state.units.includes(s.unit) && plotDistance(state, u.tileIndex, s.unit.tileIndex) <= unitAttackRange(u)
             && u.movesLeft > 0 && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, s.unit.tileIndex);
         } else if (state.units.includes(s.unit)) moveTo(state, u, s.unit.tileIndex);
+      }
+      // the spot's move keeps the unit's moves (0x773fb0 with flag 1): one
+      // with Movement left stays on the move's list (0x77d180 drops only a
+      // unit with none) for the moves after (runs/h1_duels1163 t42: the
+      // camp 42:12's Spearman 65536 goes for the spot 41:11 on player 4's
+      // Archer 41:10 two turns off and Wanders to 42:11; h1_duels1187 t22,
+      // h1_duels1179 t51 alike)
+      if (state.units.includes(u) && u.movesLeft > 0 && !pass.ended.has(u.id)) {
+        tacticsTrace?.(u, 'Barb. Camp Defense', camp, -1);
+        continue;
       }
     }
     finish(pass, u, 'Barb. Camp Defense', camp);

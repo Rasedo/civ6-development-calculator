@@ -20262,3 +20262,54 @@ cpu/export/planes.ts; GPU `_soil_mine` in gpu/core/sim_orders.py,
   after, as recorded. runs/h1_duels1144 t11 / t12 city-state 2 the same.
 - Open: runs/h1_duels1161 t249 Conservation 429.121 for the game's 429.0
   (C-98).
+
+## C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins
+
+- Operation Pillage's execution (0x811390) takes a target only on the
+  target city's own ground: the plot's ownership record +0xc (its owning
+  city, plot vt +0x30) against the target plot's (0x81144a, 0x811633), not
+  the plot's owner alone. Ported: `pillageExecute` on `AiMapPlotView.ownerCity`
+  (cpu/core/operations/assault.ts, cpu/core/aiView.ts), `_op_pillage`'s
+  ground on `tile_city` (gpu/core/sim_barbops.py). The member loop's other
+  tests as read: the unit's pillage ability (0x51afd0: combat, not
+  embarked), the pillage operation's CanStart (XP2 0xa50680: the plot's
+  owner at war, the improvement unpillaged, a completed unpillaged district,
+  and Movement as GetMaxMoves or the parameter at +0x550 / +0x558), then
+  twice the formation's Movement above the distance and the planning's spot
+  (0x791300, the range 1 for a land unit of +0x18bd, else 0) where 0x586900
+  lets the formation end.
+- Make Formation's execution (0x7ee630) walks the operation's units in turn
+  (0x6092c0), each named by a pair (0x7389f0: the first pair whose rider or
+  escort it is): off the pair's plot (the rider's at the update) its turn
+  done and its MOVE_TO there; then its partner, off the unit's plot, its turn
+  done, UNITOPERATION_SWAP_UNITS onto that plot (0x972880) and MOVE_TO there
+  (0x7ee963..0x7eea7a); met, ENTER_FORMATION (0x7eead4). So a rider walks to
+  an escort that did not reach it. Ported: `makeFormation.execute`
+  (cpu/core/operations/nodes.ts), `_bop_form_exec` / `_bop_partner_walk` and
+  the capture's tick (gpu/core/sim_barbops.py).
+- Siege City's walls branch (0x811e80 at 0x812027..0x812219) runs only where
+  the city keeps no walls ability off (0x811f48..0x81201b): its owner's
+  Urban Defenses (the Free Cities' record +0x1c, any other player's
+  Player_Cities +0xf4) and the city's m_iPreventBypassOuterDefenses (+0x2a10)
+  and m_iPreventMeleeAttackOuterDefenses (+0x2a70) all clear — the City
+  serializer 0x1baa90 names the two (0x1bd7b7, 0x1bd822), the install's
+  EFFECT_ADJUST_CITY_PREVENT_BYPASS_OUTER_DEFENSES /
+  _PREVENT_MELEE_ATTACK_OUTER_DEFENSES (the Castle the melee one, the Star
+  Fort and the Tsikhe both). Ported: `wallsShut` (the walls tier from
+  `WALLS_TIER_CASTLE` up), `siegeCityExecute`; `_bop_walls_tier`, `_op_siege`.
+- The camp defender's mover (0x772940) moves to its strike's spot through
+  0x773fb0 with the flag set: its moves are not ended, and a unit with
+  Movement left is not dropped from the move's list (0x77d180 at 0x7740dd
+  runs only on a unit with none), so the homeland's later moves (Wander)
+  take it. Ported: `defendCamps` (cpu/core/tactical.ts), Defend Camps in
+  `_tac_pass` (gpu/core/sim_tactics.py).
+- Confirmed: runs/h1_duels1156 t63 / t66 (the raid's Warrior on the Quarry of
+  another city passes by, Operation Move as logged); t79 the Battering Ram
+  3735584 walks to its Man-At-Arms and forms; runs/h1_duels1163 t42-43,
+  1179 t51-57, 1187 t22, 1161 t38 / t55-56, 1174 t66 (Barb. Camp Defense
+  then Wander, ten rows); runs/h1_duels1140 t85 (Handan's Castle: no walls
+  line).
+- Open: Siege City's slot assignment on 1140 t85 gives the Battering Ram
+  the slot 12:14 where the game's line names its Warrior for 12:13; Operation
+  Move's update on 1156 t82 wins on the nearest member's reach where the
+  game's tree stays in its march (C-95).

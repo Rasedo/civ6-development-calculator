@@ -15,7 +15,7 @@ import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { MINOR_UPGRADE_GOLD, cityStateCivilization, govInfluence } from '../data/cityStates';
-import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
+import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileCity, tileSeat, unitsOf, warsOf } from './seats';
 import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, planningAt, reachPlots, revealedPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
@@ -35,7 +35,7 @@ import { gpOffer, greatPersonPointsPerTurn } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
-import { UNIT_HP, UNITS } from '../data/units';
+import { UNIT_HP, UNITS, WALLS_TIER_CASTLE } from '../data/units';
 import { IMPROVEMENTS } from '../data/improvements';
 import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
@@ -204,7 +204,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   return {
     plots: () => (plots ??= map.tiles.map((t): AiMapPlotView => ({
       index: t.index, x: t.col, y: t.row, water: isWater(t), impassable: isImpassable(t),
-      owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
+      owner: tileSeat(t), ownerCity: tileCity(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
       area: t.area ?? -1, region: t.region ?? -1,
       lake: t.terrain === 'LAKE',
     }))),
@@ -807,6 +807,14 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     wallsAbility: (id) => {
       const u = state.units.find((x) => x.id === id);
       return !!u && !!UNITS[u.type]?.siegeSupport;
+    },
+    // the Castle's tier and above: the Castle's PreventMeleeAttackOuterDefenses,
+    // the Star Fort's and the Tsikhe's both, the urban tier its owner's
+    wallsShut: (p) => {
+      const held = cityAtIndex(state, p);
+      const cs = held ? undefined : cityStateAtPlot(state, p);
+      const shape = held ? held.city : cs && cs.centerIndex === p ? { buildings: cs.buildings ?? [], seat: cs.seat } : null;
+      return !!shape && wallsTier(state, shape) >= WALLS_TIER_CASTLE;
     },
     attackTargets: (i) => targetsOf(i).map((t) => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
