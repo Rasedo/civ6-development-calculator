@@ -405,6 +405,13 @@ const overCities = (fn: (r: CityRow, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityRow[]).map((r) => fn(r, state));
 const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows as Unit[]).map(fn);
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
+/** the centre plot of a known city (`citiesKnown`'s owner and id, -1 a
+ *  city-state's one city) standing, else -1 */
+function knownCentre(state: GameState, k: { owner: number; id: number }): number {
+  const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
+  return cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
+}
+
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 /** a player's tree pool (`newTreeId`): the generation its next tree takes,
@@ -709,6 +716,20 @@ const GAME: Record<string, Extractor> = {
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
   freePrimaryRegions: (s) => [[...(s.freeSeat?.primaryRegions ?? [])]],
+  // the Free Cities' revealed plots and their knowledge base's cities, as a
+  // city-state's (`minorCitiesKnown`, `minorCitiesKnownDistricts`)
+  freeRevealed: (s) => [(s.freeSeat?.revealed ?? []).flatMap((v, i) => (v === 1 ? [i] : []))],
+  freeCitiesKnown: (s) => [(s.freeSeat?.citiesKnown ?? []).flatMap((k) => {
+    const at = knownCentre(s, k);
+    return at >= 0 ? [at] : [];
+  })],
+  freeCitiesKnownDistricts: (s) => [(s.freeSeat?.citiesKnown ?? []).flatMap((k) => {
+    const at = knownCentre(s, k);
+    if (at < 0) return [];
+    const centre = k.districts.find((d) => d.plot === at);
+    const camp = k.districts.find((d) => d.plot !== at);
+    return [centre?.defense ?? -1, centre && centre.walls > 0 ? 1 : 0, camp?.defense ?? -1, camp && camp.walls > 0 ? 1 : 0];
+  })],
   freeTradeSeat: (s) => [s.freeSeat?.tradeSeat ?? -1],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
   // next contract takes and their tree pool (`newTreeId`)
@@ -1138,13 +1159,11 @@ const CITY_STATE_G: Record<string, Extractor> = {
   }),
   minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
   minorCitiesKnown: overCityStates((cityState, state) => (cityState.citiesKnown ?? []).flatMap((k) => {
-    const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
-    const at = cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
+    const at = knownCentre(state, k);
     return at >= 0 ? [at] : [];
   })),
   minorCitiesKnownDistricts: overCityStates((cityState, state) => (cityState.citiesKnown ?? []).flatMap((k) => {
-    const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
-    const at = cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
+    const at = knownCentre(state, k);
     if (at < 0) return [];
     const centre = k.districts.find((d) => d.plot === at);
     const camp = k.districts.find((d) => d.plot !== at);

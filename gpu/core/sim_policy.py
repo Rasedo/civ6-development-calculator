@@ -844,19 +844,16 @@ class SimPolicy:
 
     def _pol_enemy_plunder(self, ctx: dict, districts: bool) -> torch.Tensor:
         """`enemyPlunder` [B] for the context's minor: over the cities its
-        knowledge base holds (a city-state's entries standing,
-        `_minor_cities_look`; the Free Cities' those their look names on the
-        plots they see, `_known_city_first`) whose owner it is at war with, the PlunderAmount of
+        knowledge base holds (a city-state's or the Free Cities' entries
+        standing, `_minor_cities_look`) whose owner it is at war with, the PlunderAmount of
         the improvements on every plot of that owner, summed again for each
         of its cities known — or, with `districts`, of the city's own
         districts"""
         B, dev = ctx["B"], ctx["dev"]
         s = ctx["s"]
         live, _ctr = self._known_trade_cands(torch.full((B,), -1, dtype=torch.long, device=dev))
-        if s != self.FR:
-            live = live & (self.citystate_kb_city_rank[:, s] >= 0) & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
-        else:
-            live = live & (self._known_city_first(self._barb_seen(FREE_SEAT)) < self.T)
+        rank, cid = self._kb_city_planes(s)[:2]
+        live = live & (rank >= 0) & (cid == self._known_trade_ids())
         war = self.war[:, ctx["row"]]
         ground = torch.where(self.improvement >= 0, self._imp_plun_amt[self.improvement.clamp(min=0)], torch.zeros_like(self.improvement))
         out = torch.zeros(B, dtype=torch.long, device=dev)

@@ -276,7 +276,12 @@ class SimMinors:
             self._minor_civics_complete_now(s, full)
             return
         held, retain, prog, curp = self.citystate_techs, self.citystate_tech_retain, self.citystate_tech_prog, self.citystate_cur_tech
+        gained = full & ~held[:, s]
         held[:, s] |= full
+        # each technology's reveal pays its standing sources' copy (`techRevealed`)
+        if s != self.FR:
+            for _col in gained.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                self._tech_revealed(self._CITY_MINOR0 + s, torch.full((self.B,), _col, dtype=torch.long, device=self.device), gained[:, _col])
         retain[:, s] = torch.where(full, torch.zeros_like(retain[:, s]), retain[:, s])
         if 0 <= self._urban_def_tech < full.shape[1]:
             hit = full[:, self._urban_def_tech]
@@ -990,18 +995,31 @@ class SimMinors:
                 out.append(torch.where(m, key, none).min(dim=1).values)
         return torch.stack(out, dim=1)
 
+    def _kb_city_planes(self, s: int) -> tuple[torch.Tensor, ...]:
+        """the known-city planes of research row `s`, views to write
+        through — a city-state's, or (`FR`) the Free Cities': the slots'
+        rank and id [B, ND], the entries made [B], the district entries
+        (centre defense, its walls, Encampment defense, its walls) and the
+        plots its looks revealed [B, T]"""
+        if s == self.FR:
+            return (self.free_kb_city_rank, self.free_kb_city_id, self.free_kb_city_n, self.free_kb_city_cdef,
+                    self.free_kb_city_cwall, self.free_kb_city_edef, self.free_kb_city_ewall, self.free_revealed)
+        return (self.citystate_kb_city_rank[:, s], self.citystate_kb_city_id[:, s], self.citystate_kb_city_n[:, s],
+                self.citystate_kb_city_cdef[:, s], self.citystate_kb_city_cwall[:, s], self.citystate_kb_city_edef[:, s],
+                self.citystate_kb_city_ewall[:, s], self.mops_revealed[:, s])
+
     def _minor_cities_look(self, s: int, alive: torch.Tensor) -> None:
-        """`minorCitiesLook` — minor `s`'s knowledge base's cities: every
-        known-city slot whose city stands with a district on a plot the
-        minor revealed (`mops_revealed`, `_known_city_first`) and holds no
-        entry of that city's id joins the end of the list, in the order of
-        those plots; every entry's district entries filled anew
-        (`_kb_city_fill`)"""
+        """`minorCitiesLook` / `freeCitiesLook` — the knowledge base's cities
+        of minor `s` (`FR` the Free Cities): every known-city slot whose
+        city stands with a district on a plot it revealed
+        (`_kb_city_planes`, `_known_city_first`) and holds no entry of that
+        city's id joins the end of the list, in the order of those plots;
+        every entry's district entries filled anew (`_kb_city_fill`)"""
         live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device))
         ids = self._known_trade_ids()
-        rank = self.citystate_kb_city_rank[:, s]
-        first = self._known_city_first(self.mops_revealed[:, s])
-        new = alive.unsqueeze(1) & live & (first < self.T) & ((rank < 0) | (self.citystate_kb_city_id[:, s] != ids))
+        rank, cid, made = self._kb_city_planes(s)[:3]
+        first = self._known_city_first(self._kb_city_planes(s)[7])
+        new = alive.unsqueeze(1) & live & (first < self.T) & ((rank < 0) | (cid != ids))
         if not bool(new.count_nonzero()):
             self._kb_city_fill(s, alive, live)
             return
@@ -1009,10 +1027,9 @@ class SimMinors:
         order = torch.argsort(torch.where(new, first, torch.full_like(first, big)), dim=1, stable=True)
         pos = torch.empty_like(order)
         pos.scatter_(1, order, torch.arange(order.shape[1], device=self.device).unsqueeze(0).expand_as(order).contiguous())
-        n = self.citystate_kb_city_n[:, s]
-        self.citystate_kb_city_rank[:, s] = torch.where(new, n.unsqueeze(1) + pos, rank)
-        self.citystate_kb_city_id[:, s] = torch.where(new, ids, self.citystate_kb_city_id[:, s])
-        self.citystate_kb_city_n[:, s] = n + new.sum(dim=1)
+        rank.copy_(torch.where(new, made.unsqueeze(1) + pos, rank))
+        cid.copy_(torch.where(new, ids, cid))
+        made.copy_(made + new.sum(dim=1))
         self._kb_city_fill(s, alive, live)
 
     def _kb_city_fill(self, s: int, alive: torch.Tensor, live: torch.Tensor) -> None:
@@ -1020,17 +1037,16 @@ class SimMinors:
         holds standing (`live` [B, ND] the slots' cities standing) as its
         look fills them (`lookDistricts`, `_kb_city_entries` on the plots it
         revealed)"""
-        held = alive.unsqueeze(1) & live & (self.citystate_kb_city_rank[:, s] >= 0) \
-            & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
-        looked = self.mops_revealed[:, s]
+        rank, cid, _made, kcdef, kcwall, kedef, kewall, looked = self._kb_city_planes(s)
+        held = alive.unsqueeze(1) & live & (rank >= 0) & (cid == self._known_trade_ids())
         for k in held.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             row, c = (self._CITY_MINOR0 + k, 0) if k < self.S else self._trade_cand_row(k)
             d, cwall, own, ewall = self._kb_city_entries(row, c, looked)
             on = held[:, k]
-            self.citystate_kb_city_cdef[:, s, k] = torch.where(on, d, self.citystate_kb_city_cdef[:, s, k])
-            self.citystate_kb_city_cwall[:, s, k] = torch.where(on, cwall, self.citystate_kb_city_cwall[:, s, k])
-            self.citystate_kb_city_edef[:, s, k] = torch.where(on, own, self.citystate_kb_city_edef[:, s, k])
-            self.citystate_kb_city_ewall[:, s, k] = torch.where(on, ewall, self.citystate_kb_city_ewall[:, s, k])
+            kcdef[:, k] = torch.where(on, d, kcdef[:, k])
+            kcwall[:, k] = torch.where(on, cwall, kcwall[:, k])
+            kedef[:, k] = torch.where(on, own, kedef[:, k])
+            kewall[:, k] = torch.where(on, ewall, kewall[:, k])
 
     def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """the known cities of minor `s`'s trade AI: the known-city slots
@@ -1777,6 +1793,9 @@ class SimMinors:
         techs = techs + fire.long()
         if bool(fire.count_nonzero()):
             self.citystate_techs[fire, s, c[fire]] = True
+            # its reveal pays its standing sources' copy (`techRevealed`)
+            if not free:
+                self._tech_revealed(self._CITY_MINOR0 + s, c, fire)
             # a city-state's technology gained starts its "Upgrade Units"
             # tree at once (`minorTechGained`)
             if not free:

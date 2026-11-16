@@ -508,6 +508,11 @@ class SimGp:
             _slots_before = self._seat_policy_slots(row)
             self.civ_gp_perm[:, row] = self.civ_gp_perm[:, row] + _rowfx[:, self._GP_PERM0:self._GP_PERM0 + _np] * m.to(self.civ_gp_perm.dtype).unsqueeze(1)
             self._slot_count_rebuild(row, _slots_before, int(self.turn), m)
+            # a resource the person shows before its technology: its
+            # ownership pass at the grant (0x4ae870 -> 0x4ae4e0)
+            for _pk, _ri in self._gp_resource_reveal:
+                if _ri in self._strat_rid:
+                    self._reveal_pass(row, m & (_rowfx[:, self._GP_PERM0 + _pk] != 0), self._strat_rid.index(_ri))
             # CIV6 (Leif Erikson): "+1 sight range for all naval units" — each
             # of the owner's naval units looks again with it (`lookAgain`)
             if "navalSight" in self._gp_perm_names:
@@ -666,7 +671,9 @@ class SimGp:
         if bool(done.count_nonzero()):
             self.civ_techs[:, row, :nt] |= done
             for _col in done.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-                self._minor_catch_up(row, torch.full((self.B,), _col, dtype=torch.long, device=self.device), done[:, _col], False)
+                _ci = torch.full((self.B,), _col, dtype=torch.long, device=self.device)
+                self._tech_revealed(row, _ci, done[:, _col])
+                self._minor_catch_up(row, _ci, done[:, _col], False)
             self.civ_tech_retain[:, row, :nt] = torch.where(
                 done, torch.zeros_like(self.civ_tech_retain[:, row, :nt]), self.civ_tech_retain[:, row, :nt])
             cur = self.civ_cur_tech[:, row]

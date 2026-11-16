@@ -64,6 +64,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, upgradeType, capStockpiles } from '../core/stockpile';
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
+import { freeCitiesLook } from '../core/aiView';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, tracePlanning, traceTactics, type Pass } from '../core/tactical';
 import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt, tribeOf } from '../core/barbarians';
 import { BARB_PILLAGE_SCORE, DIFFICULTIES } from '../data/barbarians';
@@ -3133,6 +3134,9 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
   if (free && state.freeSeat) {
     if (free.ops) state.freeSeat.ops = free.ops;
     if (free.cityAi) state.freeSeat.cityAi = free.cityAi;
+    // their knowledge base's cities as their turn's end look finds them, on
+    // the plots the record's steps revealed (`freeCitiesLook`)
+    freeCitiesLook(state, plotsSeenNow(state, new Set([FREE_SEAT])));
     const player = ctx.playerOfSeat.get(FREE_SEAT);
     if (player !== undefined) {
       ctx.operations.minorTurn(turn, player, ctx.minorOps.get(FREE_SEAT)?.lines ?? [], []);

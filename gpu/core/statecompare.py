@@ -511,6 +511,9 @@ GAME = {
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
     "freePrimaryRegions": lambda sim, b, rows: [sorted(set(sim.tile_region[b][sim.free_region_plots[b]].tolist()))],
+    "freeRevealed": lambda sim, b, rows: [sim.free_revealed[b].nonzero(as_tuple=True)[0].tolist()],
+    "freeCitiesKnown": lambda sim, b, rows: [_cities_known(sim, b, sim.FR)],
+    "freeCitiesKnownDistricts": lambda sim, b, rows: [_cities_known_districts(sim, b, sim.FR)],
     "freeTradeSeat": lambda sim, b, rows: [int(sim.free_trade_seat[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
     "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), *_tree_pool(sim, b, sim.FR)]],
@@ -1191,12 +1194,13 @@ def _city_trade_list(sim, b: int, c: int, s: int) -> list[int]:
 
 
 def _cities_known(sim, b: int, s: int) -> list[int]:
-    """minor `s`'s knowledge base's cities standing, in its order, as their
-    centre plots"""
-    none = sim.citystate_center[:, s].clone().fill_(-1)
+    """minor `s`'s (`FR` the Free Cities') knowledge base's cities standing,
+    in its order, as their centre plots"""
+    none = sim.citystate_center[:, 0].clone().fill_(-1)
     live, ctr = sim._known_trade_cands(none)
-    rank = sim.citystate_kb_city_rank[b, s]
-    held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
+    kp = sim._kb_city_planes(s)
+    rank = kp[0][b]
+    held = live[b] & (rank >= 0) & (kp[1][b] == sim._known_trade_ids()[b])
     return [int(ctr[b, d]) for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist())]
 
 
@@ -1205,14 +1209,14 @@ def _cities_known_districts(sim, b: int, s: int) -> list[float]:
     district entries as its last look filled them: the centre's defense (-1
     none), its walls standing (1 / 0), the Encampment's defense (-1 none),
     its walls standing"""
-    none = sim.citystate_center[:, s].clone().fill_(-1)
+    none = sim.citystate_center[:, 0].clone().fill_(-1)
     live, _ctr = sim._known_trade_cands(none)
-    rank = sim.citystate_kb_city_rank[b, s]
-    held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
+    kp = sim._kb_city_planes(s)
+    rank = kp[0][b]
+    held = live[b] & (rank >= 0) & (kp[1][b] == sim._known_trade_ids()[b])
     out: list[float] = []
     for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist()):
-        out += [float(sim.citystate_kb_city_cdef[b, s, d]), int(sim.citystate_kb_city_cwall[b, s, d]),
-                float(sim.citystate_kb_city_edef[b, s, d]), int(sim.citystate_kb_city_ewall[b, s, d])]
+        out += [float(kp[3][b, d]), int(kp[4][b, d]), float(kp[5][b, d]), int(kp[6][b, d])]
     return out
 
 

@@ -2670,6 +2670,7 @@ class SimPhase:
             tech_done = tech_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
+            self._tech_revealed(row, curt, fin)
             self._minor_catch_up(row, curt, fin, False)
             self._eff_version += 1
             for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):

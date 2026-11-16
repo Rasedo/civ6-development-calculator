@@ -1043,6 +1043,14 @@ export interface Seat {
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;
+  /** THE FREE CITIES' REVEALED PLOTS: per plot 1 where their knowledge
+   *  base's looks have seen it (the player's revealed plots, visibility
+   *  +0x2f0, `freeKnowledge`). Absent = none. */
+  revealed?: number[];
+  /** THE FREE CITIES' KNOWN CITIES, in their order (m_knownCities,
+   *  `freeCitiesLook` at `freeKnowledge`), as a city-state's
+   *  (`CityState.citiesKnown`). Absent = none. */
+  citiesKnown?: { owner: number; id: number; districts: { plot: number; defense: number; walls: number; strike: number }[] }[];
   /** THE FREE CITIES' PRIMARY REGION LIST (the military AI's +0x1290
    *  +0x2f0), which their Combat Desire reads: every region a Free City's
    *  update added (`cityRegions`, 0x700630 from the city analysis

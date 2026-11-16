@@ -806,6 +806,7 @@ class SimEconomy:
                 if col == self._urban_def_tech:
                     self._urban_defenses_fit(row, fin)
                 self.civ_techs[:, row, col] |= fin
+                self._tech_revealed(row, idx, fin)
                 self._minor_catch_up(row, idx, fin, False)
             self._eff_version += 1
             self._research_award(row, fin, idx, is_civic)

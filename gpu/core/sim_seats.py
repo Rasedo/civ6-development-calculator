@@ -8822,6 +8822,7 @@ class SimSeats:
                     self.civ_cur_civic[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
                 else:
                     self.civ_techs[r, row, pick[r]] = True
+                    self._tech_revealed(row, pick, hit)
                     self._minor_catch_up(row, pick, hit, False)
                     self.civ_tech_retain[r, row, pick[r]] = 0
                     cur = self.civ_cur_tech[:, row]
@@ -11088,6 +11089,49 @@ class SimSeats:
         if self._log_diff:
             for _k in range(bank.shape[1]):
                 self._log_stock(range(self.B), row, _k, "ac")
+
+    def _reveal_pass(self, row: int, on: torch.Tensor, k: int) -> None:
+        """`revealPass`: A REVEAL'S OWNERSHIP PASS (0x4ae4e0) for seat row
+        `row` on strategic slot `k` in the games `on` [B] — every plot
+        holding the resource that hands it to the seat (`_res_extracting` on
+        its own ground) pays its one copy into the bank at once, the
+        allocation rebuilt; a city-state's under a suzerain passes to the
+        suzerain (0x44eff0)."""
+        minor = self._CITY_MINOR0 <= row < self.FREE_ROW and row - self._CITY_MINOR0 < self.S
+        if not (row < self.n_majors or minor):
+            return
+        rid = self._strat_rid[k]
+        n = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_live() & self._res_extracting()
+             & (self.res_id == rid)).sum(dim=1)
+        pay = on & (n > 0)
+        if not bool(pay.count_nonzero()):
+            return
+        suz = (self.citystate_suzerain[:, row - self._CITY_MINOR0] if minor
+               else torch.full((self.B,), -1, dtype=torch.long, device=self.device))
+        own = pay & (suz < 0)
+        bank = self._stock_bank(row)
+        bank[:, k] += torch.where(own, n, torch.zeros_like(n)).to(bank.dtype)
+        self._log_stock(own.nonzero().reshape(-1), row, k, "rv")
+        held = [g for g in range(self.n_majors) if bool((pay & (suz == g)).count_nonzero())]
+        for g in held:
+            to = pay & (suz == g)
+            gb = self._stock_bank(g)
+            gb[:, k] += torch.where(to, n, torch.zeros_like(n)).to(gb.dtype)
+            self._log_stock(to.nonzero().reshape(-1), g, k, "rv")
+        self._rebuild_luxuries(row, pay)
+        for g in held:
+            self._rebuild_luxuries(g, pay & (suz == g))
+
+    def _tech_revealed(self, row: int, tech: torch.Tensor, hit: torch.Tensor) -> None:
+        """`techRevealed`: the ownership pass of each resource the technology
+        `tech` [B] reveals, for seat row `row` completing it in the games
+        `hit` [B] (`_reveal_pass`)."""
+        if self._n_strategic == 0 or not bool(hit.count_nonzero()):
+            return
+        for k, rid in enumerate(self._strat_rid):
+            rt = int(self._res_reveal_tech[rid])
+            if rt >= 0:
+                self._reveal_pass(row, hit & (tech == rt), k)
 
     def _seat_stock_income(self, row: int) -> torch.Tensor:
         """[B, K] one turn's strategic income of seat row `row` by slot

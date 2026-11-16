@@ -17,7 +17,7 @@ import { adjacentBarbarians, convertAdjacentBarbarians, gpActivatedPressure } fr
 import { boostPool, drawBoosts, markBoost } from './boosts';
 import { researchLump } from './phase';
 import {
-  GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
+  GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GpSite, type GreatPersonDef,
 } from '../data/greatPeople';
@@ -43,6 +43,7 @@ import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 import { treePrereqs } from './researchTree';
 import { minorCatchUp } from './minorBuild';
+import { revealPass, techRevealed } from './stockpile';
 import { governmentSlots, slotCountRebuild } from './effects';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
@@ -224,6 +225,7 @@ function freeTechs(state: GameState, seat: number, n: number): void {
     const pick = open.splice(randRange(state, open.length, 'Choosing random tech to grant based on era'), 1)[0];
     if (pick.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     rsr.techs.push(pick.id);
+    techRevealed(state, seat, pick.id);
     minorCatchUp(state, seat, pick.id, false);
     delete rsr.techRetained[pick.id];
     if (rsr.tech === pick.id) rsr.tech = null;
@@ -322,6 +324,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
         if (!fx.eurekaGrant) continue;
         if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, unit.seat);
         rsr.techs.push(id);
+        techRevealed(state, unit.seat, id);
         minorCatchUp(state, unit.seat, id, false);
         delete rsr.techRetained[id];
         if (rsr.tech === id) rsr.tech = null;
@@ -532,6 +535,9 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   const slotsBefore = governmentSlots(state, unit.seat);
   for (const [k, n] of Object.entries(fx.perm ?? {})) permAdd(owner, GP_PERM.length, k, GP_PERM, n);
   slotCountRebuild(state, unit.seat, slotsBefore, state.turn);
+  // a resource the person shows before its technology: its ownership pass
+  // at the grant (0x4ae870 -> 0x4ae4e0)
+  for (const r of GP_RESOURCE_REVEAL) if (fx.perm?.[r.perm]) revealPass(state, unit.seat, r.resource);
   // CIV6 (Leif Erikson): "+1 sight range for all naval units" — each of the
   // owner's naval units looks again with it (`lookAgain`)
   if (fx.perm?.navalSight) for (const u of state.units) if (u.seat === unit.seat && UNITS[u.type]?.naval) lookAgain(state, u);

@@ -197,6 +197,16 @@
   context:
     - ...cc40 at 32 entries or fewer, ties keeping the list's order); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state has no diplomatic focus...
   review: reviewed
+- addr: 0x54f4a0
+  final: 0x38d2d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...trade route signal (game signals +0x1320, emitted at a route's start 0x555380 and end 0x54f4a0) with the route's resource, which no route carries.
+  review: imported
 - addr: 0x54fe20
   final: 0x38dab0
   kind: function
@@ -510,6 +520,7 @@
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-108: the trade graph's paths — READ, both twins"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...air (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x5526a0. (`tradeMet`; `minorRouteCandidate`..."

@@ -74,11 +74,11 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildi
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
-import { accrueStockpiles, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
+import { accrueStockpiles, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, techRevealed, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { purchasePick, type PurchaseEntry } from './aiEconomic';
 import type { CorpsFacts } from './aiModifiers';
-import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
+import { aiCityStats, cityGrowth, aiView, freeCitiesLook, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight, revealAround, unitSeesThrough, unitSight } from './fog';
@@ -680,6 +680,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     gained.techs += 1;
     r.techProgress -= cost;
     if (!r.techs.includes(cur)) r.techs.push(cur);
+    techRevealed(state, seat, cur);
     delete r.techRetained[cur];
     minorTechGained(state, seat);
     r.tech = null;
@@ -875,6 +876,7 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
   }
   if (r.techs.includes(id)) return;
   r.techs.push(id);
+  techRevealed(state, seat, id);
   delete r.techRetained[id];
   const cs = state.cityStates.find((x) => x.seat === seat);
   minorTechGained(state, seat);
@@ -1772,11 +1774,14 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
 }
 
 
-/** THE FREE CITIES' KNOWLEDGE BASE's army update (`knowledgeLook` on the
- *  Free Cities' seat) over the plots they see (`plotsSeenNow`: their units,
- *  their cities' centres two round, their plots with their ring) */
+/** THE FREE CITIES' KNOWLEDGE BASE's look: its army update (`knowledgeLook`
+ *  on the Free Cities' seat) over the plots they see (`plotsSeenNow`: their
+ *  units, their cities' centres two round, their plots with their ring),
+ *  then its cities over the plots they have revealed (`freeCitiesLook`) */
 export function freeKnowledge(state: GameState, age: boolean): void {
-  knowledgeLook(state, freeSeatOf(state), FREE_SEAT, plotsSeenNow(state, new Set([FREE_SEAT])), age);
+  const seen = plotsSeenNow(state, new Set([FREE_SEAT]));
+  knowledgeLook(state, freeSeatOf(state), FREE_SEAT, seen, age);
+  freeCitiesLook(state, seen);
 }
 
 /** A FREE CITY'S ANALYSIS adds its regions (`cityRegions`, 0x700630 from

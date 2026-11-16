@@ -10368,6 +10368,15 @@
     - "...s the defender). A unit requirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's plot is null), its Inverse me..."
     - "...s (the Berserker, Redcoat, Digger); a unit requirement with no plot is unmet (0xb028c0, 0xb12d50, 0xb95b80), its Inverse met. Open: REQUIREMENT_OPPONENT_IS_STRONGER's code (a fit; C-98..."
   review: reviewed
+- addr: 0xb14bb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...sourcesExtracted (+0x768 through +0x710, 0x4aa070; its one writer 0x4a7150, the applies 0xb14bb0 of EFFECT_GRANT_FREE_RESOURCE_EXTRACTED and 0xb49b70 of EFFECT_GRANT_PLAYER_FREE_RESO...
+  review: imported
 - addr: 0xb27010
   final: 0x870be0
   kind: function
@@ -10503,6 +10512,15 @@
     - "...MODIFIER (the factory 0xc27d10, the effect's vtable 0xdecb08: apply 0xb468d0 / remove 0xb47620) adds its Amount (WC_RES_MODIFY_CITY_STATE_TRADE_YIELD 100) into Player::Congress's int..."
     - "..._ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (factory 0xc27d10, vtable 0xdecb08: 0xb468d0 / 0xb47620) adds Amount 100 into Congress's +0x4b8 by MinorCivBonusType."
   review: reviewed
+- addr: 0xb49b70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s one writer 0x4a7150, the applies 0xb14bb0 of EFFECT_GRANT_FREE_RESOURCE_EXTRACTED and 0xb49b70 of EFFECT_GRANT_PLAYER_FREE_RESOURCE_EXTRACTED: Jebel Barkal, the Great People's gran..."
+  review: imported
 - addr: 0xb4d2b0
   kind: function
   semantics: "EFFECT_DIPLOMACY_AGENDA_OPTIMUS_PRINCEPS's compute: the subject's plots (0x4be720) against the owner's beyond EquivalentTerritoryPercentage (20) either way gives BetterTerritoryBonus (5) up or down; its rank by plots among the majors (0x469db0) gives TopTerritoryBonus (8) inside the top TopTerritoryPercentage (25) and against it from 1 - 25 % of the count. Two majors: +5, 0, -8, -13."
@@ -10693,6 +10711,24 @@
     - "...UST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED (factory 0xc25910, vtable 0xdf85f8, apply 0xb83b00 → 0x2bf3e0: the era entry +0x34 of +0x560, stride 0x78): the records fit a specialty di..."
     - ...+0x34's one writer is 0x2bf3e0 (the same vector through its +0x560 handle), the apply 0xb83b00 of EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED, whose one install user is C...
   review: reviewed
+- addr: 0xb8d870
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ough the watched array at +0x698, 0x4aab70; its one writer 0x4a71b0, the apply / remove 0xb8d870 / 0xb8eb20 of EFFECT_ADJUST_PLAYER_FREE_RESOURCE_IMPORT_EXTRACTION: Hattusa's suzerai..."
+  review: imported
+- addr: 0xb8eb20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tched array at +0x698, 0x4aab70; its one writer 0x4a71b0, the apply / remove 0xb8d870 / 0xb8eb20 of EFFECT_ADJUST_PLAYER_FREE_RESOURCE_IMPORT_EXTRACTION: Hattusa's suzerain rows) and..."
+  review: imported
 - addr: 0xb8edb0
   final: 0x8d33b0
   kind: function
@@ -10957,6 +10993,15 @@
     - ...uns/h1_duelw1124 t2 Rome Feed the World 68); EFFECT_GRANT_ABILITY 0x6b5b30 adds; slot 2 0xbe4aa0.
     - "...s enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   review: reviewed
+- addr: 0xbf0900
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...one, and the free visibility's grant 0x4ae870 (EFFECT_GRANT_FREE_RESOURCE_VISIBILITY, 0xbf0900). So a source standing when its resource is revealed — a Mine laid on the hill before B..."
+  review: imported
 - addr: 0xbf2b60
   final: 0x820fe0
   kind: function
@@ -10995,6 +11040,15 @@
   context:
     - "...: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, CaptureOwnedTerritory +0x14..."
   review: reviewed
+- addr: 0xc107f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- NOT A SOURCE: 0xc107f0 is EFFECT_ADJUST_MOST_ADVANCED_STRATEGIC_RESOURCE_COUNT's apply (a village's reward alo..."
+  review: imported
 - addr: 0xc1c0d0
   kind: function
   status: READ

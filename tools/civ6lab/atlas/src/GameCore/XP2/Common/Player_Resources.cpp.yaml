@@ -81,6 +81,25 @@
   context:
     - ...The extra amenities per owned luxury / bonus resource (+0x160 / +0x1c0, the effects' 0x4a7100 / 0x4a70c0) rebuild too.
   review: reviewed
+- addr: 0x4a7150
+  kind: function
+  name: changeFreeResourcesExtracted
+  semantics: (the resource, the amount) adds the amount to m_iFreeResourcesExtracted (the watched array at +0x710, read at +0x768 by 0x4aa070); its callers are the applies and removes of EFFECT_GRANT_FREE_RESOURCE_EXTRACTED (0xb14bb0 / 0xb15760, every accumulating resource where the row names none) and EFFECT_GRANT_PLAYER_FREE_RESOURCE_EXTRACTED (0xb49b70 / 0xb4a5d0).
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["open: no recorded case read against this array"]
+  review: reviewed
+- addr: 0x4a71b0
+  kind: function
+  name: changeImportResourceExtracted
+  semantics: (the resource, the amount) adds the amount to m_iImportResourceExtracted (the watched array at +0x698, read at +0x6f0 by 0x4aab70); its callers 0xb8d870 / 0xb8eb20 are the apply and remove of EFFECT_ADJUST_PLAYER_FREE_RESOURCE_IMPORT_EXTRACTION.
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes:
+    - "open: Hattusa's suzerain rows are a fit in `accumulatedPerTurn` (HATTUSA_FREE_STRATEGIC), no recorded case read against this array"
+  review: reviewed
 - addr: 0x4a72c0
   final: 0x31e910
   kind: function
@@ -153,6 +172,7 @@
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resource..."
     - "- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the allocation at once (0x4a77d4, unless the gam..."
@@ -337,10 +357,16 @@
 - addr: 0x4aa070
   final: 0x31fe60
   kind: function
-  name: Player_Resources +0x768 by resource
-  semantics: returns Player_Resources +0x768[resource], 0 for no resource. The holdings step 0x4ab6e0 (0x4ab84e..0x4ab871) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn after +0x6f0's (0x4aab70); what writes the array is unread.
-  status: PARTLY
-  notes: ["open: see 0x4aab70"]
+  name: m_iFreeResourcesExtracted by resource
+  semantics: "returns Player_Resources +0x768[resource] (m_iFreeResourcesExtracted, the watched array at +0x710), 0 for no resource. The holdings step 0x4ab6e0 (0x4ab84e..0x4ab871) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn after +0x6f0's (0x4aab70). Its one writer is 0x4a7150, from the applies 0xb14bb0 of EFFECT_GRANT_FREE_RESOURCE_EXTRACTED and 0xb49b70 of EFFECT_GRANT_PLAYER_FREE_RESOURCE_EXTRACTED (Jebel Barkal, the Great People's grants, the dedication's): a city-state holds none."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: "city-state 2's Iron 3 at its t33 with no row of either effect: see 0x4aab70"
+  impl: [cpu/core/stockpile.ts:accumulatedPerTurn, gpu/core/sim_seats.py:_seat_accumulated]
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   review: reviewed
 - addr: 0x4aa0e0
   final: 0x31fed0
@@ -451,11 +477,12 @@
       value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
-  impl: [gpu/core/sim_seats.py:_res_extracting]
+  impl: [gpu/core/sim_seats.py:_res_extracting, cpu/core/stockpile.ts:revealPass]
   readings:
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourc..."
   review: reviewed
@@ -479,17 +506,23 @@
   readings:
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "...ct:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner is the pl..."
   review: reviewed
 - addr: 0x4aab70
   final: 0x3204f0
   kind: function
-  name: Player_Resources +0x6f0 by resource
-  semantics: returns Player_Resources +0x6f0[resource], 0 for no resource. The holdings step 0x4ab6e0 (0x4ab826..0x4ab849) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn ahead of the plots' extraction; what writes the array is unread.
-  status: PARTLY
-  notes:
-    - "open: runs/h1_duels1171 city-state 2 t32-t33, its Iron stock 0 to 3 in the turn Bronze Working lands where the plots' extraction gives 2"
+  name: m_iImportResourceExtracted by resource
+  semantics: "returns Player_Resources +0x6f0[resource] (m_iImportResourceExtracted, the watched array at +0x698), 0 for no resource. The holdings step 0x4ab6e0 (0x4ab826..0x4ab849) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn ahead of the plots' extraction. Its one writer is 0x4a71b0, from the apply / remove 0xb8d870 / 0xb8eb20 of EFFECT_ADJUST_PLAYER_FREE_RESOURCE_IMPORT_EXTRACTION (Hattusa's suzerain rows): a city-state holds none."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: "city-state 2's Iron 3 at its t33 with no row of the effect: the copy over the plots' 2 is the reveal's ownership pass 0x4ae4e0, not this array"
+  impl: [cpu/core/stockpile.ts:accumulatedPerTurn, gpu/core/sim_seats.py:_seat_accumulated]
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   review: reviewed
 - addr: 0x4aabe0
   final: 0x320560
@@ -616,12 +649,14 @@
     - gpu/core/sim_seats.py:_extraction_changed_at
     - cpu/core/phase.ts:paveGround
     - gpu/core/sim_minors.py:_pave_plot
+    - cpu/core/stockpile.ts:revealPass
   readings:
     - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
     - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - ...g, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource s...
     - ...56b3 / 0x185a2a) calls 0x4a7560. A Builder's improvement on a resource rebuilds through 0x4ab4d0 (non-accumulated resources only). The harness ranks each major's record allocation on t...
@@ -663,6 +698,7 @@
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "...vic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df),..."
     - ...rs. Its only caller is the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0, the allocation 0x4a6110, then the parks), reached from Player DoTurn 0x4e46c0 alone;...
@@ -750,6 +786,44 @@
   context:
     - ...plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's...
   review: reviewed
+- addr: 0x4ad1c0
+  kind: function
+  name: the civic-acquired handler's reveal
+  semantics: "the civic's twin of 0x4ad2f0: each Resources row whose PrereqCivic is the civic (its PrereqTech held where it names one) -> the ownership pass 0x4ae4e0. No install row names a PrereqCivic."
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["open: no install resource names a PrereqCivic, so no recorded case"]
+  review: reviewed
+- addr: 0x4ad2f0
+  kind: function
+  name: the technology-acquired handler's reveal
+  semantics: "Player_Resources' handler of a technology acquired (the player, the technology): for the acquiring player alone, each Resources row whose PrereqTech is the technology (its PrereqCivic held where it names one) fires the visibility signal (game signals +0x1290) and runs the ownership pass 0x4ae4e0 on the resource. 0x4ad1c0 is the civic's twin."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: "city-state 2 completes Bronze Working with a Mine on 8:22's Iron: its stock 3 at its t33 (Equestrian Orders 7.0), the pass's 1 and the turn's 2"
+    - recording: h1_duels1162
+      turn: 180
+      value: "city-state 4 completes Radio with a Mine on 7:9's Aluminum: Resource Management 40 / 68 / 95 t180-t182 as logged"
+  impl:
+    - cpu/core/stockpile.ts:techRevealed
+    - gpu/core/sim_seats.py:_tech_revealed
+    - cpu/core/stockpile.ts:revealPass
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  review: reviewed
+- addr: 0x4ad420
+  final: 0x3222f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...FFECT_ADJUST_MOST_ADVANCED_STRATEGIC_RESOURCE_COUNT's apply (a village's reward alone); 0x4ad420 answers the trade route signal (game signals +0x1320, emitted at a route's start 0x5553...
+  review: imported
 - addr: 0x4ade20
   final: 0x322770
   kind: function
@@ -769,9 +843,12 @@
 - addr: 0x4ae4e0
   final: 0x322f00
   kind: function
-  semantics: the resource ownership pass (-> 0x4aa8e0).
+  semantics: "the resource ownership pass at a reveal (from the technology and civic handlers 0x4ad2f0 / 0x4ad1c0 and the free visibility's grant 0x4ae870): every plot holding the resource the player has revealed is recorded for it (0x50c7f0) and, where the plot hands the resource to the player (0x4aa8e0), ChangeResourceAmount (ownership 0, the plot's count +0x42) pays it at once, with no test of the resource's Accumulate; then the discovery's notification on the player's own plots."
   status: READ
   cases:
+    - recording: h1_duels1148
+      turn: 40
+      value: "city-state 3 completes Bronze Working with a Mine on 40:5's Iron: Equestrian Orders 7 / 12 / 17 t40-t42 as logged, one copy over the plots' 2 a turn"
     - recording: h1_duelw1116
       turn: 120
       value: "Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed t120 before the Coal was revealed, plot 322 under a Great Wall, no mine anywhere — powers Beijing's Coal Power Plant (Factory +"
@@ -779,9 +856,30 @@
       value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
-  readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
+  impl:
+    - cpu/core/stockpile.ts:revealPass
+    - gpu/core/sim_seats.py:_reveal_pass
+    - cpu/core/gpAbility.ts:activateGreatPerson
+    - gpu/core/sim_gp.py:col
+  readings:
+    - "H-1: a plot's resource for its owner (strategic access) — READ"
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "...layer_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's improvement (+0x44, read as non..."
+  review: reviewed
+- addr: 0x4ae870
+  kind: function
+  name: the free visibility's grant
+  semantics: sets m_aFreeResourceVisibility[resource] where unset, fires the visibility signal and runs the ownership pass 0x4ae4e0; its caller 0xbf0900 is EFFECT_GRANT_FREE_RESOURCE_VISIBILITY's apply (James Young's Oil).
+  status: PARTLY
+  impl:
+    - cpu/core/stockpile.ts:revealPass
+    - gpu/core/sim_seats.py:_reveal_pass
+    - cpu/core/gpAbility.ts:activateGreatPerson
+    - gpu/core/sim_gp.py:col
+  readings:
+    - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+  notes: ["open: no recorded case of a source standing at a Great Person's reveal"]
   review: reviewed
 - addr: 0x4ae990
   final: 0x323220

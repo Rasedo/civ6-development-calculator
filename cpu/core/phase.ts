@@ -57,7 +57,7 @@ import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
 import { cityFlags, placeCitizens, replaceAllCitizens, toggleCitizen } from './citizens';
 import { beliefSeatYields, computeCityStats, standingLuxuries, rebuildLuxuries, extractionChanged, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
-import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower, techRevealed } from './stockpile';
 import { ageReactors, pillageTopBuilding } from './disasters';
 import { droughtBars } from '../data/disasters';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressSessionDue } from './congress';
@@ -3004,6 +3004,7 @@ export function completeResearchNow(state: GameState, seat: number, id: string):
     if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     researchAward(actor, TECHS[id].effects);
     rsr.techs.push(id);
+    techRevealed(state, seat, id);
     minorCatchUp(state, seat, id, false);
     delete rsr.techRetained[id];
     if (rsr.tech === id) {
@@ -3324,6 +3325,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       researchAward(actor, TECHS[rsr.tech].effects);
       if (!rsr.techs.includes(rsr.tech)) rsr.techs.push(rsr.tech);
+      techRevealed(state, actor.seat, rsr.tech);
       minorCatchUp(state, actor.seat, rsr.tech, false);
       // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
       // technology. The SPAWN waits for the upkeep charge below — a unit

@@ -429,6 +429,19 @@ class SimInit:
         # the plots of its regions: every region a Free City's update added,
         # none taken out
         self.free_region_plots = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        # the Free Cities' revealed plots (`freeSeat.revealed`) and their
+        # knowledge base's cities (`freeSeat.citiesKnown`, `_minor_cities_look`
+        # on the row `FR`), kept as a city-state's: per known-city slot its
+        # place in the list, the city id its entry was made for, the entries
+        # made so far, and its district entries as the last look filled them
+        self.free_revealed = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        self.free_kb_city_rank = torch.full((B, _nd), -1, dtype=torch.long, device=device)
+        self.free_kb_city_id = torch.full((B, _nd), -1, dtype=torch.long, device=device)
+        self.free_kb_city_n = torch.zeros(B, dtype=torch.long, device=device)
+        self.free_kb_city_cdef = torch.full((B, _nd), -1.0, dtype=torch.float64, device=device)
+        self.free_kb_city_cwall = torch.zeros(B, _nd, dtype=torch.bool, device=device)
+        self.free_kb_city_edef = torch.full((B, _nd), -1.0, dtype=torch.float64, device=device)
+        self.free_kb_city_ewall = torch.zeros(B, _nd, dtype=torch.bool, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)

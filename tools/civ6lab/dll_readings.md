@@ -19217,3 +19217,68 @@ wrapper over `_tac_spot_link` (gpu/core/sim_tactics.py).
   research (12 rows gone).
 - Open: the eighth argument's kept feature and the city's +0x1a8 district
   list (0x173c64..0x173cca) are not asked by the engines' eligibility.
+
+## C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins
+
+- THE REVEAL'S OWNERSHIP PASS: Player_Resources 0x4ae4e0 (the resource)
+  walks every plot of the map holding it that the player has revealed
+  (visibility count +0x290 above 0, else 0x154c0) and, where the plot hands
+  the resource to the player (0x4aa8e0 -> 0x4aaa70: its own plot, the
+  resource's condition met, an unpillaged district on it or an unpillaged
+  improvement whose valid resources hold it), calls ChangeResourceAmount
+  0x4a7560 (resource, ownership 0, the plot's count +0x42) with no test of
+  the Resource_Consumption row's Accumulate. Its callers: the
+  technology-acquired handler 0x4ad2f0 (each Resources row whose PrereqTech
+  is the technology, its PrereqCivic held where it names one), the
+  civic-acquired handler 0x4ad1c0, each for the acquiring player alone, and
+  the free visibility's grant 0x4ae870 (EFFECT_GRANT_FREE_RESOURCE_VISIBILITY,
+  0xbf0900). So a source standing when its resource is revealed — a Mine laid
+  on the hill before Bronze Working, a district on the plot — starts the
+  stock one copy up; one laid after the reveal pays none, the plot's
+  extraction change 0x4ab4d0 skipping an accumulating resource. A
+  city-state's change passes to its suzerain (0x44eff0). Ported:
+  `revealPass` / `techRevealed` in stockpile.ts at every completion of a
+  technology (`minorResearchBank`, `minorCompleteNow`, `completeResearchNow`,
+  the research loop, `grantFreeResearch`, `freeTechs`, the eureka grant) and
+  at a Great Person's reveal (`GP_RESOURCE_REVEAL`); GPU `_reveal_pass` /
+  `_tech_revealed`.
+- THE HOLDINGS STEP'S TWO AMOUNTS (0x4ab6e0 at 0x4ab826..0x4ab871) are
+  m_iImportResourceExtracted (+0x6f0 through the watched array at +0x698,
+  0x4aab70; its one writer 0x4a71b0, the apply / remove 0xb8d870 / 0xb8eb20
+  of EFFECT_ADJUST_PLAYER_FREE_RESOURCE_IMPORT_EXTRACTION: Hattusa's
+  suzerain rows) and m_iFreeResourcesExtracted (+0x768 through +0x710,
+  0x4aa070; its one writer 0x4a7150, the applies 0xb14bb0 of
+  EFFECT_GRANT_FREE_RESOURCE_EXTRACTED and 0xb49b70 of
+  EFFECT_GRANT_PLAYER_FREE_RESOURCE_EXTRACTED: Jebel Barkal, the Great
+  People's grants, the dedication's, the Future Victory card's). A
+  city-state holds neither; the engines pay them in `accumulatedPerTurn`.
+- NOT A SOURCE: 0xc107f0 is EFFECT_ADJUST_MOST_ADVANCED_STRATEGIC_RESOURCE_COUNT's
+  apply (a village's reward alone); 0x4ad420 answers the trade route signal
+  (game signals +0x1320, emitted at a route's start 0x555380 and end
+  0x54f4a0) with the route's resource, which no route carries.
+- CONFIRMED: runs/h1_duels1171 city-state 2, its Mine on 8:22's Iron before
+  Bronze Working lands in its t33: Equestrian Orders 7 / 12 / 17 ... 47 / 47
+  / 42 t33-t43 as logged (3 copies at t33, 2 a turn after); runs/h1_duels1148
+  city-state 3 t40-t52 (the Mine on 40:5) alike; runs/h1_duels1162
+  city-state 4, its Mine on 7:9's Aluminum at Radio in t180: Resource
+  Management 40 / 68 / 95 as logged.
+- THE FREE CITIES' KNOWN CITIES are kept as a city-state's (the look
+  0x7877e0 -> 0x5f0280 over the plots the player has revealed, +0x2f0): a
+  city joins the list's end at the look that first finds a district of it
+  on a revealed plot and stays while it stands, its district entries filled
+  at each look. Ported: `Seat.revealed` and `Seat.citiesKnown` on the Free
+  Cities' seat, `freeCitiesLook` at `freeKnowledge`, the reveal in
+  `freeLook`; GPU `free_revealed`, `free_kb_city_*`, `_minor_cities_look` on
+  the row `FR`.
+- CONFIRMED: runs/h1_duels1143 the Free Cities' list (aiunits kbCities):
+  their own 8:8 from t208, player 1's 3:8 from t215 with no district entry
+  to t221, 8:8 under player 0 at the list's end from t219, 3:12 from t221;
+  Raid 141 / 146 / 143 at t215-t220 and 284 / 289 from t221 against ours
+  138 / 143 / 141 and 279 / 284.
+- Open: runs/h1_duels1143 Raid 2 to 5 under the game's each turn from t215
+  (138 for 141, 284 for 289: the game's two cities of one owner give an odd
+  sum); the Free Cities' revealed plots at the revolt, t208 7:11 and 8:11
+  beyond ours. runs/h1_duels1171 city-state 2 from t33: The Wheel 19 over
+  (308.3 for 289.3) with Engineering and Machinery behind it, the game
+  boosting Iron Working alone at the reveal (Game_Boosts t33) where the
+  engines' HAVE_X_IMPROVEMENTS counts the Mine on the Iron now seen.

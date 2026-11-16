@@ -1001,10 +1001,15 @@ class SimMinorAi:
 
     def _free_knowledge(self, act: torch.Tensor, age: bool) -> None:
         """`freeKnowledge` — the Free Cities' knowledge base's look (row
-        `FK`) over the plots they see (`_barb_seen` of their seat)."""
+        `FK`) over the plots they see (`_barb_seen` of their seat), then
+        its cities over the plots they have revealed (`free_revealed`,
+        `_minor_cities_look` on the row `FR`)."""
         if not bool(act.count_nonzero()):
             return
-        self._knowledge_look(self.FK, FREE_SEAT, self._barb_seen(FREE_SEAT), act, age)
+        seen = self._barb_seen(FREE_SEAT)
+        self._knowledge_look(self.FK, FREE_SEAT, seen, act, age)
+        self.free_revealed |= seen & act.unsqueeze(1)
+        self._minor_cities_look(self.FR, act)
 
     def _minor_standing_army(self, s: int, act: torch.Tensor) -> torch.Tensor:
         """[B] `minorStandingArmy` — THE STANDING ARMY of minor `s`'s city

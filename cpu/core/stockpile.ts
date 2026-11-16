@@ -238,6 +238,42 @@ export function accumulatedPerTurn(state: GameState, seat: number): number[] {
 }
 
 /**
+ * A REVEAL'S OWNERSHIP PASS (0x4ae4e0; from the technology handler 0x4ad2f0
+ * on the player's own completion and from a free visibility's grant
+ * 0x4ae870): every plot holding `resource` that hands it to the seat
+ * (0x4aa8e0: a plot it owns, `extractsResource`) pays the plot's one copy
+ * into its bank at once through ChangeResourceAmount, with no test of the
+ * resource's Accumulate — a source standing before the reveal starts the
+ * bank one copy up, one laid after it pays none (0x4ab4d0 skips an
+ * accumulating resource). The change rebuilds the luxury allocation; a
+ * city-state's under a suzerain passes to the suzerain (0x44eff0).
+ */
+export function revealPass(state: GameState, seat: number, resource: string): void {
+  const k = strategicSlot(resource);
+  const s = seatOf(state, seat);
+  if (k < 0 || !s || !(isCiv(seat) || isCityStateSeat(seat))) return;
+  let n = 0;
+  for (const t of state.map.tiles) if (t.resource === resource && tileOwnedByCiv(t, seat) && extractsResource(t)) n += 1;
+  if (!n) return;
+  const suz = isCityStateSeat(seat) ? suzerainOf(s as CityState) : -1;
+  const to = suz >= 0 ? suz : seat;
+  const holder = seatOf(state, to);
+  if (holder) {
+    const bk = bank(holder);
+    bk[k] += n;
+    logStockWrite(state.turn, to, k, 'rv', bk[k]);
+  }
+  rebuildLuxuries(state, seat);
+  if (suz >= 0) rebuildLuxuries(state, suz);
+}
+
+/** The ownership pass of each resource the technology `tech` reveals, on the
+ *  seat's own completion of it (`revealPass`). */
+export function techRevealed(state: GameState, seat: number, tech: string): void {
+  for (const def of Object.values(RESOURCES)) if (def.revealTech === tech) revealPass(state, seat, def.id);
+}
+
+/**
  * THE TURN END's cap (Player::Processor::DoTurnDeactivate 0x7eb60 ->
  * 0x4e4ad0 -> Player_Resources 0x4a8f10): each accumulated resource whose
  * stockpile, less what the player's queued units reserve, stands over the cap

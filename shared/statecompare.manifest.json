@@ -636,6 +636,44 @@
           ]
         },
         {
+          "name": "freeRevealed",
+          "compare": "exact",
+          "note": "the Free Cities' revealed plots (`freeCitiesLook` and `freeLook` on `freeSeat.revealed`), the plot indices ascending.",
+          "covers": [
+            "Seat.revealed"
+          ],
+          "planes": [
+            "free_revealed"
+          ]
+        },
+        {
+          "name": "freeCitiesKnown",
+          "compare": "exact",
+          "note": "the cities the Free Cities' knowledge base holds (`freeCitiesLook` on `freeSeat.citiesKnown`), those standing in its order, as their centre plots (the GPU's known-city slots read through their centres), as `minorCitiesKnown`.",
+          "covers": [
+            "Seat.citiesKnown"
+          ],
+          "planes": [
+            "free_kb_city_rank",
+            "free_kb_city_id",
+            "free_kb_city_n"
+          ]
+        },
+        {
+          "name": "freeCitiesKnownDistricts",
+          "compare": "milli",
+          "note": "per city the Free Cities' knowledge base holds standing, in its order, its district entries as its last look filled them (`lookDistricts`), as `minorCitiesKnownDistricts`.",
+          "covers": [
+            "Seat.citiesKnown"
+          ],
+          "planes": [
+            "free_kb_city_cdef",
+            "free_kb_city_cwall",
+            "free_kb_city_edef",
+            "free_kb_city_ewall"
+          ]
+        },
+        {
           "name": "freeTradeSeat",
           "compare": "exact",
           "note": "the city-state the Free Cities' knowledge base last met (`meetFreeCities` on `freeSeat.tradeSeat`), the absolute seat; -1 before any (their walk over the last major's cities).",

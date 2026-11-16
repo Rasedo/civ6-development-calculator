@@ -2521,6 +2521,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
   const barbRead = revealedPlots(rec, playerOfSeat.get(BARB_SEAT) ?? -1, W * H);
   if (barbRead) state.barbSeat.explored = barbRead;
+  const freeRead = state.freeSeat && revealedPlots(rec, playerOfSeat.get(FREE_SEAT) ?? -1, W * H);
+  if (freeRead) state.freeSeat!.revealed = freeRead;
   const seatOfGame = (pid: number) => seatOfPlayer.get(pid) ?? NO_SEAT;
 
   // the religions: an engine religion is named by its founder's seat

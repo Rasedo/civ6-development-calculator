@@ -1282,15 +1282,16 @@ class SimMinorOps:
         enemy_units = torch.where(theirs, term, torch.zeros_like(term)).sum(dim=1)
         garrison = (enemy >= 0) & (enemy >= self.n_majors)
         # the cities its knowledge base holds (`knownCities`): a city-state's
-        # those of its list, any other seat's each city a district of which
-        # stands on a plot its look takes (`lookPlots`: the Free Cities' the
-        # plots they see); a district's entry only on such a plot
-        if 100 <= seat < 100 + self.S:
-            s0 = seat - 100
-            looked = self.mops_revealed[:, s0]
-            listed = (self.citystate_kb_city_rank[:, s0] >= 0) & (self.citystate_kb_city_id[:, s0] == self._known_trade_ids())
+        # or the Free Cities' those of its list, any other seat's each city
+        # a district of which stands on a plot its look takes (`lookPlots`);
+        # a district's entry only on such a plot
+        kept = 100 <= seat < 100 + self.S or seat == FREE_SEAT
+        if kept:
+            kp = self._kb_city_planes(self.FR if seat == FREE_SEAT else seat - 100)
+            looked = kp[7]
+            listed = (kp[0] >= 0) & (kp[1] == self._known_trade_ids())
         else:
-            looked = self._barb_seen(seat) if seat == FREE_SEAT else self._tac_known(seat)
+            looked = self._tac_known(seat)
             if looked is None:
                 looked = torch.ones(B, self.T, dtype=torch.bool, device=dev)
             listed = self._known_city_first(looked) < self.T
@@ -1312,12 +1313,11 @@ class SimMinorOps:
                 m &= self.pair_dist[cc, tc].to(torch.long) <= 3
                 if not bool(m.any()):
                     continue
-                # its district entries: a city-state's as its last look
-                # filled them, any other seat's the city's now
-                if 100 <= seat < 100 + self.S:
+                # its district entries: a list's as its last look filled
+                # them, any other seat's the city's now
+                if kept:
                     k = slot0 + c
-                    d, cwall = self.citystate_kb_city_cdef[:, s0, k], self.citystate_kb_city_cwall[:, s0, k]
-                    own, ewall = self.citystate_kb_city_edef[:, s0, k], self.citystate_kb_city_ewall[:, s0, k]
+                    d, cwall, own, ewall = kp[3][:, k], kp[4][:, k], kp[5][:, k], kp[6][:, k]
                 else:
                     d, cwall, own, ewall = self._kb_city_entries(row, c, looked)
                 # the centre's entry, and its Encampment's: each its defense,

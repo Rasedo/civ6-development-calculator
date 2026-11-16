@@ -37,6 +37,7 @@ import { applyTrainingGrants } from './combat';
 import { promoClassOf, unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { minorCatchUp } from './minorBuild';
+import { techRevealed } from './stockpile';
 import { congressEnergyProdMult, congressGppFactor, congressProjectMult, congressUdtProdDistrict } from './congress';
 import { buildingCreatedCulture, suzerainProjectMult, suzerainWonderPct } from './cityStates';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -65,6 +66,7 @@ export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);
+      techRevealed(state, owner.seat, next.id);
       minorCatchUp(state, owner.seat, next.id, false);
       delete rsr.techRetained[next.id];
       if (rsr.tech === next.id) rsr.tech = null;

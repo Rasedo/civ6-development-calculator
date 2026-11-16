@@ -285,16 +285,20 @@ function minorLook(state: GameState, seat: number, tileIndex: number, radius: nu
   if (seen.has(FREE_SEAT)) meetFreeCities(state, cs);
 }
 
-/** A FREE CITIES' UNIT STANDS on `tileIndex` and looks: every city-state one
- *  of whose plots or units the look takes in meets the Free Cities
- *  (`meetFreeCities`; the meets 0x524890 / 0x5249c0 on the Free Cities'
- *  visibility). */
+/** A FREE CITIES' UNIT STANDS on `tileIndex` and looks: the plots the look
+ *  takes in join the Free Cities' revealed plots (`Seat.revealed`, the
+ *  player's +0x2f0), and every city-state one of whose plots or units it
+ *  takes in meets the Free Cities (`meetFreeCities`; the meets 0x524890 /
+ *  0x5249c0 on the Free Cities' visibility). */
 function freeLook(state: GameState, tileIndex: number, radius: number, los: Look): void {
   const t = state.map.tiles[tileIndex];
   const sees = losDisk(state.map, t, radius, los.seeThrough);
   const seen = new Set<number>();
+  const free = state.freeSeat;
+  const revealed = free ? (free.revealed ??= new Array<number>(state.map.tiles.length).fill(0)) : undefined;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (!sees.has(n.index)) continue;
+    if (revealed) revealed[n.index] = 1;
     const owner = tileSeat(n);
     if (isCityStateSeat(owner)) seen.add(owner);
   }

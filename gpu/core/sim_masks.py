@@ -3701,13 +3701,17 @@ class SimMasks:
 
     def _free_look(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> None:
         """`freeLook`: a Free Cities' unit stands on `tiles` ([K]) and looks,
-        in the games `rows` ([K], unique); every city-state one of whose
-        plots or units the look takes in meets the Free Cities
-        (`_meet_free_cities`), in the city-states' order. No-op with fog off,
-        as `revealAround` gates."""
-        if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
+        in the games `rows` ([K], unique); the plots the look takes in join
+        the Free Cities' revealed plots (`free_revealed`), and every
+        city-state one of whose plots or units it takes in meets the Free
+        Cities (`_meet_free_cities`), in the city-states' order. No-op with
+        fog off, as `revealAround` gates."""
+        if not self.fog_of_war or rows.numel() == 0:
             return
         disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
+        self.free_revealed[rows] = self.free_revealed[rows] | disk
+        if self.S == 0:
+            return
         own = self.tile_seat[rows]
         uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & self.major_unit_alive[rows]
         us = self.major_unit_seat[rows]

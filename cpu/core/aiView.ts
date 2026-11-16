@@ -426,9 +426,10 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     citiesTourism: (i) => seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0),
     enemyPlunder: (i, of) => {
       if (!warsOf(state, i).length) return 0;
-      // a city-state's knowledge base's cities (`minorCitiesLook`); any
-      // other player's, the cities its look names (`lookCities`)
-      const known = isCityStateSeat(i) ? (seatOf(state, i) as CityState).citiesKnown ?? [] : lookCities(state, lookPlots(state, i));
+      // a city-state's or the Free Cities' knowledge base's cities
+      // (`minorCitiesLook`, `freeCitiesLook`); any other player's, the
+      // cities its look names (`lookCities`)
+      const known = isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.citiesKnown ?? [] : lookCities(state, lookPlots(state, i));
       const ground = new Map<number, number>();
       let sum = 0;
       for (const k of known) {
@@ -882,18 +883,43 @@ export function lookCities(state: GameState, seen: (plot: number) => boolean): {
 
 /** the plots a seat's knowledge base's look takes (0x7877e0: visibility
  *  count +0x290 above 0, else the revealed byte +0x2f0): a city-state's
- *  revealed plots, a major's and the barbarians' explored ones, the Free
- *  Cities' those they see */
+ *  and the Free Cities' revealed plots, a major's and the barbarians'
+ *  explored ones */
 function lookPlots(state: GameState, seat: number): (plot: number) => boolean {
-  if (isCityStateSeat(seat)) {
-    const revealed = state.cityStates.find((c) => c.seat === seat)?.revealed;
+  if (isCityStateSeat(seat) || seat === FREE_SEAT) {
+    const revealed = (isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat) : state.freeSeat)?.revealed;
     return (p) => revealed?.[p] === 1;
   }
-  if (seat === FREE_SEAT) {
-    const sees = plotsSeenNow(state, new Set([FREE_SEAT]));
-    return (p) => sees[p] === 1;
-  }
   return (p) => isExplored(state, seat, p);
+}
+
+/** THE FREE CITIES' KNOWLEDGE BASE's cities at their look (0x7877e0 -> the
+ *  city arm 0x5f0280, in plot order), kept as a city-state's are
+ *  (`minorCitiesLook`): the plots they see (`seen`) join their revealed
+ *  plots (`Seat.revealed`); every city a district of which stands on a
+ *  revealed plot joins the end of their list (`Seat.citiesKnown`) where no
+ *  entry of its owner and id stands, an entry whose city stands no more
+ *  leaves it, and every entry's district entries are filled anew
+ *  (`lookDistricts`). */
+export function freeCitiesLook(state: GameState, seen: Uint8Array): void {
+  const free = state.freeSeat;
+  if (!free) return;
+  const revealed = (free.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
+  seen.forEach((v, p) => {
+    if (v) revealed[p] = 1;
+  });
+  const looked = (p: number) => revealed[p] === 1;
+  const stands = (k: { owner: number; id: number }): boolean => (k.id < 0
+    ? state.cityStates.some((o) => o.seat === k.owner && o.centerIndex >= 0)
+    : !!cityHolders(state).find((h) => h.seat === k.owner)?.cities.some((c) => c.id === k.id));
+  const known = (free.citiesKnown ?? []).filter(stands).map((k) => ({ owner: k.owner, id: k.id, districts: lookDistricts(state, k.owner, k.id, looked) }));
+  const has = new Set(known.map((k) => `${k.owner}:${k.id}`));
+  for (const f of lookCities(state, looked)) {
+    if (has.has(`${f.owner}:${f.id}`) || !stands(f)) continue;
+    known.push({ ...f, districts: lookDistricts(state, f.owner, f.id, looked) });
+  }
+  if (known.length) free.citiesKnown = known;
+  else delete free.citiesKnown;
 }
 
 /** a known city's district entries as a look fills them (0x5efaf0): one for
@@ -930,17 +956,18 @@ export function lookDistricts(state: GameState, owner: number, id: number, looke
 }
 
 /** the cities the seat's knowledge base holds, as it records them (the look
- *  0x7877e0 -> 0x5f0280 -> 0x5efaf0): a city-state's the cities of its list
- *  (`CityState.citiesKnown`), any other seat's each city a district of which
- *  stands on a plot its look takes (`lookCities`); the majors' cities and
- *  the Free Cities' first, then the city-states'. Per city its record, then
- *  its district entries (`knownDistricts`): a city-state's those its last
- *  look filled (its upgrade and purchases after the look, and its pass's
- *  blows on the city, none of them), any other seat's the city's now. */
+ *  0x7877e0 -> 0x5f0280 -> 0x5efaf0): a city-state's or the Free Cities'
+ *  the cities of its list (`citiesKnown`), any other seat's each city a
+ *  district of which stands on a plot its look takes (`lookCities`); the
+ *  majors' cities and the Free Cities' first, then the city-states'. Per
+ *  city its record, then its district entries (`knownDistricts`): a
+ *  list's those its last look filled (its upgrade and purchases after the
+ *  look, and its pass's blows on the city, none of them), any other seat's
+ *  the city's now. */
 function knownCities(state: GameState, seat: number): AiKnownCityView[] {
   const out: AiKnownCityView[] = [];
   const looked = lookPlots(state, seat);
-  const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat) : undefined;
+  const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat) : seat === FREE_SEAT ? state.freeSeat : undefined;
   const filled = new Map<string, readonly AiKnownDistrictView[]>((minor?.citiesKnown ?? []).map((k) => [`${k.owner}:${k.id}`, k.districts]));
   const add = (c: City, originalCapital: boolean, key: string) => {
     const t = computeCityStats(state, c).total;
