@@ -5202,9 +5202,13 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
       water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air', war: false };
     // a formation moves on its Movement (+0x218): the least its members hold
     // (0x267650 at 0x2679f9, refreshed as a member's order ends its moves,
-    // 0x56d6f0 -> 0x267b00), each member set to it
+    // 0x56d6f0 -> 0x267b00), each member set to it; a walk of the formation
+    // under an earlier member's order paid it (runs/h1_duels1154 t19: the
+    // Builder Capture's Settler 1179664 walks 6:13 to 7:12, its Horseman
+    // 851979 takes its order there on the Settler's 1 Movement, its path
+    // through 6:11 a later turn's, and stays, as logged)
     const live = mine.filter((m) => state.units.includes(m));
-    const held = Math.min(pass.ended.has(u.id) ? 0 : u.movesLeft, ...live.map((m) => opened.get(m) ?? 0));
+    const held = Math.min(pass.ended.has(u.id) ? 0 : u.movesLeft, ...live.map((m) => Math.min(opened.get(m) ?? 0, m.movesLeft)));
     if (held <= 0) continue;
     u.movesLeft = held;
     moveTo(state, u, dest, strike, true, false, danger, live);

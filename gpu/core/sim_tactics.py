@@ -4803,12 +4803,14 @@ class SimTactics:
                 f80[rows] = ~naval & (self._type_air.take(ut) == 0)
                 dg = (danger, f8, f80, torch.zeros_like(f8))
             # a formation moves on its Movement, the least its members hold,
-            # each member set to it (0x267650)
+            # each member set to it (0x267650), a walk of the formation under an
+            # earlier member's order paying it
             go_m = ms.clone()
             mtc = mt.clamp(min=0)
             live_m = fm & alive_p[rows, mtc]
             own_mp = mp_p[rows, ur]
-            held = torch.where(live_m, torch.minimum(own_mp, mp_open[rows, mtc]), own_mp)
+            mate_mp = torch.minimum(mp_open[rows, mtc], mp_p[rows, mtc])
+            held = torch.where(live_m, torch.minimum(own_mp, mate_mp), own_mp)
             mp_p[rows, ur] = held
             go_m[rows] = held > 0
             self._tac_move_to(go_m & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False, danger=dg)
@@ -5996,15 +5998,16 @@ class SimTactics:
     def _endangered_districts(self, ent_d: torch.Tensor, plot: torch.Tensor, mcb: torch.Tensor,
                               on: torch.Tensor, skip_seat: int | None = None) -> torch.Tensor:
         """[B] f64 — the team update's district blows (`endangered`'s
-        COMBAT_DISTRICT arm, 0x738f20 at 0x7393e5..0x7394c4) on the member
+        district arm, 0x738f20 at 0x7393e5..0x7394c4) on the member
         standing on `plot` [B] of AI combat `mcb` [B] in the games `on`: each
-        district entry of `ent_d` [B, T] whose district strikes (its
+        district entry of `ent_d` [B, T] (the count of the plot's COMBAT and
+        PASSIVE DISTRICT entries, each a blow) whose district strikes (its
         perimeter standing, `_danger_districts`), the member within its reach
         of the district's own plot, adds the district's strike with no
         damage term (`_strike_base` and a major's Bastions half) on the
         member's strength; a city of `skip_seat` none"""
         total = torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        if not bool((ent_d & on.unsqueeze(1)).any()):
+        if not bool(((ent_d > 0) & on.unsqueeze(1)).any()):
             return total
         b = self._bidx
         for row in range(self.city_alive.shape[1]):
@@ -6020,9 +6023,9 @@ class SimTactics:
                     base = base + self._gov_mods(row)[12]["crng"].to(torch.float64)
                 hit = self._damage_expected(base - mcb.to(torch.float64))
                 for live_d, p, _def, strike in self._danger_districts(row, col, alive):
-                    ok = (live_d & (strike > 0) & ent_d[b, p]
+                    ok = (live_d & (strike > 0)
                           & (self.pair_dist[plot, p].to(torch.long) <= _CITY_STRIKE_RANGE))
-                    total = total + torch.where(ok, hit, torch.zeros_like(hit))
+                    total = total + torch.where(ok, hit * ent_d[b, p].to(torch.float64), torch.zeros_like(hit))
         return total
 
     def _tac_min_step_mp(self) -> int:

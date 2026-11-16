@@ -2793,7 +2793,7 @@ class SimMinorOps:
         that fights, where no unit of the minor stands beside the member and
         its plot holds danger or the entry is HIGH, within the unit's
         Movement or its range, adds its blow on the member (`damageExpected`
-        on their strengths); a combat district that strikes, the member
+        on their strengths); each COMBAT or PASSIVE DISTRICT entry whose district strikes, the member
         within its reach of the district's own plot, its strike
         (`_endangered_districts`) — and the member
         the sum leaves with no hit points (one that does not fight, any blow
@@ -2836,8 +2836,9 @@ class SimMinorOps:
                & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((du <= emm) | (du <= erng)))
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
-        # the combat districts: each one that strikes, its own strike
-        ent_d = ((tg["dk"] & 1) > 0) & (d <= near.unsqueeze(1))
+        # the district entries, a COMBAT and a PASSIVE DISTRICT one each: each
+        # whose district strikes, its own strike
+        ent_d = torch.where(d <= near.unsqueeze(1), (tg["dk"] & 1) + ((tg["dk"] >> 1) & 1), torch.zeros_like(tg["dk"]))
         total = total + self._endangered_districts(ent_d, plot, mcb, on, skip_seat=seat)
         hp_max = int(self.rules.combat["unitHp"])
         dmg_now = hp_max - pu("hp")[b, jc].long()

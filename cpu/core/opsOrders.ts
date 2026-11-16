@@ -114,12 +114,14 @@ const afloatInDanger = (state: GameState, pass: Pass, u: Unit): boolean =>
  * unit of the target that fights, where no unit of the member's player
  * stands beside it (0x6b1b0's ring) and the member's plot holds danger or
  * the target is HIGH, within the target's Movement or its range, adds the
- * blow it would strike the member (0x51a240 on their strengths); a combat
- * district whose perimeter stands, the member within its reach of the
- * district's own plot, its strike with no damage term (0x519370 on
- * 0x249ee0: runs/h1_duelp1121 t174, Builder Capture's Line Infantry 4128797
- * at 67 damage on 5:16 beside Xi'an's Encampment 5:15, its centre 6:12 four
- * away, goes to safety on 3:16) — and the member
+ * blow it would strike the member (0x51a240 on their strengths); a COMBAT
+ * or PASSIVE DISTRICT target whose district's perimeter stands, the member
+ * within its reach of the district's own plot, its strike with no damage
+ * term (0x519370 on 0x249ee0: runs/h1_duelp1121 t174, Builder Capture's Line
+ * Infantry 4128797 at 67 damage on 5:16 beside Xi'an's Encampment 5:15, its
+ * centre 6:12 four away, goes to safety on 3:16; runs/h1_duels1144 t50 its
+ * Warrior 2228239 at 51 damage on 15:8, Xi'an's Encampment 16:7 listed as a
+ * COMBAT and a PASSIVE DISTRICT, struck twice: Protect Units to 13:7) — and the member
  * the sum would leave with no hit points is endangered; one that does not
  * fight, any blow at all where it stands alone on land: its formation of one
  * unit (0x739659: no civilian of `formed`) and no other unit of the units'
@@ -147,10 +149,11 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[], form
             && (d <= maxMoves(state, ev) || d <= rangeOf(ev))) {
             sum += damageExpected(Math.max(theirs.melee, theirs.ranged) - mine.melee);
           }
-        } else if (e.type === 'COMBAT_DISTRICT') {
+        } else if (e.type === 'COMBAT_DISTRICT' || e.type === 'PASSIVE_DISTRICT') {
           // the district itself (0x408770): its strike while its perimeter
           // stands (0x249ee0 with no flag, no damage term), over its reach
-          // of its own plot (+0x158)
+          // of its own plot (+0x158); a COMBAT and a PASSIVE DISTRICT entry
+          // of one district each strike (0x739163..0x739171)
           const city = cityOfPlot(state, e.tile);
           const strikes = city && dangerDistricts(state, city).some((x) => x.plot === e.tile && x.strike > 0);
           if (city && strikes && d <= CITY_STRIKE_RANGE) sum += damageExpected(cityStrikeBase(state, city) - mine.melee);

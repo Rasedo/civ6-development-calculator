@@ -20414,3 +20414,27 @@ GPU `_mops_run`'s per-priority `_mops_free_trees` (gpu/core/sim_minorops.py),
 - OPEN: the bought Nihang's Corps at runs/h1_duels1170 t241 is Make
   Military Formation's (the Nihang 1900547 on 27:11 logs Heal, the bought
   one on the centre 26:11 beside it; UnitFormCorps after PlayerTurnActivated).
+
+## C-95 / C-123: an escort's order on its formation's Movement left; the team update's PASSIVE DISTRICT entries
+
+- Operation Move's execution (0x816cb0) orders each mover in turn; a
+  formation moves on one Movement (+0x218, the least its members hold), so
+  where an earlier member's order walked the formation, the later member's
+  order sets out on what that walk left: the member's own Movement and its
+  mates' (as the order opened and as they stand now), the least
+  (passMoveExec's held; _op_move_exec's mate_mp).
+- The team update (0x738f20) weighs the target list's entries of kinds
+  CIVILIAN_UNIT .. HIGH_PRIORITY_UNIT, ENEMY_COMBAT_DISTRICT and
+  ENEMY_PASSIVE_DISTRICT (0x739150..0x739171), then by the entry's component
+  type: 1 a unit (0x7392a6), 3 a district (0x7393e5 -> 0x408770, its strike
+  0x249ee0 above 0, the member within its reach 0x249e40 of the district's
+  plot, 0x519370's blow). A district listed as both kinds strikes twice
+  (opsOrders.ts' endangered; _endangered_districts on the plot's count of
+  the two entries).
+- Cases: runs/h1_duels1154 t19 (the Builder Capture's Horseman 851979 on
+  its Settler's 1 Movement stays on 7:12), 1160 t39, 1145 t67 (the escort
+  and captive pairs as logged); runs/h1_duels1144 t50 (the Warrior 2228239
+  at 51 damage beside Xi'an's Encampment 16:7, listed COMBAT and PASSIVE:
+  Operation Protect Units Move 13 7).
+- Open: whether a PASSIVE DISTRICT entry's district is always the plot's
+  combat district where both stand (one case).

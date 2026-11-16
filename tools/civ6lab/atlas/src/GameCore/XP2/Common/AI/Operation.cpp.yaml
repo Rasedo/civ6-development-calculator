@@ -264,6 +264,9 @@
       turn: 65
       value: Barbarian City Assault's Battering Ram 2883607 on 15:8 beside the tribe's Archer 2818070 on its plot holds to Siege City; t66, the Archer gone to 15:10, Protect Units Move 14 10
     - recording: h1_duels1144
+      turn: 50
+      value: "a COMBAT and a PASSIVE DISTRICT entry of one district each strike (0x739163..0x739171, component type 3 at 0x7393e5): Builder Capture's Warrior 2228239 at 51 damage on 15:8, Xi'an's Encampment 16:7 listed as both, 2 x 36 endangers it; Operation Protect Units Move 13 7 and its Builder follows, as logged"
+    - recording: h1_duels1144
       turn: 143
       value: "the weighed target types are CIVILIAN_UNIT (6) to HIGH_PRIORITY_UNIT (11) by value (0x739150..0x739161), RELIGIOUS_CIVILIAN 7 and TRADER 8 among them: city-state 2's City Defense team +0x98 55, +0x94 0, its Musketman 1572870 on 12:13 beside a religious unit's entry on 11:13 (the list's type 7), no Fortify"
   impl:
@@ -281,6 +284,7 @@
     - cpu/core/opsOrders.ts:targetStrength
     - gpu/core/sim_minorops.py:_mops_reaches
     - gpu/core/sim_minorops.py:_mops_district_strikes
+    - cpu/core/opsOrders.ts:city
   readings:
     - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -291,6 +295,7 @@
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
+    - "C-95 / C-123: an escort's order on its formation's Movement left; the team update's PASSIVE DISTRICT entries"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed

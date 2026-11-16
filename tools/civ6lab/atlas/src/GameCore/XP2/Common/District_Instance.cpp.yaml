@@ -115,6 +115,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
+    - "C-95 / C-123: an escort's order on its formation's Movement left; the team update's PASSIVE DISTRICT entries"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...e the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0,..."
   context:
@@ -170,6 +171,7 @@
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
+    - "C-95 / C-123: an escort's order on its formation's Movement left; the team update's PASSIVE DISTRICT entries"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:

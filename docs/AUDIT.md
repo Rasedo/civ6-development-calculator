@@ -292,7 +292,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (camps): duels1145 t1 the camp step's top region holds 15 plots for the game's 14 (32 for 31 over the regions): 42:20 holds FEATURE_FOUNTAIN_OF_YOUTH, no feature of the engines' and camp ground in ours (the camp on 41:22 for the game's 32:23)
   - LAB (camps): duels1137 t1 the camp step's region order: the game's draw 12 of 22 falls on the region of 3:12, ours (6, 2, 4 and 4 plots by region id) on the region of 11:15
   - LAB (camps): duels1136 t28 ours raises a camp on 14:21 with its Spearman and Scout, the game none; duels1134 t30 the barbarians' camps ours 0:14 for the game's 43:15 and t80 ours keeps 11:20; duels1140 t184 ours holds 4:2, the game none
-  - LAB (camps): duels1149 t42 the game draws no Barbarian Ranged unit roll at tribe 0's seventh-turn strike (count at NumMilitary), ours raises a Warrior with the count at 4 after a death it booked near t32-34
+  - LAB (camps): duels1149 t42 the game draws no Barbarian Ranged unit roll at tribe 0's seventh-turn strike (count at NumMilitary), ours raises a Warrior with the count at 4: ours books a unit of the tribe lost near t32 (count 4 to 3, the unit back from the record next turn) while the replay's blows on player 1's Warrior 458757 (Archer 1179659, Warrior 589832) deal it 0 where the game's deal 38 and 31 and kill it (REPLAY_TRACE=battleHp)
 - **C-125. THE TACTICAL PLANNING: TARGETS AND THE COMBAT PREDICTION.** Weight 3.
   - LAB (exchange filter): +0x1ba bit 5 waiving the exchange and survival filters (0x776795)
   - LAB (predicted blow): an input lowering the planning's dealt to 27 or less (1117 t10)
@@ -353,7 +353,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (endangered units): 1128 t106 Builder Capture's Swordsman 4456471 (60 damage, beside Xi'an's Encampment 13:13 at 40) endangered in the game, our sum 36
   - LAB (endangered units): 1121 t181 Line Infantry 4653085 (40 damage, two from the Encampment 5:15 at 77) endangered, our sum 52, Protect Units to 4:18 missed
   - LAB (endangered units): an embarked captive's danger from a land unit beside it: 1127 t166 Settler 2097173 on 16:12 by player 0's Warrior on 15:12, the game's Move To Safety to 17:9, ours to 17:10
-  - LAB (endangered units): duels1144 t50 Builder Capture's Warrior 2228239 on 15:8 with its captive Builder beside player 1's 16:7 (plan.blow ours d4 t34, the game's d3 t41): the game's Defend Units moves it to 13:7 and the Builder follows, ours Operation Move holds 15:8 (367 // 321 for both)
+  - LAB (endangered units): duels1144 t50 Builder Capture's Warrior 2228239 on 15:8 beside player 1's 16:7: plan.blow ours d4 t34, the game's d3 t41
   - LAB (search): the danger search's blocking for ranged movers (1128 t159 Man-At-Arms 5505044)
   - LAB (search): Move Unit's flag 8 on our danger map (1124 t92 Catapult 1245186 via 699, ours 25 from Archer 3801089)
   - LAB (search): fit, unread: an Open Borders grant's last turn (1127: player 1's grant to player 0 of t99, 20 turns, open through the barbarians' turn of t118): the count 0x3e6b50 keeps one a source, the turn the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00) ends unread
