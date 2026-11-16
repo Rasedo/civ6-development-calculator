@@ -100,6 +100,9 @@ class SimMinors:
             ran = self.citystate_ai_on[:, s].clone()
             self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._cv_counted[s] = self._cv_known(s)
+            # and its units as its list walks them, the units held its table
+            # keeps (`CityState.unitsCounted`)
+            self._cv_owned[s] = self._minor_listed_units(s)
             # the table its city's purchases read keeps the same records past
             # the look
             self._cv_tabled[s] = {"known": self._cv_counted[s], "slot": self.citystate_kb_slot[:, s].clone(),
@@ -136,6 +139,7 @@ class SimMinors:
             self._mops_refresh_run(s, alive)
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
+            del self._cv_owned[s]
             del self._cv_yields_seen[s]
             del self._cv_growth_seen[s]
             # the boosts its routes and the actions before them earned land

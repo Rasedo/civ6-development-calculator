@@ -212,6 +212,7 @@ export function minorPhase(state: GameState): void {
     // city-state 4 after its t40 turn, its free Trader to Rome that turn)
     if (!fresh) minorTradeList(state, cityState);
     cityState.armyCounted = minorArmyCounts(cityState.armyKnown ?? []);
+    cityState.unitsCounted = minorOwnedUnits(state, cityState);
     // the table its city's purchases read keeps the same records past the
     // look (runs/h1_duels1124 Granada t72: a second barbarian record that
     // turn's look adds; the table's at-war field at the end look still the
@@ -278,6 +279,7 @@ export function minorPhase(state: GameState): void {
     minorOpsRefresh(state, cityState);
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
+    delete cityState.unitsCounted;
     delete cityState.aiYields;
     // the boosts its routes and the actions before them earned land before
     // its army's walk and its second hook's tree tick (runs/h1_duely1121
@@ -1644,20 +1646,27 @@ export function unitObsoleteIn(r: { techs: readonly string[]; civics: readonly s
  *  against the units its knowledge base counts (`known`) */
 export function minorUnitProduction(state: GameState, cityState: CityState, known: (unit: string) => number) {
   const r = cityState.research;
-  const own = new Map<string, number>();
-  for (const u of state.units) {
-    if (u.seat !== cityState.seat) continue;
-    const t = installType('unit', u.type, 'UNIT_');
-    own.set(t, (own.get(t) ?? 0) + 1);
-  }
+  const own = cityState.unitsCounted ?? minorOwnedUnits(state, cityState);
   return unitProductionTable({
     isVersion: (u) => minorUnitVersion(cityState, u) === u,
     obsolete: (u) => unitObsoleteIn(r, u),
     listed: seatListed(r, (x) => researchHolds(r, x), false),
-    owned: (u) => own.get(u) ?? 0,
+    owned: (u) => own[u] ?? 0,
     known,
     surplus: strategicSurplus(state, cityState.seat),
   });
+}
+
+/** a city-state's units by install unit type as its unit list walks them
+ *  (`minorListedUnits`, 0x4f2c90): the units held its unit production table
+ *  keeps per entry (the entry's +0x20) and its obsolete entries' test */
+export function minorOwnedUnits(state: GameState, cityState: CityState): Record<string, number> {
+  const own: Record<string, number> = {};
+  for (const [type, n] of minorListedUnits(state, cityState)) {
+    const t = installType('unit', type, 'UNIT_');
+    own[t] = (own[t] ?? 0) + n;
+  }
+  return own;
 }
 
 /** A city-state's knowledge base's look: its army records (`knowledgeLook`)

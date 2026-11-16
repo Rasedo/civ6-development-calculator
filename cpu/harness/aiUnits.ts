@@ -57,7 +57,7 @@ import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { aiView } from '../core/aiView';
-import { installType, minorKnownUnits, minorUnitProduction } from '../core/minorBuild';
+import { minorKnownUnits, minorOwnedUnits, minorUnitProduction } from '../core/minorBuild';
 import { cityHolders, isBarbSeat, tileSeat } from '../core/seats';
 import type { Pass, PlanEntry, Target, TargetType } from '../core/tactical';
 import { NO_SEAT, type CityState, type GameState, type Unit } from '../core/types';
@@ -483,18 +483,13 @@ export function readUnitTable(game: GameUnits, unitNames: readonly string[], sta
   const t = game.at('endlook', turn, player)?.unitTable;
   if (!t?.built) return [];
   const ours = minorUnitProduction(state, cs, minorKnownUnits(cs));
-  const held = new Map<string, number>();
-  for (const u of state.units) {
-    if (u.seat !== cs.seat) continue;
-    const type = installType('unit', u.type, 'UNIT_');
-    held.set(type, (held.get(type) ?? 0) + 1);
-  }
+  const held = cs.unitsCounted ?? minorOwnedUnits(state, cs);
   const name = (type: string) => type.replace(/^UNIT_/, '');
   const theirs = new Map(t.entries.map((e) => [unitNames[e[0]] ?? `unit${e[0]}`, e] as const));
   const P = `p${player}`;
   const both = [...ours.keys()].filter((type) => theirs.has(type));
   return [
     listRead('unit.table', P, [...ours].map(([type, e]) => `${name(type)}=${e.value}`), [...theirs].map(([type, e]) => `${name(type)}=${e[88] ?? 0}`)),
-    listRead('unit.table.held', P, both.map((type) => `${name(type)}=${held.get(type) ?? 0}`), both.map((type) => `${name(type)}=${theirs.get(type)![8] ?? 0}`)),
+    listRead('unit.table.held', P, both.map((type) => `${name(type)}=${held[type] ?? 0}`), both.map((type) => `${name(type)}=${theirs.get(type)![8] ?? 0}`)),
   ];
 }

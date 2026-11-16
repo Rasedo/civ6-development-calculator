@@ -18327,3 +18327,25 @@ over `civ_gpp_turn` (gpu/core/sim_minors.py).
 - OPEN: duels1153 China's best route the game's K reads from t142 (1 Faith
   in it, its value stepping with the faith boost) is in no list the
   engines keep; duels1191 t131 K 16.02 for 15.73 at one boost step.
+
+## C-96: the unit production table's held counts walk the unit list at the table's build — READ (0x7989e0 at 0x79a138..0x79a19f, 0x4f2c90), both twins
+
+- THE HELD COUNT (+0x20 of each entry, 0x79a138..0x79a19f): after the
+  values, the player's unit list (+0x12e8 +0xd8, each node's unit +0x160
+  the type) is walked and each unit's entry counted, the dead flag (+0x770)
+  unread: the walk of 0x4f2c90, which the obsolete entry's test at
+  0x798c19 also reads. A unit the delayed kill took (a levy, the unit
+  commands, the turn's damage) counts until its owner's end of turn erases
+  it.
+- WHEN: the counts are those of the table's build (the city AI's turn,
+  beside the records it counts: `CityState.armyCounted`), before the
+  turn's contract purchases, its economic disband and its military AI's
+  upgrade. The engines keep them for that window (`CityState.unitsCounted`,
+  `minorOwnedUnits` over `minorListedUnits`; `_cv_owned`,
+  `_minor_listed_units`)
+  and the table's obsolete test reads them.
+- Confirming: duels1124 t27 city-state 3, the Builder its contract bought
+  not counted (BUILDER 0 as recorded); t118 city-state 4, a Man-at-Arms
+  and a Trebuchet gone after the build still counted (1 / 2); t69 city-state 4,
+  the Warrior, Heavy Chariot and Catapult player 1 levied in its turn still
+  counted (1 each); 1124 unit.table.held 15 rows to 0, no other row moved.

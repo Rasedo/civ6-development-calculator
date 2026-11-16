@@ -481,6 +481,9 @@ class SimInit:
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}
+        # and its units by engine type as its unit list walks them
+        # (`CityState.unitsCounted`, `_minor_listed_units`)
+        self._cv_owned: dict[int, torch.Tensor] = {}
         # per minor to the end of its army's turn, the same records for the
         # table its city's purchases read: the counts and each record's slot,
         # type and owner (`CityState.armyTabled`)

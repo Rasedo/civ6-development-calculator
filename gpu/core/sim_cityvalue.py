@@ -2335,11 +2335,13 @@ class _MinorFacts:
             version = torch.tensor([self.unit_version(r["type"]) is not None for r in rows], dtype=torch.bool, device=dev)
             version = version.unsqueeze(0) | sim._minor_trait_version(s)
             obs = self._obsolete()
-            mine = self._mine()
+            # its units as its list walks them, as its city AI's turn counted
+            # them (`CityState.unitsCounted`, `minorOwnedUnits`)
+            listed = sim._cv_owned[s] if s in sim._cv_owned else sim._minor_listed_units(s)
             owned = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
             for k, ei in enumerate(eng):
                 if ei >= 0:
-                    owned[:, k] = (mine & (sim.major_unit_type == ei)).sum(dim=1)
+                    owned[:, k] = listed[:, ei]
             known = sim._cv_known(s) if tabled is None else tabled
             if self.no_known is not None:
                 known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
