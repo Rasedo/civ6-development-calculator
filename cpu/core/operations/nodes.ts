@@ -583,29 +583,45 @@ const formedOf = (view: AiView, seat: number, op: Operation): number[] => {
   return opUnits(op).filter((id) => (units.get(id)?.mates.length ?? 0) > 0);
 };
 
-/** the team's planned pairs (0x73b8a0): each civilian member of the
- *  Civilian Unit type in no formation takes, of the members of the Combat
- *  Unit type that fight and stand in none, the one whose planning reaches
- *  the civilian's plot in the fewest turns (then the least Movement spent,
- *  the first of equals); they meet on the civilian's plot */
-function planFormations(view: AiView, seat: number, op: Operation, civ: string, combat: string): { pairs: [number, number, number][]; near: boolean } {
+/** FormationClass (GetFormationClass 0x8bcd0) */
+const FC_LAND_COMBAT = 0;
+const FC_SUPPORT = 1;
+const FC_CIVILIAN = 2;
+
+/** the team's planned pairs (0x73b6c0 over each team, 0x73b8a0): with a
+ *  Combat Unit type and a Civilian or Support Unit type named, the escorts
+ *  are the living LAND_COMBAT members of the Combat Unit type whose
+ *  formation holds no SUPPORT or CIVILIAN unit; each living SUPPORT or
+ *  CIVILIAN member of the Civilian or the Support Unit type whose formation
+ *  holds no LAND_COMBAT unit takes the escort whose planning reaches its
+ *  plot in the fewest turns, under 4 (then the least Movement spent, the
+ *  first of equals; an escort paired stays on the list); they meet on its
+ *  plot. Near: no pair more than a turn apart (runs/h1_duels1140 t71:
+ *  Barbarian City Attack's Battering Ram 2883611, its Support Unit
+ *  UNITTYPE_SIEGE_SUPPORT, joins the Warrior 2490391's formation) */
+function planFormations(view: AiView, seat: number, op: Operation, combat: string | undefined, civ: string | undefined,
+  support: string | undefined): { pairs: [number, number, number][]; near: boolean } {
   const units = unitsById(view, seat);
-  const paired = new Set(formedOf(view, seat, op));
   const pairs: [number, number, number][] = [];
   let near = true;
+  if (!combat || (!civ && !support)) return { pairs, near };
+  const holds = (u: AiUnitView, classes: readonly number[]): boolean => u.mates.some((id) => {
+    const m = units.get(id);
+    return !!m && classes.includes(m.formation);
+  });
   for (const t of op.teams) {
     const escorts = t.members.filter((id) => {
       const u = units.get(id);
-      return !!u && !paired.has(id) && !u.founder && u.combat > 0 && hasAiType(u.type, combat);
+      return !!u && u.formation === FC_LAND_COMBAT && hasAiType(u.type, combat) && !holds(u, [FC_SUPPORT, FC_CIVILIAN]);
     });
     for (const id of t.members) {
       const c = units.get(id);
-      if (!c || paired.has(id) || c.combat > 0 || !hasAiType(c.type, civ)) continue;
+      if (!c || (c.formation !== FC_SUPPORT && c.formation !== FC_CIVILIAN)) continue;
+      if (!((civ && hasAiType(c.type, civ)) || (support && hasAiType(c.type, support))) || holds(c, [FC_LAND_COMBAT])) continue;
       let best = -1;
       let bestTurns = 4;
       let bestCost = 0;
       for (const e of escorts) {
-        if (paired.has(e)) continue;
         const r = view.unitReach(e, 2).find((x) => x.plot === c.plot);
         if (!r) continue;
         const cost = -r.moves;
@@ -617,8 +633,6 @@ function planFormations(view: AiView, seat: number, op: Operation, civ: string, 
       }
       if (best < 0) continue;
       pairs.push([id, best, c.plot]);
-      paired.add(id);
-      paired.add(best);
       if (bestTurns > 1) near = false;
     }
   }
@@ -628,10 +642,8 @@ function planFormations(view: AiView, seat: number, op: Operation, civ: string, 
 const makeFormation: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     if (dataBool(node, 'Destroy Formations')) return BT_SUCCESS;
-    const civ = dataValue(node, 'Civilian Unit');
-    const combat = dataValue(node, 'Combat Unit');
-    if (!civ || !combat) return BT_SUCCESS;
-    const plan = planFormations(ctx.view(), ctx.seat, ctx.op, civ, combat);
+    const plan = planFormations(ctx.view(), ctx.seat, ctx.op, dataValue(node, 'Combat Unit'), dataValue(node, 'Civilian Unit'),
+      dataValue(node, 'Support Unit'));
     run.mem[node.index].pairs = plan.pairs;
     return plan.near ? BT_SUCCESS : BT_RUNNING;
   },

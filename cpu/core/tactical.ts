@@ -4974,7 +4974,9 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     out.push({ unit: u, from: u.tileIndex, dest });
     const combat = (UNITS[u.type]?.combat ?? 0) > 0;
     const paired = mine.length > 0;
-    const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || paired : !combat && !paired,
+    // a formation holding a CIVILIAN unit (0x266950(2)): no support rider
+    const withCivilian = mine.some((m) => unitDomain(m.type) === 'civilian');
+    const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || withCivilian : !combat && !paired,
       water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air', war: false };
     // a formation moves on its Movement (+0x218): the least its members hold
     // (0x267650 at 0x2679f9, refreshed as a member's order ends its moves,

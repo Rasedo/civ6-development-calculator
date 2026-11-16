@@ -498,20 +498,32 @@
 - addr: 0x73b6c0
   final: 0x4df100
   kind: function
-  semantics: Make Formation's pairing (-> 0x73b8a0).
-  status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  semantics: "Make Formation's pairing: each of the four AI type hashes (Combat, Civilian, Support, Naval) to its UnitAiInfos index (0xad6630's list, +0x18 hash, +0x14 index; -1 unnamed); team -1 every team (stride 0x118, 0x73b8a0 ANDed), else the one team."
+  status: READ
+  cases:
+    - recording: h1_duels1140
+      turn: 71
+      value: Barbarian City Attack's Battering Ram 2883611 paired with the Warrior 2490391 (one formation from t72)
+  impl: [cpu/core/operations/nodes.ts:planFormations, gpu/core/sim_barbops.py:_bop_form_plan]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
   context:
     - ...unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation...
   review: reviewed
 - addr: 0x73b8a0
   final: 0x4df2e0
   kind: function
-  semantics: forms a pair of units into a formation.
-  status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:planFormations]
+  semantics: "a team's formation pairs (args: team, combat, civilian, support, naval — the naval unread): with a combat index, the escorts the living members (+0x770 clear) of FormationClass LAND_COMBAT (0x8bcd0 0) carrying it whose formation (+0x1fb8) holds no SUPPORT or CIVILIAN unit (0x266950 1 / 2), asked only where a civilian or support index is named; each living member of class SUPPORT or CIVILIAN carrying the civilian or the support type (0x79cb30) whose formation holds no LAND_COMBAT unit takes the escort whose planning (+0x1fc0, 0x793300) reaches its plot in the fewest turns under 4, then the least Movement, the first of equals — the escort list never shrinks; the pair (rider id, escort id, rider plot) to team +0xd0. False where a pair's turns pass 1."
+  status: READ
+  cases:
+    - recording: h1_duels1140
+      turn: 71
+      value: the Battering Ram 2883611 (SUPPORT, UNITTYPE_SIEGE_SUPPORT) with the Warrior 2490391 (LAND_COMBAT, UNITTYPE_MELEE)
+  impl: [cpu/core/operations/nodes.ts:planFormations, gpu/core/sim_barbops.py:_bop_form_plan]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   context:
     - ...operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x...

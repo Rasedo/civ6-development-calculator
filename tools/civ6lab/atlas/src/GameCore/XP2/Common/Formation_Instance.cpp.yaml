@@ -286,11 +286,15 @@
     - recording: 1128
       turn: 251
       value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
-  impl: [cpu/core/tactical.ts:passMoveExec]
+  impl:
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/tactical.ts:paired
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
   context:
     - "...f its domain (+0x650), with Combat (0x56dc90), whose formation holds none of its class (0x266950): of those its planning reaches within two turns (0x791300) the strongest, else the n..."
   review: reviewed

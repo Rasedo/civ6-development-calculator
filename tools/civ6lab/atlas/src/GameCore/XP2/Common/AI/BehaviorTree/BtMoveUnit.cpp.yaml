@@ -17,11 +17,13 @@
     - gpu/core/sim_barbops.py:_bop_capture_tick
     - cpu/core/operations/nodes.ts:formedOf
     - cpu/core/operations/nodes.ts:execute
+    - gpu/core/sim_barbops.py:_bop_form_exec
   readings:
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
   context:
     - ...the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0...
   review: reviewed
@@ -136,11 +138,20 @@
 - addr: 0x7efd70
   final: 0x557e40
   kind: function
-  semantics: Make Formation's update (execution 0x7ee630).
-  status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:planFormations, cpu/core/operations/nodes.ts:formedOf]
+  semantics: "Make Formation's update (execution 0x7ee630): Destroy Formations (data 0) SUCCESS; else the hashes of Combat Unit (data 1), Civilian Unit (2), Support Unit (3) and Naval Unit (4), -1 each one unnamed, to the pairing 0x73b6c0 over every team (-1): true SUCCESS, false RUNNING."
+  status: READ
+  cases:
+    - recording: h1_duels1140
+      turn: 71
+      value: "Barbarian City Attack's Make Formation (Combat UNITTYPE_MELEE, Support UNITTYPE_SIEGE_SUPPORT): the Battering Ram 2883611 enters the Warrior 2490391's formation (aiunits t72 start: the Ram's formation 2490391)"
+  impl:
+    - cpu/core/operations/nodes.ts:makeFormation
+    - cpu/core/operations/nodes.ts:planFormations
+    - gpu/core/sim_barbops.py:_bop_form_plan
+    - cpu/core/operations/nodes.ts:formedOf
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:

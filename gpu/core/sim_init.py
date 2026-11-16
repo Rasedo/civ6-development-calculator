@@ -4593,8 +4593,9 @@ class SimInit:
         # (a raid's recruit counts a unit to its class by them)
         # per unit type, UNITAI_COMBAT (the raid team's requirement)
         self._bop_combat_ai = torch.tensor([bool(x) for x in self._bb["unitCombatAi"]] or [False], dtype=torch.bool, device=device)
-        self._bop_land_ai = torch.tensor([bool(x) for x in self._bb["unitLandCombatAi"]] or [False], dtype=torch.bool, device=device)
-        self._bop_civ_ai = torch.tensor([bool(x) for x in self._bb["unitCivilianAi"]] or [False], dtype=torch.bool, device=device)
+        # per AI type the trees' Make Formations name, per unit type whether it carries it
+        self._bop_form_ai = {ai: torch.tensor([bool(x) for x in v] or [False], dtype=torch.bool, device=device)
+                             for ai, v in self._bb["unitFormationAi"].items()}
         self._barb_tag_member = torch.zeros(len(self._bb["tagUnits"]), self.NU, dtype=torch.bool, device=device)
         for _ti, _rows in enumerate(self._bb["tagUnits"]):
             for _r in _rows:

@@ -17997,3 +17997,46 @@ Check Plot's `canPlaceDistrict` / `gpu/core/sim_minorai.py`
   0x4be880, the city's followers) is unported, so the engines want nothing
   without the game's memory; a drowned plot claimed after the sea took it
   would hold the water bit alone (the engines keep the land bit).
+
+## C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins
+
+`makeFormation`, `planFormations`, `formationClass` (cpu/core/operations/nodes.ts,
+cpu/core/aiView.ts: `AiUnitView.formation`); `_bop_form_plan`,
+`_bop_form_exec` in `_bop_assault_tick` (gpu/core/sim_barbops.py), the
+rules' `unitFormationAi`.
+
+- THE UPDATE (0x7efd70): Destroy Formations (data 0) SUCCESS. Else the
+  hashes of Combat Unit (1), Civilian Unit (2), Support Unit (3) and Naval
+  Unit (4), -1 for one unnamed, go to 0x73b6c0 with team -1: each hash to
+  its UnitAiInfos index (0xad6630), then 0x73b8a0 over every team (stride
+  0x118), the results ANDed; true SUCCESS, false RUNNING.
+- THE PAIRS (0x73b8a0): with a combat index and a civilian or support
+  index, the escorts are the living members of FormationClass LAND_COMBAT
+  (GetFormationClass 0x8bcd0: LAND_COMBAT 0, SUPPORT 1, CIVILIAN 2) carrying
+  the combat type whose formation holds no SUPPORT or CIVILIAN unit
+  (0x266950). Each living member of class SUPPORT or CIVILIAN carrying the
+  civilian or the support type whose formation holds no LAND_COMBAT unit
+  takes the escort whose planning (0x793300) reaches its plot in the fewest
+  turns under 4, then the least Movement spent, the first of equals; the
+  escort list is never shortened. The pair (rider, escort, the rider's
+  plot) goes to team +0xd0; a pair more than a turn apart makes the result
+  false. The Naval Unit index is passed and never read. The execution
+  (0x7ee630, "C-93") walks each escort to its rider and forms them there.
+- Barbarian City Attack's three Make Formations (12, 16, 22) name Combat
+  UNITTYPE_MELEE and Support UNITTYPE_SIEGE_SUPPORT: its Battering Ram or
+  Siege Tower rides with a melee member. Their updates read the walk's
+  state (after the recruit), one plan for the three.
+- OPERATION MOVE'S FLAG 8 for a formation (0x816cb0 at 0x817842..0x81788e):
+  where the operation is weaker than its target, a unit with no Combat or
+  one whose formation holds a CIVILIAN unit (0x266950(2)), so an escort
+  carrying a support rider takes none; else a unit with no Combat alone in
+  its formation (+0x738 1) (`passMoveExec`'s `withCivilian`, `_op_move_exec`'s
+  `with_civ`; the twin's goal test reads the formation's other member by
+  its own class, a support rider on the support plane).
+- CONFIRMED: duels1140 t71 UnitEnterFormation of the Battering Ram 2883611
+  with the Warrior 2490391 (the Ram's formation 2490391 in aiunits from the
+  t72 start); the pair walks on to t84 as logged (t80 9:7 -> 10:9, t81 on
+  10:9: the escort with no flag 8 under the weak assault).
+- OPEN: the execution's orders go through the units' operation queues
+  (0x570b40, MoveTo 0x962030, Swap 0x972880 through vtable +0x60), the
+  engines' walk at once (duels1163 t88: AUDIT C-95).

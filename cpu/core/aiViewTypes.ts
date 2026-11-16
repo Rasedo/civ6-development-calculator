@@ -71,6 +71,9 @@ export interface AiUnitView {
   defender: boolean;
   /** the other members of its formation (unit +0x1fb8), none outside one */
   mates: readonly number[];
+  /** its type's FormationClass (GetFormationClass 0x8bcd0): LAND_COMBAT 0,
+   *  SUPPORT 1, CIVILIAN 2, NAVAL 3, AIR 4 */
+  formation: number;
 }
 
 /** a unit of a player at war with the seat that the seat sees now */

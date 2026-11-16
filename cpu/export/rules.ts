@@ -2202,9 +2202,13 @@ export function buildRules() {
         trees: Object.fromEntries([AI_OP_DEFS[BARB_RAID_DEF].tree!, AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, BARB_SCOUT_TREE,
           AI_OP_DEFS[BARB_CAPTURE_DEF].tree!].map((t) => [t, AI_TREES[t]])),
         unitCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITAI_COMBAT')),
-        // the AI types the capture's formation pairs (UnitAiInfos)
-        unitLandCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_LAND_COMBAT')),
-        unitCivilianAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_CIVILIAN')),
+        // per AI type a Make Formation of these trees names (its Combat,
+        // Civilian and Support Unit; UnitAiInfos), per unit whether it
+        // carries it
+        unitFormationAi: Object.fromEntries([...new Set([AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, AI_OP_DEFS[BARB_CAPTURE_DEF].tree!]
+          .flatMap((t) => (AI_TREES[t] ?? []).filter((n) => n.type === 'Make Formation')
+            .flatMap((n) => ['Combat Unit', 'Civilian Unit', 'Support Unit'].map((k) => n.data[k]?.value).filter((v): v is string => !!v))))]
+          .map((ai) => [ai, Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes(ai))])),
         // the handicap every seat plays at (the engines' seats carry none of
         // their own) and the Difficulties in index order, for the raid's In
         // Difficulty Range

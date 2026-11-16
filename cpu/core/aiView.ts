@@ -985,5 +985,15 @@ function unitView(state: GameState, u: Unit): AiUnitView {
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
     bombard: aiFormed(u, d?.bombard ?? 0), domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u),
-    mates: formationMates(state, u).map((m) => m.id) };
+    mates: formationMates(state, u).map((m) => m.id), formation: formationClass(u.type) };
+}
+
+/** a unit type's FormationClass (Units.xml; GetFormationClass 0x8bcd0):
+ *  LAND_COMBAT 0, SUPPORT 1, CIVILIAN 2 (a Spy among them), NAVAL 3, AIR 4 */
+export function formationClass(type: string): number {
+  const d = unitDomain(type);
+  if (d === 'air') return 4;
+  if (d === 'support') return 1;
+  if (d === 'civilian' || d === 'spy') return 2;
+  return UNITS[type]?.naval ? 3 : 0;
 }

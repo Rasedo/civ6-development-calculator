@@ -4499,7 +4499,11 @@ class SimTactics:
             o_s = self._tac_own_class(self.support_at, seat)[rows][nr, gr]
             sup_m = self._type_support.take(ut)
             civ_m = self._type_civilian.take(ut) & ~sup_m
-            stacks = torch.where(sup_m, o_s, torch.where(civ_m, o_c, o_m)) | (fm & (o_m | o_c))
+            mtt = type_p[rows, mt.clamp(min=0)].clamp(min=0, max=self.NU - 1)
+            sup_t = self._type_support.take(mtt)
+            civ_t = self._type_civilian.take(mtt) & ~sup_t
+            stacks = (torch.where(sup_m, o_s, torch.where(civ_m, o_c, o_m))
+                      | (fm & torch.where(sup_t, o_s, torch.where(civ_t, o_c, o_m))))
             barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | stacks
                       | foreign[rows, gr]) & (here != gr)
             r = torch.where(barred, r.clamp(min=1), r)
@@ -4565,10 +4569,11 @@ class SimTactics:
             dg = None
             if danger is not None:
                 comb = self._type_combat.take(ut) > 0
-                paired = fm
+                # in a formation holding a CIVILIAN unit (0x266950(2)), in any
+                with_civ = fm & civ_t
                 wk = weak[rows] if weak is not None else torch.zeros_like(comb)
                 f8 = torch.zeros(B, dtype=torch.bool, device=dev)
-                f8[rows] = torch.where(wk, ~comb | paired, ~comb & ~paired)
+                f8[rows] = torch.where(wk, ~comb | with_civ, ~comb & ~fm)
                 f80 = torch.zeros(B, dtype=torch.bool, device=dev)
                 f80[rows] = ~naval & (self._type_air.take(ut) == 0)
                 dg = (danger, f8, f80, torch.zeros_like(f8))

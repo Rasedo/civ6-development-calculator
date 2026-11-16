@@ -81,9 +81,14 @@ class _Trees:
         assert _num(_node_data(cap[2], "Backup Amount")) == 0 and _num(_node_data(cap[2], "Failure Amount")) == -1
         for n in (cap[6], cap[8]):
             assert _num(_node_data(n, "Move To (enum)"), 1) == 1, "the capture's Operation Move to its target"
-        for n in (ass[12], ass[16], ass[22]):
-            # a formation of a civilian alone: none of the assault's pairs
-            assert _node_data(n, "Civilian Unit") is None, "Make Formation with a civilian"
+        # the assault's three Make Formations: one Combat Unit and one
+        # Support Unit type, no Civilian Unit, none destroying (one plan)
+        forms = {(_node_data(n, "Combat Unit"), _node_data(n, "Support Unit"), _node_data(n, "Civilian Unit"),
+                  _flag(_node_data(n, "Destroy Formations"))) for n in (ass[12], ass[16], ass[22])}
+        assert len(forms) == 1, "the assault's Make Formations differ"
+        (combat, support, civ, destroy), = forms
+        assert combat and support and civ is None and not destroy, "the assault's Make Formation: a combat unit and a support unit"
+        self.ass_form = (combat, support)
 
         def move(n: dict) -> tuple[int, int, int]:
             return (_num(_node_data(n, "Move To (enum)"), 1), _num(_node_data(n, "Range to goal")),
@@ -330,7 +335,7 @@ class SimBarbOps:
         self._bcap_bury()
         bidx = self._bidx
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
-        civ_ai = self._bop_civ_ai.take(ut)
+        civ_ai = self._bop_form_ai["UNITTYPE_CIVILIAN"].take(ut)
         for c in range(self.bcap_id.shape[1]):
             on = self.bcap_id[:, c] >= 0
             if not bool(on.any()):
@@ -425,8 +430,8 @@ class SimBarbOps:
         start8 = m & (resume == 8)
         # Make Formation 1
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
-        land = self._bop_land_ai.take(ut)
-        civ_ai = self._bop_civ_ai.take(ut)
+        land = self._bop_form_ai["UNITTYPE_LAND_COMBAT"].take(ut)
+        civ_ai = self._bop_form_ai["UNITTYPE_CIVILIAN"].take(ut)
         # the captive and its escort each in no formation (`planFormations`)
         free = (self._tac_mate(bidx, cs, "barb") < 0) & (self._tac_mate(bidx, es, "barb") < 0)
         pair = (start1 & civ_ok & esc_ok & free
@@ -721,10 +726,11 @@ class SimBarbOps:
         """"Barbarian City Attack"'s tick (the root Concurrent over Defend
         Units and the Sequence 2 from the child it resumes at: the recruit 4,
         the gathering 11, the march 14, the assault 18): the walk's statuses,
-        then the executions in node order — Defend Units 1, Move 13, Attack
-        Units 15, Move 17,
-        Siege City 19, Attack City 20, Attack Units 21, Pillage 23, Move 24
-        (Make Formation forms no pair: its formations take a civilian)"""
+        then the executions in node order — Defend Units 1, Make Formation
+        12, Move 13, Attack Units 15, Make Formation 16, Move 17, Siege City
+        19, Attack City 20, Attack Units 21, Make Formation 22, Pillage 23,
+        Move 24 (the three Make Formations one plan: their updates read the
+        walk's state, after the recruit)"""
         tr = self._bop_trees()
         resume = self.tribe_op_resume[:, k]
         target = self.tribe_op_plot[:, k]
@@ -737,13 +743,17 @@ class SimBarbOps:
         rec = m & (resume <= 4)
         ok4 = self._bop_recruit_seq(rec, k, False, tr.ass_recruit)
         self.tribe_op_resume[:, k] = torch.where(rec & ~ok4, 4, self.tribe_op_resume[:, k])
+        # Make Formation 12 / 16 / 22: SUCCESS where no pair is more than a
+        # turn apart, else RUNNING
+        fnear, fpairs = self._bop_form_plan(m & ((resume >= 11) | ok4), k, ctx)
+        mf = torch.where(fnear, _S, _R)
         # the gathering (Concurrent 11: Make Formation, Operation Move to the rally)
         gather = m & ((resume == 11) | ok4)
         sl, rg, sp = tr.ass_moves[0]
         goal0 = torch.where(torch.full_like(target, sl) == 1, target, rally)
         no0 = goal0 < 0
         st13, ar13 = self._bop_move_update(gather & ~no0, k, 0, goal0, sl == 1, rg, sp, ctx)
-        c11 = torch.where(no0, _F, st13)
+        c11 = torch.where(no0, _F, torch.maximum(mf, st13))
         self.tribe_op_resume[:, k] = torch.where(gather & (c11 == _R), 11, self.tribe_op_resume[:, k])
         end |= gather & (c11 == _F)
         # the march (Concurrent 14: Attack Units, Make Formation, Operation Move
@@ -753,7 +763,7 @@ class SimBarbOps:
         goal1 = target if sl == 1 else rally
         no1 = goal1 < 0
         st17, ar17 = self._bop_move_update(march & ~no1, k, 1, goal1, sl == 1, rg, sp, ctx)
-        c14 = torch.where(no1, _F, st17)
+        c14 = torch.where(no1, _F, torch.maximum(mf, st17))
         self.tribe_op_resume[:, k] = torch.where(march & (c14 == _R), 14, self.tribe_op_resume[:, k])
         end |= march & (c14 == _F)
         # the assault (Concurrent 18: Siege City, Attack City, Attack Units,
@@ -769,22 +779,96 @@ class SimBarbOps:
         sl, rg, sp = tr.ass_moves[2]
         goal2 = target if sl == 1 else rally
         st24, ar24 = self._bop_move_update(on23 & (goal2 >= 0), k, 2, goal2, sl == 1, rg, sp, ctx)
-        c18 = torch.where(fail18, _F, torch.maximum(c18, torch.where(goal2 >= 0, st24, _F)))
+        c18 = torch.where(fail18, _F, torch.maximum(torch.maximum(c18, mf), torch.where(goal2 >= 0, st24, _F)))
         self.tribe_op_resume[:, k] = torch.where(ass & (c18 == _R), 18, self.tribe_op_resume[:, k])
         end |= ass & (c18 != _R)
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
         self._bop_defend_exec(m & mk1, team, self.tribe_op_plot[:, k], pct1, rng1, ctx)
+        self._bop_form_exec(gather, fpairs)
         self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][2], ar13, ready, ctx)
         self._bop_attack_units(march, k, ctx)
+        self._bop_form_exec(march, fpairs)
         self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][2], ar17, ready, ctx)
         self._bop_siege(ass & (s19 == _S), k, ctx)
         self._bop_attack_city(ass & ~fail18, k, ctx)
         self._bop_attack_units(on23, k, ctx)
+        self._bop_form_exec(on23, fpairs)
         self._bop_pillage(on23, k, ctx)
         self._bop_move_exec(on23 & (goal2 >= 0), k, goal2, tr.ass_moves[2][2], ar24, ready, ctx)
         # the assault's Notify Owner: no city to a list (a bribed tribe's alone)
         self.tribe_op_done[:, k] |= end
+
+    # -- Make Formation ------------------------------------------------------
+
+    def _bop_form_plan(self, m: torch.Tensor, k: int, ctx: dict) -> tuple[torch.Tensor, list]:
+        """MAKE FORMATION's update over tribe `k`'s assault team in the games
+        `m` (`planFormations`, 0x73b8a0): the escorts its living LAND_COMBAT
+        members of the Combat Unit type in a formation of no rider; each
+        living SUPPORT or CIVILIAN member of the Support Unit type in no
+        formation takes the escort whose planning reaches its plot in the
+        fewest turns, under 4, then the most Movement left, then the first in
+        the team's order (an escort paired stays an escort). [B] no pair more
+        than a turn apart; the pairs (the rider's slot, its escort's [B], -1
+        none, the rider's plot [B])"""
+        tr = self._bop_trees()
+        combat, support = tr.ass_form
+        bidx = self._bidx
+        rowof, res = ctx["rowof"], ctx["res"]
+        B = self.B
+        mem = self._bop_members(k) & m.unsqueeze(1)
+        ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        sup_t = self._type_support.take(ut)
+        civ_t = self._type_civilian.take(ut)
+        land = ~sup_t & ~civ_t & (self._type_air.take(ut) == 0) & ~self.unit_naval.take(ut)
+        near = torch.ones(B, dtype=torch.bool, device=self.device)
+        pairs: list = []
+        cols = mem.any(dim=0).nonzero(as_tuple=True)[0].tolist()
+        if not cols:
+            return near, pairs
+        P = mem.shape[1]
+        mate = torch.full_like(self.barb_unit_join, -1)
+        for j in cols:
+            mate[:, j] = self._tac_mate(bidx, torch.full((B,), j, dtype=torch.long, device=self.device), "barb")
+        esc = mem & land & self._bop_form_ai[combat].take(ut) & (mate < 0)
+        rider = mem & (sup_t | civ_t) & self._bop_form_ai[support].take(ut) & (mate < 0)
+        n = rowof[:, :P]
+        nc = n.clamp(min=0)
+        big = 1 << 40
+        for j in cols:
+            cand = rider[:, j]
+            if not bool(cand.any()):
+                continue
+            plot = self.barb_unit_tile[:, j]
+            pc = plot.clamp(min=0).unsqueeze(1).expand(-1, P)
+            t = res["turns"][nc, pc]
+            mv = res["moves"][nc, pc].to(torch.long)
+            ok = esc & (n >= 0) & (t >= 0) & (t <= 2) & cand.unsqueeze(1)
+            key = t.to(torch.long) * (1 << 34) + ((1 << 20) - mv) * (1 << 12) + self.barb_unit_join.clamp(min=0, max=(1 << 12) - 1)
+            key = torch.where(ok, key, torch.full_like(key, big))
+            best = key.min(dim=1)
+            has = best.values < big
+            e = torch.where(has, best.indices, torch.full_like(best.indices, -1))
+            near &= ~(has & (t.gather(1, best.indices.unsqueeze(1)).squeeze(1) > 1))
+            pairs.append((j, e, plot))
+        return near, pairs
+
+    def _bop_form_exec(self, on: torch.Tensor, pairs: list) -> None:
+        """MAKE FORMATION's execution (0x7ee630) in the games `on`: each
+        pair's escort walks to its rider's plot, and met there, the two in no
+        formation, the rider enters the escort's (UNITCOMMAND_ENTER_FORMATION)"""
+        bidx = self._bidx
+        for j, e, plot in pairs:
+            go = on & (e >= 0)
+            if not bool(go.any()):
+                continue
+            ec = e.clamp(min=0)
+            self._tac_move_to(go & (self.barb_unit_tile[bidx, ec] != plot), ec, plot.clamp(min=0), strike=False)
+            js = torch.full_like(e, j)
+            meet = (go & self.barb_unit_alive[bidx, ec] & self.barb_unit_alive[:, j]
+                    & (self.barb_unit_tile[bidx, ec] == self.barb_unit_tile[:, j])
+                    & (self._tac_mate(bidx, js, "barb") < 0) & (self._tac_mate(bidx, ec, "barb") < 0))
+            self.barb_unit_escorted[:, j] |= meet
 
     # -- Operation Defend Units ----------------------------------------------
 
