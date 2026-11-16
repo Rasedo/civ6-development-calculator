@@ -2223,9 +2223,13 @@ class SimMinorOps:
                             continue
                         m = on & atq & (self.mops_def[:, s, k] == d)
                         if bool(m.any()):
-                            # an operation a recruit left with no unit ends, its
-                            # tree not run (`robbedOps`)
-                            rb = m & view["robbed"][:, k] & ~(self.mops_mem[:, s, k] >= 0).flatten(1).any(dim=1)
+                            # an operation a recruit left with no unit, or whose
+                            # every member is an upgrade's old self dying in its
+                            # slot, ends, its tree not run (`treeEmptied`)
+                            mem = self.mops_mem[:, s, k].flatten(1)
+                            held = mem >= 0
+                            gone = held.any(dim=1) & (u["dying"].gather(1, mem.clamp(min=0)) | ~held).all(dim=1)
+                            rb = m & ((view["robbed"][:, k] & ~held.any(dim=1)) | gone)
                             view["robbed"][:, k] &= ~m
                             self._mops_end(s, k, rb)
                             m = m & ~rb

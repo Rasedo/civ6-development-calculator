@@ -19849,3 +19849,36 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
 - OPEN: runs/h1_duels1171 t5: the game raises a fifth camp on 16:10 with 307
   land plots unseen by the full civilizations (Barbarians.csv), ours counts
   304 and raises none (the full civilizations' sight of t5, three plots).
+
+## C-134: an operation whose members an upgrade took ends at its tick — LAB (the records), both twins
+
+- AN UPGRADE'S OLD UNIT dies with its erase delayed (0xa49cb0 -> 0x9402a0
+  with r8b 1 -> 0x4ef040): its team's list still names it through the
+  turn, and the military AI's refresh before the upgrade (0x727510, then
+  the upgrade 0x727db0) logs the team with it. Where every member of an
+  operation is such a unit, the operations' run finds its tree gone and
+  the manager ends it ("Operation complete", 0x73a840 -> 0x725000) before
+  any node runs: no Recruit, Move or Attack line. A member upgraded beside
+  others stays listed and the operation runs on; a member killed in
+  battle leaves the team at the next keep and the tree runs (its Recruit
+  failing with no unit). Ported: `treeEmptied` in `tickTree`
+  (cpu/core/operations/manager.ts) beside the recruit's `robbedOps`; GPU
+  `_mops_run`'s `gone` on the holder's `dying` plane.
+- CONFIRMED: runs/h1_duels1159 t45: city-state 4's Attack Barb Camp, its
+  one Warrior 327683 upgraded to the Swordsman 655366 (UnitUpgraded),
+  logs "Ready, UNIT_WARRIOR;" then "Operation complete"; 1135 t167 the
+  Trebuchet 1310722 -> Bombard 1703943, 1169 t145 the Crossbowman 1376256
+  -> Field Cannon 1507331, 1172 t181 the Crossbowman 1048577 -> Field
+  Cannon 1245189, each Attack Barb Camp's one member. Beside others:
+  runs/h1_duelz1127 t94 City Defense's Heavy Chariot 720899 listed to the
+  end look. Killed: runs/h1_duels1159 t82-83 city-state 4's Swordsman
+  786439 killed by the barbarian Skirmisher, Attack Barb Camp "Not Ready",
+  "Operation Recruit, 0 units", then complete.
+- Open: the tree's own end (the writer of the tree's destroy flag +0x368
+  on the unit's death signal, game signals +0x1470) is unread; the rule is
+  the records'. In each case that ends, the old unit's aiController is
+  clear at the tacpass read; runs/h1_duels1135 t163 city-state 3's
+  Attack Barb Camp, its one Swordsman 851973 upgraded to the Line Infantry
+  1572872, keeps the tree's id 8585224 as its controller and the tree runs
+  on (Recruit takes the Trebuchet 1310722), which the port ends: what
+  keeps the controller is unread.

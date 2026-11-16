@@ -249,8 +249,25 @@ export function tickOperation(ai: OpsAi, env: OpsEnv, op: Operation): void {
   tickTree(ai, env, op);
 }
 
+/** the operation's tree has lost every unit it held: a higher one's recruit
+ *  took them in the run (`robbedOps`), or each member is an upgrade's old
+ *  self dying in its slot this turn (`unitsDying`) — the team's list still
+ *  naming it — so the tree is gone and the operation ends at its tick, no
+ *  node run (runs/h1_duels1159 t45: city-state 4's Attack Barb Camp, its
+ *  one Warrior 327683 upgraded to the Swordsman 655366, "Ready,
+ *  UNIT_WARRIOR;" then "Operation complete"; 1135 t167 the Trebuchet
+ *  1310722, 1169 t145 and 1172 t181 a Crossbowman; a member upgraded beside
+ *  others stays listed and the operation runs on: runs/h1_duelz1127 t94) */
+function treeEmptied(ai: OpsAi, env: OpsEnv, op: Operation): boolean {
+  const units = opUnits(op);
+  if (robbedOps.delete(op) && units.length === 0) return true;
+  if (!units.length) return false;
+  const dying = new Set(env.view().unitsDying(ai.seat).map((u) => u.id));
+  return units.every((id) => dying.has(id));
+}
+
 function tickTree(ai: OpsAi, env: OpsEnv, op: Operation): void {
-  if (robbedOps.delete(op) && opUnits(op).length === 0) {
+  if (treeEmptied(ai, env, op)) {
     env.log(`${op.def}, Operation complete`);
     endOperation(ai, op);
     return;
