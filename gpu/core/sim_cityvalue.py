@@ -841,10 +841,11 @@ class SimCityValue:
     # -- the military AI's unit production table (aiUnitProduction.ts) ------
 
     def _cv_unit_surplus(self, row: int) -> torch.Tensor:
-        """[B, NU] per AI unit row: seat row `row`'s turn income less its
-        units' fuel bill (`strategicSurplus`) of the row's table maintenance
-        resource (`tableMaintenanceResource`, Units_XP2's row at the unit's
-        Units index), 0 for none"""
+        """[B, NU] per AI unit row: seat row `row`'s accumulated resource a
+        turn (Player_Resources +0x350, a city-state's own under a suzerain
+        too) less its units' fuel bill (`strategicSurplus`) of the row's table
+        maintenance resource (`tableMaintenanceResource`, Units_XP2's row at
+        the unit's Units index), 0 for none"""
         slots = getattr(self, "_cv_surplus_slots", None)
         if slots is None:
             T = self._cv_tables()
@@ -858,7 +859,7 @@ class SimCityValue:
         out = torch.zeros(self.B, len(slots), dtype=torch.long, device=self.device)
         if all(k < 0 for k in slots):
             return out
-        net = self._seat_stock_income(row).long() - self._unit_upkeep_bill(row).long()
+        net = self._seat_accumulated(row).long() - self._unit_upkeep_bill(row).long()
         for i, k in enumerate(slots):
             if k >= 0:
                 out[:, i] = net[:, k]
@@ -1556,7 +1557,7 @@ class SimCityValue:
                      "EFFECT_ADD_PLAYER_FAVOR", "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
                      "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
                      "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER", "EFFECT_MOUNTAIN_PORTAL",
-                     "EFFECT_ADJUST_IMPROVEMENT_HOUSING")
+                     "EFFECT_ADJUST_IMPROVEMENT_HOUSING", "EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
         """refuse a modifier whose analysis the TS evaluator reads through an
@@ -1785,6 +1786,21 @@ class SimCityValue:
             if none:
                 return zero
             return torch.where(_t(sf.city_strikes(), like).bool(), torch.full_like(like, amount), zero)
+        if eff == "EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION":
+            # 0x6aa300: the city's purchase unit pick of the domain at its
+            # centre UNITS value times fx(Amount x 0.01f), whole, once a
+            # Corps / Fleet the player may form and once more an Army /
+            # Armada, else the product's half whole
+            # (`EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION`)
+            if none or amount == 0:
+                return zero
+            dom = a.get("UnitDomain") or "NO_DOMAIN"
+            x = _fmul(torch.full_like(like, _fx_const(_f32(amount * _f32(0.01)))), _t(sf.corps_unit(dom), like))
+            corps = _t(sf.corps_formation(dom, 1), like).bool()
+            army = _t(sf.corps_formation(dom, 2), like).bool()
+            half = _fmul(x, torch.full_like(x, _fx_const(0.5))) >> 8
+            both = torch.where(corps, x >> 8, zero) + torch.where(army, x >> 8, zero)
+            return torch.where(corps | army, both, half)
         if eff == "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY":
             k = f.trade_knowledge()
             if k is None:
@@ -2892,6 +2908,49 @@ class _MinorFacts:
         if ui < 0:
             return 0
         return self._item_cost(u).long() if ui == self.sim._builder_idx or int(self.sim._type_pk[ui]) > 0 else int(self.sim._type_cost[ui])
+
+    def corps_unit(self, domain):
+        """`minorCorpsFacts`' domainUnit: the centre UNITS value of the unit
+        list's purchase pick of `domain` (0x5d2810 -> 0x5d4cd0), 0 with none
+        or where that value is not read; [B] raw. The Free Cities': 0"""
+        def build():
+            sim, s = self.sim, self.s
+            dev = sim.device
+            if s >= sim.S:
+                return torch.zeros(sim.B, dtype=torch.long, device=dev)
+            rows = self.T["unit_rows"]
+            order, entry, ranked = sim._minor_purchase_rows(s, self)
+            eu = torch.tensor(self.E["unit"] or [-1], dtype=torch.long, device=dev)
+            must = torch.tensor([bool(r["mustPurchase"]) for r in rows], dtype=torch.bool, device=dev)
+            dom = torch.tensor([r["domain"] == domain for r in rows], dtype=torch.bool, device=dev)
+            pick = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
+            seen = torch.zeros(sim.B, dtype=torch.bool, device=dev)
+            for c in range(order.shape[1]):
+                k = order[:, c]
+                ui = eu.take(k)
+                cand = ~seen & entry[:, c] & (ui >= 0) & ~must.take(k) & dom.take(k)
+                if not bool(cand.count_nonzero()):
+                    continue
+                cand = cand & sim._minor_can_train(s, ui)
+                pick = torch.where(cand & ranked[:, c], k, pick)
+                seen = seen | cand
+            tab = sim._cv_unit_table(self)
+            units = torch.stack([v for v, _read in tab], dim=1)
+            read = torch.stack([torch.as_tensor(r, dtype=torch.bool, device=dev).expand_as(v) for v, r in tab], dim=1)
+            at = pick.clamp(min=0).unsqueeze(1)
+            got = units.gather(1, at).squeeze(1)
+            # a pick whose value is not read: the analysis worth 0
+            ok = (pick >= 0) & read.gather(1, at).squeeze(1)
+            return torch.where(ok, got, torch.zeros_like(got))
+        return self._get(("corps", domain), build)
+
+    def corps_formation(self, domain, level):
+        """`minorCorpsFacts`' formation: the formation test of a sea or land
+        domain at `level` (0x536da0), any other refused; [B] bool"""
+        if domain not in ("DOMAIN_SEA", "DOMAIN_LAND"):
+            return self._bools(False)
+        land, naval = self.sim._form_civic_ok(self.row, level)
+        return naval if domain == "DOMAIN_SEA" else land
 
     def plot_unit_cost(self, u):
         # the plot values' build unit: a Builder at the count its City

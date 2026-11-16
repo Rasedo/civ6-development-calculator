@@ -107,7 +107,10 @@
     - recording: h1_duelv1124
       turn: 71
       value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
-  impl: [cpu/data/aiValue.ts:AI_UNLOCK_SHARE, cpu/core/minorOps.ts:UPGRADE_RESERVE]
+  impl:
+    - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
+    - cpu/core/minorOps.ts:UPGRADE_RESERVE
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"

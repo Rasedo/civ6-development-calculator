@@ -398,6 +398,7 @@
     - gpu/core/sim_minorops.py:_mops_unit_rows
     - cpu/core/operations/unitRows.ts:unitBuildable
     - gpu/core/sim_minorops.py:_mops_stock_buildable
+    - cpu/core/minorBuild.ts:facts
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"

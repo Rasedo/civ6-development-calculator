@@ -18531,3 +18531,52 @@ harness's seizure (`barbarianAi`, the `seize` decision, cpu/harness/replay.ts).
 - The GPU's military plane holds one unit a plot, a ship or a land unit:
   the partner and `_mops_swap`'s own unit beside it are taken where the two
   types' sea domain agrees (the plane holds no other class).
+
+## C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins
+
+`EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION` and `CorpsFacts`
+(cpu/core/aiModifiers.ts), `minorCorpsFacts` (cpu/core/minorBuild.ts),
+`strategicSurplus` (cpu/core/stockpile.ts); GPU `_cv_analyze`,
+`corps_unit`, `corps_formation`, `_cv_unit_surplus`
+(gpu/core/sim_cityvalue.py).
+
+- THE ANALYZER: the registry (0x6c9640 at 0x6c99b6) hands
+  EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION its static object, whose
+  vtable holds the parser 0x6a9fb0 (+0) and the analyzer 0x6aa300
+  (+8). The parser keeps nothing for an Amount whose whole part is 0, else
+  +8 fx(Amount x 0.01f) and +0xc the UnitDomain. The analyzer, with the
+  context's player and city: the city's purchase unit pick of the domain
+  (0x5d2810, the first trainable entry of its unit list), its centre UNITS
+  value (0x5d4cd0: 0 for no pick) times the Amount (0x16e7d0); that
+  product's whole part once where the formation test (0x536da0) admits a
+  Corps or Fleet of the domain, once more an Army or Armada, else half the
+  product (0.5f) whole. The Seaport (SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT, 25
+  at sea) and the Military Academy (25 on land) carry it.
+- THE TABLE IT READS: the UNITS values of the same analysis, the turn's:
+  a city-state at peace with more than five units values every unit at
+  FX(-9999) (`unitValueExit`), so its Seaport takes 2 x -2,500 = -5,000.
+  The engines value a pick whose unit value they do not read (a unit with
+  a Units_XP2 maintenance resource) at 0.
+- Confirmed (one-seed aimem windows): runs/h1_duels1164 Cardiff t163-t183
+  the Seaport near -5,000 as logged (-4,829.50 at t169), its Sewer contract
+  at t169 / t176 / t183 as recorded; t184 its units valued, the Seaport
+  432.96; runs/h1_duels1186 Lahore t181 / t188 / t195 the Sewer, t199 its
+  Harbor pillaged (no sea pick) the Seaport 151.16; runs/h1_duels1143 Bandar
+  Brunei t207-t228 the Food Market; runs/h1_duels1136 Chinguetti t214 the
+  Flood Barrier, t221 / t228 the Food Market; runs/h1_duels1135 city-state
+  3 t235 the Sewer over the Military Academy (the land pick).
+- THE SURPLUS: the unit production table's shortfall divide and the
+  operations' maintenance test read Player_Resources +0x350, the
+  accumulated resource a turn, which a city-state under a suzerain holds of
+  its own sources (the recorded m_aAccumulatedResourcePerTurn), not the
+  income its bank takes (`stockpileIncome`, none under a suzerain):
+  `accumulatedPerTurn` less the units' fuel bill.
+- Confirmed: runs/h1_duels1157 city-state 4 (suzerain player 1) t207-t235,
+  Aluminum 2.0 a turn, its Helicopter's bill 1: the Bombard, Cavalry and AT
+  Crew entries undivided as recorded (29 tables).
+- Open: a pick whose unit value the engines do not read (runs/h1_duels1181
+  Cahokia t239: its Nuclear Submarine, -36.94 in the game's table, takes
+  the Seaport to 83.83 under the Sewer's 96.67); the Free Cities' and a
+  major's building values carry no `CorpsFacts` (their Seaport's analysis
+  0); the resource value's shortfall term (`minorResourceFacts`) still
+  reads the bank's income.

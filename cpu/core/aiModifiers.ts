@@ -108,6 +108,20 @@ export interface ValueTerms {
    *  24.8, null for none: the cards neither obsolete nor active, unlocked,
    *  of the slot (any for a wildcard), the most its scores give (0x623b90) */
   bestPolicy?: (slot: string) => number | null;
+  /** the evaluation city's CityBuildAI (context +0x70 -> 0xa5c20) as the
+   *  formation discount's analyzer reads it (`CityBuildFacts.corps`);
+   *  absent, not read */
+  corps?: CorpsFacts;
+}
+
+/** what EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION reads of its city: the
+ *  centre UNITS value (0x5d4cd0) of the city's purchase unit pick of a
+ *  UnitDomain (0x5d2810), 0 with none, null where that value is not read; whether the player may form a
+ *  formation of a level in the domain (0x536da0: 1 a Corps or Fleet, 2 an
+ *  Army or Armada) */
+export interface CorpsFacts {
+  domainUnit(domain: string): number | null;
+  formation(domain: string, level: number): boolean;
 }
 
 /** a city an analysis may stand on: its owner's seat, the engine's city id
@@ -818,6 +832,27 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const c = ownerCity(t);
     if (!c || c.kind !== 'city' || !t.view.cityStrikes(c.seat, c.id)) return 0;
     return Number(args.Amount ?? 0) | 0;
+  },
+  // 0x6aa300 (its parser 0x6a9fb0 stores fx(Amount x 0.01f) at +8 and the
+  // UnitDomain at +0xc, no analyzer for an Amount whose whole part is 0):
+  // on the context's city, its purchase unit pick of the domain at its
+  // centre UNITS value times the Amount, whole, once where the player may
+  // form a Corps or Fleet of the domain and once more an Army or Armada,
+  // else that product's half (0.5f @0xd20458) whole (runs/h1_duels1164 Cardiff
+  // t163-t183: its units all FX(-9999), the Seaport's 25 twice -5,000); a
+  // pick whose UNITS value is not read here, 0
+  EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION: (t, args) => {
+    const amount = Number(args.Amount ?? 0) | 0;
+    const c = ownerCity(t);
+    if (amount === 0 || !t.corps || !c || c.kind !== 'city') return 0;
+    const domain = args.UnitDomain ?? 'NO_DOMAIN';
+    const v = t.corps.domainUnit(domain);
+    if (v === null) return 0;
+    const x = fmul(fxConst(Math.fround(amount * Math.fround(0.01))), v);
+    const corps = t.corps.formation(domain, 1);
+    const army = t.corps.formation(domain, 2);
+    if (!corps && !army) return whole(fmul(x, fxConst(0.5)));
+    return (corps ? whole(x) : 0) + (army ? whole(x) : 0);
   },
   // 0x6be2d0: a subject and the context's city; the space race's worth to
   // its owner (PSEUDOYIELD_SPACE_RACE 1.0 at its weight); per SpaceRace

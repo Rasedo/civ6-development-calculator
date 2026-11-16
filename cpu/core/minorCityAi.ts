@@ -865,7 +865,7 @@ export function minorContractCity(state: GameState, cs: CityState): CityTreeCity
  *  first (equal entries in database order). The table is the one its
  *  military AI built as the turn opened, on the records its last turn left
  *  (`CityState.armyTabled`) */
-function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
+export function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const r = cs.research;
   const records = cs.armyTabled ?? [];
   const known = new Map<string, number>();

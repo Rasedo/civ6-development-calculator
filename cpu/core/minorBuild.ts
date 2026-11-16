@@ -35,11 +35,11 @@ import { boostOnResearch, detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, urbanFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
-import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
+import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn, purchaseEntries } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants, centreStrength } from './combat';
 import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
-import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
+import { districtScaledBase, formationCivicIn, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
@@ -75,6 +75,8 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
 import { accrueStockpiles, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
+import { purchasePick, type PurchaseEntry } from './aiEconomic';
+import type { CorpsFacts } from './aiModifiers';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
@@ -2017,7 +2019,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
   const amenity = amenityCityOf(stats);
-  return {
+  const facts: CityBuildFacts = {
     view,
     seat: cityState.seat,
     cityId: city.id,
@@ -2123,6 +2125,33 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const rate = fxOf((founding ? foundingProduction(stats) : stats.total.production) * (1 + pct / 100)) * minorItemMult(state, item);
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
+  };
+  facts.corps = minorCorpsFacts(state, cityState, facts);
+  return facts;
+}
+
+/** what the formation discount's analyzer (0x6aa300) reads of the minor's
+ *  city: the centre UNITS value these facts give (0x5d4cd0 on CityBuildAI
+ *  +0xcf8) of its unit list's purchase pick of the domain (0x5d2810 over
+ *  `purchaseEntries`), 0 with none, null where that value is not read; its formation test (0x536da0) of a
+ *  sea or land domain, any other refused */
+function minorCorpsFacts(state: GameState, cityState: CityState, facts: CityBuildFacts): CorpsFacts {
+  let entries: readonly PurchaseEntry[] | null = null;
+  let units: readonly (number | null)[] | null = null;
+  const row = (u: string) => AI_UNITS[AI_UNIT_INDEX.get(u)!];
+  return {
+    domainUnit: (domain) => {
+      entries ??= purchaseEntries(state, cityState);
+      const u = purchasePick(entries, (x) => {
+        const id = engineId('unit', x, 'UNIT_', UNITS);
+        return !!id && minorCanTrain(state, cityState, id);
+      }, (x) => !row(x).mustPurchase, (x) => row(x).domain, domain);
+      if (u === null) return 0;
+      units ??= unitTable(facts);
+      return units[AI_UNIT_INDEX.get(u)!] ?? null;
+    },
+    formation: (domain, level) => (domain === 'DOMAIN_SEA' || domain === 'DOMAIN_LAND')
+      && formationCivicIn(state, cityState.seat, domain === 'DOMAIN_SEA', level),
   };
 }
 

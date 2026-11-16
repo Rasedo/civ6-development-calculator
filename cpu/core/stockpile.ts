@@ -305,11 +305,13 @@ export function unitUpkeepBill(state: GameState, seat: number): number[] {
   return bill;
 }
 
-/** the seat's turn income of an install strategic resource (Player_Resources
- *  +0x350) less its units' fuel bill of it (0x4ab270); 0 for another
- *  resource */
+/** the seat's accumulated resource a turn (Player_Resources +0x350,
+ *  `accumulatedPerTurn`: a city-state's own under a suzerain too —
+ *  runs/h1_duels1157 city-state 4 t207-235, its Aluminum 2.0 a turn under
+ *  player 1, its Helicopter's 1 billed, no shortfall divide) less its
+ *  units' fuel bill of it (0x4ab270); 0 for another resource */
 export function strategicSurplus(state: GameState, seat: number): (resource: string) => number {
-  const income = stockpileIncome(state, seat);
+  const income = accumulatedPerTurn(state, seat);
   const bill = unitUpkeepBill(state, seat);
   return (resource) => {
     const id = engineId('resource', resource, 'RESOURCE_', RESOURCES);

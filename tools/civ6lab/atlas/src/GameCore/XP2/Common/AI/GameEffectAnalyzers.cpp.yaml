@@ -390,6 +390,39 @@
   context:
     - ...ty's great works, PSEUDOYIELD_TOURISM, between), EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJ...
   review: reviewed
+- addr: 0x6a9fb0
+  kind: function
+  name: parseCityCorpsArmyProduction
+  semantics: "EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION's parser (its vtable +0 in the analyzer table): Amount through 0xc7dc60, its whole part; none stored for 0; else +8 fx(Amount x 0.01f) (floor << 8 | trunc(frac x 256)) and +0xc the UnitDomain (NO_DOMAIN default) by its hash (0xadd590)."
+  status: READ
+  cases:
+    - recording: h1_duels1164
+      turn: 169
+      value: "the Seaport's SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT 25 DOMAIN_SEA as 0.25: Cardiff's units all FX(-9999), twice -2,500 (the Seaport -4,829.50 as logged)"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_cityvalue.py:_cv_analyze]
+  readings:
+    - "C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins"
+  review: reviewed
+- addr: 0x6aa300
+  kind: function
+  name: EFFECT_ADJUST_CITY_CORPS_ARMY_PRODUCTION
+  semantics: "with the context's player (+0x80) and city (+0x70): x = fx(Amount) (+8) x 0x5d4cd0(the city's CityBuildAI, 0x5d2810(its purchase unit pick of the UnitDomain +0xc)) (0x16e7d0), the centre UNITS value of the pick (0 with none, FX(-9999) with no plot evaluation); x's whole part into the sum (+0xc0) where 0x536da0(player, domain, 1) admits a Corps / Fleet, again where 0x536da0(.., 2) admits an Army / Armada; with neither, (x x 0.5f @0xd20458) whole. No city: refused."
+  status: READ
+  cases:
+    - recording: h1_duels1164
+      turn: 169
+      value: Cardiff's Seaport -4,829.50 (t163-t183 near -5,000 while its UNITS table is all FX(-9999)), its Sewer contract over the Seaport; t184 its units valued, the Seaport 432.96
+    - recording: h1_duels1186
+      turn: 199
+      value: "Lahore's Harbor pillaged, no sea unit to pick: the Seaport -4,962.94 at t198, 151.16 at t199"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/minorBuild.ts:minorCorpsFacts
+    - gpu/core/sim_cityvalue.py:_cv_analyze
+    - gpu/core/sim_cityvalue.py:corps_unit
+  readings:
+    - "C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins"
+  review: reviewed
 - addr: 0x6aa780
   final: 0x480d90
   kind: function

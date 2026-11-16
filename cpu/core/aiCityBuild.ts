@@ -41,7 +41,7 @@ import type { GameState } from './types';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { AI_YIELDS } from './aiWeights';
-import { modifiersValue, type AiModifier } from './aiModifiers';
+import { modifiersValue, type AiModifier, type CorpsFacts } from './aiModifiers';
 
 /** One Buildings row as the city build AI reads it (ai_tables.py) */
 export interface AiBuildingRow {
@@ -294,6 +294,9 @@ export interface CityBuildFacts {
   handicap: number;
   /** the world's artifacts an Archaeologist's value counts (`worldArtifacts`) */
   artifacts: number;
+  /** the city's CityBuildAI as the formation discount's analyzer reads it
+   *  (`CorpsFacts`); absent, its analysis is worth 0 */
+  corps?: CorpsFacts;
 }
 
 /** THE WORLD'S ARTIFACTS as the Archaeologist's value counts them: the
@@ -661,8 +664,8 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     value += unitValue(f, AI_UNITS[AI_UNIT_INDEX.get(u)!], t, h) ?? unitValueExit(f, u, t, h) ?? 0;
   }
   if (b.housing > 0) value += housingValue(f.growth, f.forecast, b.housing, t, h);
-  value += modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, owner: { cityId: f.cityId, capital: f.capital } },
-    b.modifiers);
+  value += modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, owner: { cityId: f.cityId, capital: f.capital },
+    corps: f.corps }, b.modifiers);
   return value;
 }
 

@@ -721,6 +721,13 @@ class Mods:
     def city_strikes(self):
         return 1
 
+    def corps_unit(self, domain):
+        # the TS stub's terms carry no `corps`: the formation discount 0
+        return 0
+
+    def corps_formation(self, domain, level):
+        return 0
+
     def city_has_building(self, b):
         return int(b == "BUILDING_MONUMENT")
 

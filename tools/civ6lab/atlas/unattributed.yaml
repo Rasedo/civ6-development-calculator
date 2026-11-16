@@ -3563,10 +3563,14 @@
     - cpu/core/tactical.ts:makeMilitaryFormation
     - cpu/core/game.ts:formationCivicIn
     - gpu/core/sim_tactics.py:_tac_make_formation
+    - cpu/core/aiModifiers.ts:CorpsFacts
+    - cpu/core/minorBuild.ts:minorCorpsFacts
+    - gpu/core/sim_cityvalue.py:corps_formation
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins"
   context:
     - "...0x4f2af0 (the units manager's Corps / Army TECH, -1 in the install) names the row and 0x536da0 (the player holds that civic and tech) fails — never. PSEUDOYIELD_TOURISM of the +0xe8..."
     - "...ionalism, Mobilization, a trait's EFFECT_ADJUST_CORPS_ARMY_PREREQ — names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per d..."
@@ -5340,6 +5344,7 @@
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
     - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
     - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+    - "C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."

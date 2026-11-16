@@ -1137,6 +1137,7 @@
     - gpu/core/sim_cityvalue.py:_cv_unit_mods
     - cpu/core/minorBuild.ts:minorListedCount
     - cpu/core/minorBuild.ts:amenity
+    - cpu/core/minorBuild.ts:facts
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
