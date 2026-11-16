@@ -173,6 +173,7 @@
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -222,8 +223,9 @@
 - addr: 0x7864c0
   final: 0x514a60
   kind: function
-  semantics: "binds the tactical AI's signal handlers: player signal +0xc0 -> 0x7874a0 (at 0x786b25)."
+  semantics: "binds the tactical AI's signal handlers: player signal +0x1f8 -> its turn 0x785f30, player signal +0x228 -> the look 0x7877e0, game signal +0x10c8 -> the sight's city arm 0x787180 (at 0x78662b), game signal +0x4c8 -> 0x787530, player signal +0xc0 -> 0x7874a0 (at 0x786b25)."
   status: PARTLY
+  impl: [cpu/core/aiView.ts:sightCities]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
@@ -232,6 +234,7 @@
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "...ement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0, bound in 0x7864c0 at 0x786b25) records a unit of the player's own through 0x5f0440 with no sight asked: t..."
@@ -292,6 +295,24 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...no   influence map: every plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of..."
   context:
     - "- THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player 0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a d..."
+  review: reviewed
+- addr: 0x787180
+  final: 0x515710
+  kind: function
+  name: the sight's city arm
+  semantics: "(the tactical AI, the unit, the plot's holder), bound by 0x7864c0 (at 0x78662b) to the game signal +0x10c8 the unit sight update 0x58aa90 raises per plot newly visible to the unit's player: where the unit's owner (+0x2e0) is the AI's player and the plot holds a district of any kind (GetDistrictType 0x810d0 not -1), the look's city arm 0x5f0280 with the handle (the plot's owner +0x1c, 3, the plot's district +0x10): the district's city is found in the known cities or appended and filled from that district (0x5efaf0), at once."
+  status: READ
+  cases:
+    - recording: h1_duels1124
+      turn: 53
+      value: "city-state 2's Swordsmen 786440 and 655366, teleported off player 1's new 6:13, see the Holy Site 4:14 and then the Campus 4:11: its list takes 3:14, 3:10 and at its look 6:13 (a look alone, in plot order, 3:10, 6:13, 3:14)"
+  impl:
+    - cpu/core/aiView.ts:sightCities
+    - cpu/core/fog.ts:sightBefore
+    - gpu/core/sim_minors.py:_sight_cities
+    - gpu/core/sim_minors.py:_minor_sight_before
+  readings:
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   review: reviewed
 - addr: 0x7874a0
   final: 0x515a30
@@ -363,6 +384,7 @@
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

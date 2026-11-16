@@ -20592,3 +20592,73 @@ the flat bonus' pool count (gpu/core/sim_policy.py), `_free_city_produce`
   15 at that turn's end look, Agoge and Feudal Contract 70 -> 16.
 - Open (C-98): Raid's pillage value on the Free Cities' units, 2 to 8
   under from t215 (duels1143 t215 138 for 141).
+
+## C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins
+
+`sightCities` (cpu/core/aiView.ts), `minorLook` / `sightBefore`
+(cpu/core/fog.ts); `_sight_cities` / `_minor_sight_before`
+(gpu/core/sim_minors.py), `_minor_look` (gpu/core/sim_masks.py).
+`captureCityState` / `captureCityStateFor` (cpu/core/combat.ts),
+`occupiedCapitals` (cpu/core/seatTurn.ts), `grievanceHeldCapitals`
+(cpu/core/grievance.ts), the importer's `origCapitalSeat`
+(cpu/harness/import.ts); `_capture_city_state`'s `city_orig_cap`
+(gpu/core/sim_orders.py), `_occupied_capitals` (gpu/core/sim_seats.py).
+
+- THE SIGHT'S CITY ARM. The tactical AI's signal setup 0x7864c0 binds, per
+  player: its turn 0x785f30 to the player signal +0x1f8, the look 0x7877e0
+  to the player signal +0x228, and 0x787180 to the game signal +0x10c8
+  (0x78662b), the one the unit sight update 0x58aa90 raises per plot whose
+  owner's visibility count went from 0 to more and the barbarian scout's
+  look 0x153ef0 hears too. 0x787180 (the unit, the plot's holder): where
+  the unit's owner (+0x2e0) is the AI's player and the plot holds a
+  district of any kind (GetDistrictType 0x810d0 not -1), it calls the
+  look's city arm 0x5f0280 with the handle (the plot's owner +0x1c, 3, the
+  plot's district +0x10): the district's city is found in the known cities
+  or appended, and filled from that district (0x5efaf0), at once. So a
+  city joins the list the moment a unit's step, placement or teleport
+  first shows one of its district plots, in the sight's walk order, ahead
+  of the cities the next look (plot order) finds; a plot seen without a
+  break raises nothing (a move adds the new sight before it drops the old).
+- PORTED for the city-states: `minorLook` hands `sightCities` the look's
+  plots the minor did not see as the look landed (`sightBefore`: its
+  ground's sight, its other units' looks, the movers' from the plot they
+  left). The replay takes each logged teleport of a city-state's unit
+  before its turn opens as a look from the plot it lands on, and leaves a
+  minor's list as its turn opened through the record's walk of its own
+  moves (the minors' copy runs the turn). The score reads a city-state's
+  list, and a city its opening held otherwise than the record, once the
+  pass's operations ran, the moment the record is read at.
+- CONFIRMED (aimem windows): runs/h1_duels1124 t53, player 1 founds 6:13
+  and city-state 2's Swordsmen 786440 and 655366 are teleported to 6:14 /
+  5:15 and 6:12 / 5:12: the list takes 3:14 (the Holy Site 4:14), 3:10
+  (the Campus 4:11) and at its look 6:13, the game's order; a look alone
+  gives 3:10, 6:13, 3:14 (plot order). runs/h1_duels1177 t80: its Galley's
+  operation move to 33:20 shows 31:20 before the pass's record; 1190 t43;
+  the single turns a city stands in the game's list a look before ours
+  (1140 t117 / t120, 1154 t75 / t82 / t87, 1183 t46 .. t144, 1136 t72 ..
+  t131).
+- THE ORIGINAL-CAPITAL FLAG. The city's flag +0x648 and original owner
+  +0x218 are read off the old city by the transfer 0x1e8880
+  (0x1e890e..0x1e8938) and passed on to the new one (0x1e9435): a
+  city-state's capital a major takes stays flagged, its
+  original owner the city-state. The known city's record 0x5ef9a0 copies
+  the flag alone (0x5ef9e4), so the city value's
+  PSEUDOYIELD_CITY_ORIGINAL_CAPITAL counts it. The readers that mean a
+  major's capital test the original owner: the Favor per turn 0x37b7d0
+  counts, times FAVOR_PER_OWNED_ORIGINAL_CAPITAL (GlobalParameters +0x36c),
+  the player's cities flagged, of another original owner, that owner valid
+  and a full civilization (0x595c90 -> 0x484a10); Rules CanRaze 0x533e50
+  and the moments' transfer 0x3088a0 the same way.
+- CONFIRMED: runs/h1_duels1127 t213, player 1 takes Mexico City 8:10:
+  record t214 holds it originalCapital true, originalOwner 4, population
+  13 as before the capture (CityPopulationChanged 1 then 13: the engines'
+  quarter lost is no rule of the game; CITY_POPULATION_LOSS_TO_CONQUEST_
+  PERCENTAGE, GlobalParameters +0x148, has no reader in the DLL), and
+  AI_Knowledge.csv's CITY line of 8:10 reads "Is original capital, Not
+  capital" in city-state 3's and the barbarians' looks to t249;
+  runs/h1_duels1136 t232 its 16:9 alike.
+- OPEN (C-129): the barbarians and the Free Cities hold no list in the
+  engines (their known cities are read at the look's plots), so the sight's
+  arm is the city-states' alone; a district entry of a district gone (0x5efaf0
+  finds or appends an entry by the district's handle, none leaves: 1191's
+  Encampment under the sea) is refilled away at the engines' look.

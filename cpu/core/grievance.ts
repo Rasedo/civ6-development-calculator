@@ -217,7 +217,7 @@ export function grievanceDenounce(state: GameState, denouncer: number, target: n
 export function grievanceHeldCapitals(state: GameState, seat: number): void {
   for (const c of citiesOf(state, seat)) {
     const orig = c.origCapitalSeat ?? -1;
-    if (orig < 0 || orig === seat) continue;
+    if (!isCiv(orig) || orig === seat) continue;
     if (!seatOf(state, orig) || civsAtWar(state, seat, orig)) continue;
     addGrievance(state, orig, seat, GRIEVANCE_HELD_CAPITAL_PER_TURN);
   }

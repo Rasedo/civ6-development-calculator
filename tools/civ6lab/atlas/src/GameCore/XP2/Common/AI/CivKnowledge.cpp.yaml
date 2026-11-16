@@ -502,6 +502,7 @@
     - "C-97: the AI's knowledge of the map's cities"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "- The record (0x5ef9a0): an entry per city the player knows (its own and those it sees): the yields truncated,..."
   review: reviewed
@@ -534,6 +535,7 @@
     - gpu/core/sim_minorops.py:_kb_city_entries
     - gpu/core/sim_minors.py:_kb_city_fill
     - cpu/core/aiView.ts:knownDistricts
+    - cpu/core/aiView.ts:sightCities
   readings:
     - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -541,6 +543,7 @@
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "- THE KNOWN CITY RECORD (0x5efaf0, 0xe0 bytes; AI_Knowledge.csv's CITY lines 0x5ed0b0): +0x8 / +0xc the plot, +0x1c the p..."
     - ...he records of the turn before and logs the CITY VALUES on the turn's (the city records' 0x5efaf0 and the look 0x7877e0).
@@ -619,6 +622,7 @@
     - gpu/core/sim_minorops.py:_ops_enemy_str
     - cpu/core/aiView.ts:lookCities
     - cpu/core/aiView.ts:freeCitiesLook
+    - cpu/core/aiView.ts:sightCities
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
@@ -631,6 +635,7 @@
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-129 / C-125: a city-state's known cities hold the district entries its look filled; Fascism's strength is an attacker's — READ (0x5f0280 -> 0x5efaf0 at the look, the install's FASCISM_REQUIREMENTS / UNIT_STRONG_WHEN_ATTACKING_REQUIREMENTS), both twins"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   review: reviewed
 - addr: 0x5f0440
   final: 0x3f5f20

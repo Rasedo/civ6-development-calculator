@@ -977,6 +977,33 @@ export function lookDistricts(state: GameState, owner: number, id: number, looke
   return city ? knownDistricts(state, city, looked) : [];
 }
 
+/** A CITY-STATE'S UNIT'S SIGHT HANDS ITS KNOWLEDGE BASE A CITY (the sight
+ *  update 0x58aa90 raises game signal +0x10c8 per plot newly visible to the
+ *  unit's player; the tactical AI's 0x787180, bound to it at 0x78662b, takes
+ *  a plot holding a district to the city arm 0x5f0280): each plot of
+ *  `plots` (the look's, in its walk's order) the minor did not see `before`
+ *  that holds a district of any kind under an owner names that district's
+ *  city, which joins the end of the minor's list (`citiesKnown`) where it
+ *  holds no entry of it; the entry's district entry of that plot is filled
+ *  (0x5efaf0), the rest at the next look (`minorCitiesLook`). */
+export function sightCities(state: GameState, cs: CityState, plots: Iterable<number>, before: Uint8Array): void {
+  for (const p of plots) {
+    if (before[p]) continue;
+    const t = state.map.tiles[p];
+    const owner = tileSeat(t);
+    if ((t.district === null && !t.builtWonder) || owner === NO_SEAT) continue;
+    const id = isCityStateSeat(owner) ? -1 : t.ownerCity;
+    const stands = id < 0 ? state.cityStates.some((o) => o.seat === owner && o.centerIndex >= 0)
+      : !!cityHolders(state).find((h) => h.seat === owner)?.cities.some((c) => c.id === id);
+    if (!stands) continue;
+    const known = cs.citiesKnown ?? [];
+    const i = known.findIndex((x) => x.owner === owner && x.id === id);
+    const fresh = lookDistricts(state, owner, id, (q) => q === p);
+    const entry = { owner, id, districts: [...(i >= 0 ? known[i].districts.filter((d) => d.plot !== p) : []), ...fresh] };
+    cs.citiesKnown = i >= 0 ? known.map((k, j) => (j === i ? entry : k)) : [...known, entry];
+  }
+}
+
 /** the cities the seat's knowledge base holds, as it records them (the look
  *  0x7877e0 -> 0x5f0280 -> 0x5efaf0): a city-state's or the Free Cities'
  *  the cities of its list (`citiesKnown`), any other seat's each city a

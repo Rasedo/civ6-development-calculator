@@ -74,7 +74,7 @@ function player(id: number, over: Partial<DumpPlayer>): DumpPlayer {
 
 function city(over: Partial<DumpCity>): DumpCity {
   return {
-    owner: 0, id: 65536, name: 'LOC_CITY_NAME_ROMA', x: 2, y: 1, pop: 3, capital: true, originalOwner: 0, occupied: false,
+    owner: 0, id: 65536, name: 'LOC_CITY_NAME_ROMA', x: 2, y: 1, pop: 3, capital: true, originalCapital: true, originalOwner: 0, occupied: false,
     yields: [0, 0, 0, 0, 0, 0], food: 4, foodSurplus: 2, growthThreshold: 16, turnsToGrow: 6, housing: 5, housingParts: [],
     housingGrowthMod: 1, happinessGrowthMod: 0, overallGrowthMod: 1, amenities: 2, amenitiesNeeded: 2, happiness: 4,
     amenityParts: [], culture: 7, cultureYield: 2, nextPlot: -1, nextPlotCost: 10, turnsToExpand: 2, loyalty: 100,
@@ -444,7 +444,7 @@ describe('the ages', () => {
 });
 
 describe('the era checks', () => {
-  const antium = city({ id: 65537, name: 'LOC_CITY_NAME_ANTIUM', x: 4, y: 2, capital: false, buildings: [],
+  const antium = city({ id: 65537, name: 'LOC_CITY_NAME_ANTIUM', x: 4, y: 2, capital: false, originalCapital: false, buildings: [],
     districts: [[0, 4, 2, true, false, 10, 0, 200, 0, 0]], worked: [], plots: [16] });
 
   it('read a founded city and a pantheon off the pair', () => {

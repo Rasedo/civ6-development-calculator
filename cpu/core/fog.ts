@@ -17,6 +17,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { suzerainWonderRelics } from './cityStates';
 import { createRelic } from './greatWorks';
 import { nameRiversInLook } from './disasters';
+import { sightCities } from './aiView';
 
 export const SIGHT_RANGE = 2;
 
@@ -237,7 +238,9 @@ export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
   return promoFlag(u, 'SEE_THROUGH') || !!UNITS[u.type]?.seesThrough;
 }
 
-/** A CITY-STATE'S UNIT STANDS on `tileIndex` and looks: the plots the look
+/** A CITY-STATE'S UNIT STANDS on `tileIndex` and looks: the plots newly
+ *  visible to the minor that hold a district hand its knowledge base their
+ *  cities (`sightCities`); the plots the look
  *  takes in join the minor's revealed plots (`CityState.revealed`, the
  *  player's +0x2f0 the visibility count change 0x508d50 writes), which its
  *  units' planning reads; every major one of whose plots, or of whose units,
@@ -265,6 +268,11 @@ function minorLook(state: GameState, seat: number, tileIndex: number, radius: nu
   }
   const seen = new Set<number>();
   const sees = losDisk(state.map, t, radius, los.seeThrough);
+  // the plots newly visible to it that hold a district hand its knowledge
+  // base their cities (`sightCities`), in the walk's order
+  if ([...sees].some((p) => state.map.tiles[p].district !== null || state.map.tiles[p].builtWonder)) {
+    sightCities(state, cs, sees, sightBefore(state, seat, los.mover));
+  }
   const revealed = (cs.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (!sees.has(n.index)) continue;
@@ -416,6 +424,28 @@ export function cityStateSight(state: GameState, seat: number, units = true): Ui
   for (const u of state.units) {
     if (u.seat !== seat) continue;
     for (const n of unitLook(state, u)) out[n] = 1;
+  }
+  return out;
+}
+
+/** THE PLOTS A CITY-STATE SAW AS A LOOK OF `mover`'s LANDS (its visibility
+ *  counts as the sight update 0x58aa90 finds them, the new sight added
+ *  before the old is dropped): `cityStateSight` with the mover's units
+ *  looking from the plot they left (none where placed anew), nothing
+ *  stored. */
+function sightBefore(state: GameState, seat: number, mover?: LookMover): Uint8Array {
+  const out = cityStateSight(state, seat, false);
+  for (const u of state.units) {
+    if (u.seat !== seat) continue;
+    let plots: Iterable<number>;
+    if (!mover?.units.includes(u)) plots = unitLookNow(state, u);
+    else if (mover.from < 0) continue;
+    else {
+      const l = u.look;
+      plots = l && l.at === mover.from ? l.plots
+        : losDisk(state.map, state.map.tiles[mover.from], unitSight(u, state), unitSeesThrough(u));
+    }
+    for (const n of plots) out[n] = 1;
   }
   return out;
 }

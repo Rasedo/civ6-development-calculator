@@ -7874,6 +7874,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // plot China's in China's start, teleported to 9:8 before Hunza's look);
       // an addition's own teleport is the unit's birth
       const teleports: { ord: number; key: string; owner: number; plot: number }[] = [];
+      // ...each such teleport's look taken once, from the plot it put the
+      // unit on, as the game's sight update does (runs/h1_duels1124 t53:
+      // city-state 2's Swordsmen 786440 and 655366 pushed off player 1's new
+      // 6:13 see the Holy Site 4:14 and then the Campus 4:11, its list 3:14,
+      // 3:10 and at its look 6:13)
+      const teleportLooked = new Set<number>();
       // ...a levied unit's removal at its levy's end is its return, made anew
       // under its minor (runs/h1_duely1121 t215: China's levied Ironclad
       // 6553622 removed, city-state 3's 1376259 added on 38:22 and recruited
@@ -7911,6 +7917,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         // ...its units its turn made among them, the record's (runs/h1_duely1124
         // t201: city-state 3's Builder trained on 41:12 steps to 42:12, out of
         // Granada's look)
+        // (the cities its units' sights of its own turn hand its knowledge
+        // base are its own turn's, the minors' copy's: the record's walk
+        // here leaves its list as its turn opened)
+        const listOf = state.cityStates.find((c) => c.seat === seat);
+        const listWas = listOf?.citiesKnown;
         matchNewUnits(ctx, b, player);
         // ...each seeing from every plot its logged steps entered, as the
         // game's units do (runs/h1_duely1127 record 7: city-state 3's
@@ -7938,6 +7949,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
             cs!.unitsListed![u.id] = u.type;
           }
         }
+        if (listOf && listWas) listOf.citiesKnown = listWas;
+        else if (listOf) delete listOf.citiesKnown;
       };
       // ...and with the units the record took off that the log removes after
       // its turn opens, on their plot then (runs/h1_duely1127 t43: city-state
@@ -8019,7 +8032,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         for (const t of open === undefined ? [] : teleports) {
           if (t.ord >= open! || t.owner < before) continue;
           const u = unitOf(ctx, t.key);
-          if (u) u.tileIndex = t.plot;
+          if (!u) continue;
+          const from = u.tileIndex;
+          u.tileIndex = t.plot;
+          if (teleportLooked.has(t.ord) || !isCityStateSeat(u.seat)) continue;
+          teleportLooked.add(t.ord);
+          revealAround(state, u.seat, t.plot, unitSight(u, state), { seeThrough: unitSeesThrough(u), mover: { units: [u], from } });
         }
         for (const [key, dmg] of open === undefined ? [] : damageAt(open, before)) {
           const u = unitOf(ctx, key);

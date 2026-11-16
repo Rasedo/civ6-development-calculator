@@ -278,7 +278,7 @@ def poke_galley_cs(rules, path, GALLEY):
     assert int(sim.city_alive[0, 0].sum()) >= ncity0 + 1, "CS capture must found a seat-0 city"
     c_new = int(sim.centre_slot_at[0, ctr])
     assert c_new >= 0 and int(sim.city_slot_at(0)[0, ctr]) == c_new, "captured CS center must transfer"
-    assert int(sim.city_pop[0, 0, c_new]) == max(1, (pop_before * 3) // 4), "captured pop x0.75 (min 1)"
+    assert int(sim.city_pop[0, 0, c_new]) == max(1, pop_before), "the captured population comes over whole"
     print(f"  2 galley captures a city-state OK (pop {pop_before}->{int(sim.city_pop[0, 0, c_new])}, city {c_new})")
 
 

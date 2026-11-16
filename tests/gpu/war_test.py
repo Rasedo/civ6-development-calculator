@@ -322,7 +322,7 @@ def test_cs_siege(rules, path):
     """A seat-0 MELEE attack into a city-state CENTER mirrors TS
     `attackCityState` — defCS = 15 + pop (+6 militaristic), CS-damage roll then
     the counter, attacker consumed, NO advance; `captureCityState` at 0 HP
-    converts it into a seat-0 city (pop x0.75 min 1, half HP, the radius-2
+    converts it into a seat-0 city (its population whole, half HP, the radius-2
     cityStateId territory transfers)."""
     sim = build(rules, path, steps=20)
     live = sim.citystate_alive[0].nonzero(as_tuple=True)[0]
@@ -410,7 +410,7 @@ def test_cs_siege(rules, path):
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "center must map to the new city"
     assert int(sim.city_slot_at(0)[0, ctr]) == c_new, "center tile must transfer"
     assert int(sim.citystate_at[0, ctr]) == -1, "cityStateId territory must clear"
-    assert int(sim.city_pop[0, 0, c_new]) == max(1, (pop_before * 3) // 4), "pop x0.75 (min 1)"
+    assert int(sim.city_pop[0, 0, c_new]) == max(1, pop_before), "the population comes over whole"
     assert int(sim.city_hp[0, 0, c_new]) in (100, 120), "captured city starts at half HP (+20 same-turn heal allowed)"
     assert not bool(sim._seat_envoy_mask(0)[0, s]), "dead CS must leave the envoy mask"
     print(f"  cs siege OK (hp {hp0} -> {int(sim.citystate_hp[0, s])} on hit; capture: pop {pop_before} -> {int(sim.city_pop[0, 0, c_new])}, city {c_new})")

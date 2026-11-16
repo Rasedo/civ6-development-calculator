@@ -120,6 +120,7 @@ export interface DumpCity {
   y: number;
   pop: number;
   capital: Read<boolean>;
+  originalCapital: Read<boolean>;
   originalOwner: Read<number>;
   occupied: Read<boolean>;
   yields: Read<number>[];

@@ -1599,7 +1599,7 @@ class SimOrders:
 
         The minor ceases and its envoys die with it (citystate_alive gates every
         consumer). Territory within radius 2 that the minor owns transfers, pop
-        lands at ×0.75 floor 1, and the new city starts at half HP with zero
+        comes over whole, and the new city starts at half HP with zero
         boxes, zero tilesAcquired, no buildings, no districts beyond its
         CITY_CENTER and no religion. The seat city cap applies here too: a FULL
         empire RAZES the city-state instead of annexing it — the minor dies, its
@@ -1614,7 +1614,7 @@ class SimOrders:
             b = int(rows[i]); s = int(citystate_of[rows[i]])
             row = dst_rows if isinstance(dst_rows, int) else int(dst_rows[b])
             c_t = int(self.citystate_center[b, s])
-            pop = max(1, (int(self.citystate_pop[b, s]) * 3) // 4)
+            pop = max(1, int(self.citystate_pop[b, s]))
             self.citystate_alive[b, s] = False
             # CIV6: the minor is ELIMINATED and its units leave the map with it
             # — removed, not killed (`disbandMinorArmy`)
@@ -1676,7 +1676,9 @@ class SimOrders:
                             torch.tensor([c_t], dtype=torch.long, device=dev))
             self.city_id[b, row, col] = new_id
             self.city_is_cap[b, row, col] = False  # an annexed minor is never a capital
-            self.city_orig_cap[b, row, col] = -1   # ...and never anyone's original one
+            # the transfer carries the city's original-capital flag and its
+            # original owner (TransferCity 0x1e8880): the minor's seat
+            self.city_orig_cap[b, row, col] = 100 + s
             self.city_founder[b, row, col] = -1     # a minor founded it, and minors keep no ledger
             self.city_founded_turn[b, row, col] = int(self.turn)
             # CIV6 (City-State Emergency): the minor's PATRONS — met, with at

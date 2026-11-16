@@ -2,7 +2,7 @@
 import type { City, GameState, QueueItem, Seat } from './types';
 import { logPopWrite } from './difflog';
 import { gainPopulationPressure } from '../data/religion';
-import { seatOf, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
+import { NO_SEAT, isCiv, seatOf, allianceLevelWith, alliedAtLevel, dominantReligionOf } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { resumeItem } from './production';
@@ -41,14 +41,17 @@ export function allianceLevels(state: GameState, seat: number): number {
   return state.seats.reduce((n, o) => n + (o.seat !== seat ? allianceLevelWith(state, seat, o.seat) : 0), 0);
 }
 
-/** Original capitals this seat holds that it did not found — the -5/turn
- *  each. A city whose founder is gone still counts: the penalty is for
- *  sitting in it, not for who is left to resent it. */
+/** Original capitals of other majors this seat holds — the -5/turn each
+ *  (0x595c90 under the Favor per turn 0x37b7d0: a city flagged an original
+ *  capital whose original owner is another player and a full civilization;
+ *  a taken city-state's capital counts for none). A city whose founder is
+ *  gone still counts: the penalty is for sitting in it, not for who is left
+ *  to resent it. */
 export function occupiedCapitals(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
-  return s.cities.reduce((n, c) => n + ((c.origCapitalSeat ?? -1) >= 0
-    && (c.origCapitalSeat ?? -1) !== seat ? 1 : 0), 0);
+  return s.cities.reduce((n, c) => n + (isCiv(c.origCapitalSeat ?? NO_SEAT)
+    && c.origCapitalSeat !== seat ? 1 : 0), 0);
 }
 
 /** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they

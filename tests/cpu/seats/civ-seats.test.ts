@@ -582,7 +582,7 @@ describe('civ CS trade routes', () => {
     expect(civ.cities.length).toBe(before + 1);
     const civCity = civ.cities[civ.cities.length - 1];
     expect(civCity.centerIndex).toBe(cityState.centerIndex);
-    expect(civCity.population).toBe(2); // 3 × 0.75 floored
+    expect(civCity.population).toBe(3); // the population comes over whole
     expect(tileSeat(state.map.tiles[cityState.centerIndex])).toBe(civ.seat);
     expect(tileCity(state.map.tiles[cityState.centerIndex])).toBe(civCity.id);
   });

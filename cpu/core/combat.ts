@@ -3370,13 +3370,18 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     foundedTurn: state.turn,
     name: cityState.name,
     centerIndex: cityState.centerIndex,
-    population: Math.max(1, Math.floor(cityState.population * 0.75)),
+    // the transfer hands the city its population whole (runs/h1_duels1127
+    // t213 Mexico City 13 -> 13, runs/h1_duels1136 t232 16:9 13 -> 13)
+    population: Math.max(1, cityState.population),
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
     focus: 'balanced',
     queue: [],
     isCapital: false,
+    // the transfer carries the city's original-capital flag and its
+    // original owner (TransferCity 0x1e8880 at 0x1e8925..0x1e8938)
+    origCapitalSeat: seatOfCityState(cityState.id),
     founderSeat: -1,   // a minor founded it, and minors keep no ledger
     // what the minor BUILT comes along — the tiles already carry the
     // districts, so a registry that said "none" would disagree with them
@@ -3387,7 +3392,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
-    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, Math.floor(cityState.population * 0.75)),
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, cityState.population),
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   const _csList = seatOf(state, seat)!.cities;
@@ -3426,13 +3431,16 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     name: cityState.name,
     seat: actor.seat,
     centerIndex: cityState.centerIndex,
-    population: Math.max(1, Math.floor(cityState.population * 0.75)),
+    // the transfer hands the city its population whole (runs/h1_duels1127
+    // t213 Mexico City 13 -> 13, runs/h1_duels1136 t232 16:9 13 -> 13)
+    population: Math.max(1, cityState.population),
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
     focus: 'balanced',
     queue: [],
     isCapital: false,
+    origCapitalSeat: seatOfCityState(cityState.id),
     founderSeat: -1,   // a minor founded it, and minors keep no ledger
     buildings: [...(cityState.buildings ?? [])],
     // a pillaged building stays pillaged in the conqueror's hands — the
@@ -3441,7 +3449,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
-    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, Math.floor(cityState.population * 0.75)),
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, cityState.population),
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });

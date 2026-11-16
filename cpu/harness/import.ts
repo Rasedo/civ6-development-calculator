@@ -2851,6 +2851,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       continue;
     }
     const origOwner = seatOfGame(num(c.originalOwner));
+    // the city's own flag (IsOriginalCapital): a capital whose original
+    // owner the record lists no more (a taken city-state's: the record's
+    // players are the living) keeps it under a city-state seat no living
+    // one holds
+    const origCapital = !bool(c.originalCapital) ? -1 : origOwner === NO_SEAT ? seatOfCityState(minors.length) : origOwner;
     const city: City = {
       id: holder.nextCityId++,
       seat,
@@ -2867,7 +2872,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       focus: 'balanced',
       queue: [],
       isCapital: bool(c.capital),
-      origCapitalSeat: bool(c.capital) && origOwner === seat ? seat : -1,
+      origCapitalSeat: origCapital,
       founderSeat: origOwner,
       buildings,
       districts,

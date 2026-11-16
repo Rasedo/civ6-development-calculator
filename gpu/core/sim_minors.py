@@ -423,8 +423,18 @@ class SimMinors:
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its
-        plots and those beside them, the plots within two of its centre, and
-        each of its units' look as it last took it (`_unit_look`)."""
+        ground's (`_minor_ground_sight`) and each of its units' look as it
+        last took it (`_unit_look`)."""
+        seen = self._minor_ground_sight(s)
+        mine = self.unit_alive & (self.unit_seat == 100 + s)
+        for j in mine.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            k = mine[:, j].nonzero(as_tuple=True)[0]
+            seen[k] = seen[k] | self._unit_look(k, torch.full_like(k, j))
+        return seen
+
+    def _minor_ground_sight(self, s: int) -> torch.Tensor:
+        """[B, T] bool — `cityStateSight` without its units: minor `s`'s
+        plots and those beside them, the plots within two of its centre."""
         B, T = self.B, self.T
         seat = 100 + s
         if getattr(self, "_ring1", None) is None:
@@ -438,12 +448,103 @@ class SimMinors:
         seen = (own.gather(1, ring.clamp(min=0).reshape(1, -1).expand(B, -1)).reshape(B, T, -1)
                 & (ring >= 0).unsqueeze(0)).any(dim=2)
         centre = self.citystate_center[:, s]
-        seen = seen | ((self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 2) & (centre >= 0).unsqueeze(1))
-        mine = self.unit_alive & (self.unit_seat == seat)
-        for j in mine.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-            k = mine[:, j].nonzero(as_tuple=True)[0]
-            seen[k] = seen[k] | self._unit_look(k, torch.full_like(k, j))
+        return seen | ((self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 2) & (centre >= 0).unsqueeze(1))
+
+    def _minor_sight_before(self, s: int, rows: torch.Tensor, movers: torch.Tensor | None,
+                            from_tile: torch.Tensor | None) -> torch.Tensor:
+        """[K, T] bool — `sightBefore`: the plots minor `s` saw in the games
+        `rows` [K] as a look of `movers` ([K, R] merged slots, -1 none) lands:
+        its ground's sight, each other unit's look nothing stored
+        (`_unit_look_now`), and the movers' from the plot they left
+        (`from_tile` [K]; none where placed anew, -1) — their stored look
+        where it was taken there, else the line of sight from it."""
+        seat = 100 + s
+        seen = self._minor_ground_sight(s)[rows]
+        K = rows.numel()
+        mine = (self.unit_alive & (self.unit_seat == seat))[rows]
+        moving = torch.zeros_like(mine)
+        if movers is not None:
+            for r in range(movers.shape[1]):
+                ok = movers[:, r] >= 0
+                moving[ok.nonzero(as_tuple=True)[0], movers[:, r][ok]] = True
+        stand = mine & ~moving
+        for j in stand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            k = stand[:, j].nonzero(as_tuple=True)[0]
+            seen[k] = seen[k] | self._unit_look_now(rows[k], torch.full_like(k, j))
+        if movers is None or from_tile is None:
+            return seen
+        for r in range(movers.shape[1]):
+            sl = movers[:, r]
+            ok = (sl >= 0) & (from_tile >= 0)
+            ok = ok & mine.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1)
+            k = ok.nonzero(as_tuple=True)[0]
+            if k.numel() == 0:
+                continue
+            rr, ss, ft = rows[k], sl[k], from_tile[k]
+            at = self.unit_look_at[rr, ss]
+            look = self._look_unpack(at, self.unit_look_lo[rr, ss], self.unit_look_hi[rr, ss])
+            rad, thr = self._look_key(rr, ss)
+            fresh = self._los_disk(rr, ft, rad, thr)
+            seen[k] = seen[k] | torch.where((at == ft).unsqueeze(1), look, fresh)
         return seen
+
+    def _sight_cities(self, rows: torch.Tensor, s: torch.Tensor, at: torch.Tensor, disk: torch.Tensor,
+                      movers: torch.Tensor | None, from_tile: torch.Tensor | None) -> None:
+        """`sightCities`: the look `disk` [K, T] minor `s` ([K])'s unit
+        takes from `at` [K] in the games `rows` [K] hands its knowledge base
+        the cities of the plots newly visible to it (`_minor_sight_before`)
+        that hold a district: a known-city slot standing with such a plot
+        and no entry of its city joins the end of the list, in the order the
+        look's walk reaches those plots (`_los_tgt`'s places); the entry's
+        centre and Encampment entries are filled where their own plot is
+        newly visible (`_kb_city_entries`), a new entry's others none."""
+        K, T, B, dev = rows.numel(), self.T, self.B, self.device
+        tgt = self._los_tgt[at]
+        place = torch.arange(1, tgt.shape[1] + 1, device=dev).unsqueeze(0).expand_as(tgt)
+        walk = torch.full((K, T), T, dtype=torch.long, device=dev)
+        walk.scatter_reduce_(1, tgt.clamp(min=0), torch.where(tgt >= 0, place, torch.full_like(place, T)), reduce="amin")
+        walk[torch.arange(K, device=dev), at] = 0
+        live, _ctr = self._known_trade_cands(torch.full((B,), -1, dtype=torch.long, device=dev))
+        ids = self._known_trade_ids()
+        for sv in torch.unique(s).tolist():
+            if sv < 0 or sv >= self.S:
+                continue
+            k = (s == sv).nonzero(as_tuple=True)[0]
+            kr = rows[k]
+            before = self._minor_sight_before(sv, kr, None if movers is None else movers[k],
+                                              None if from_tile is None else from_tile[k])
+            new = torch.zeros(B, T, dtype=torch.bool, device=dev)
+            new[kr] = disk[k] & ~before
+            if not bool(new.count_nonzero()):
+                continue
+            key = torch.full((B, T), T, dtype=torch.long, device=dev)
+            key[kr] = walk[k]
+            first = self._known_city_first(new, key)
+            sighted = live & (first < T)
+            if not bool(sighted.count_nonzero()):
+                continue
+            rank, cid, made, kcdef, kcwall, kedef, kewall, _looked = self._kb_city_planes(sv)
+            fresh = sighted & ((rank < 0) | (cid != ids))
+            if bool(fresh.count_nonzero()):
+                big = 1 << 40
+                order = torch.argsort(torch.where(fresh, first, torch.full_like(first, big)), dim=1, stable=True)
+                pos = torch.empty_like(order)
+                pos.scatter_(1, order, torch.arange(order.shape[1], device=dev).unsqueeze(0).expand_as(order).contiguous())
+                rank.copy_(torch.where(fresh, made.unsqueeze(1) + pos, rank))
+                cid.copy_(torch.where(fresh, ids, cid))
+                made.copy_(made + fresh.sum(dim=1))
+                kcdef.copy_(torch.where(fresh, torch.full_like(kcdef, -1.0), kcdef))
+                kcwall.copy_(kcwall & ~fresh)
+                kedef.copy_(torch.where(fresh, torch.full_like(kedef, -1.0), kedef))
+                kewall.copy_(kewall & ~fresh)
+            for d in sighted.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                row, c = (self._CITY_MINOR0 + d, 0) if d < self.S else self._trade_cand_row(d)
+                cd, cwall, own, ewall = self._kb_city_entries(row, c, new)
+                on = sighted[:, d]
+                kcwall[:, d] = torch.where(on & (cd >= 0), cwall, kcwall[:, d])
+                kcdef[:, d] = torch.where(on & (cd >= 0), cd, kcdef[:, d])
+                kewall[:, d] = torch.where(on & (own >= 0), ewall, kewall[:, d])
+                kedef[:, d] = torch.where(on & (own >= 0), own, kedef[:, d])
 
     def _minor_knowledge(self, s: int, age: bool) -> None:
         """`minorKnowledge` — minor `s`'s knowledge base's look: its army
@@ -760,7 +861,9 @@ class SimMinors:
                 ms = torch.full_like(r, s)
                 sight = self._unit_sight(ut, up, ms + 100, r)
                 thr = self._sees_through(ut, up)
-                self._minor_look(r, ms, self.major_unit_tile[r, u], sight, thr)
+                self._minor_look(r, ms, self.major_unit_tile[r, u], sight, thr,
+                                 movers=torch.full_like(r, u + self.POOL_LO["major"]).unsqueeze(1),
+                                 from_tile=torch.full_like(r, -1))
                 self._suzerain_look(r, ms, self.major_unit_tile[r, u], sight, thr)
             # each unit made anew under the minor (`sendLevyHome`): the
             # record any knowledge base held of the unit before the levy a
@@ -986,14 +1089,15 @@ class SimMinors:
                 ids.append(self.city_id[:, r2, j].long())
         return torch.stack(ids, dim=1)
 
-    def _known_city_first(self, plane: torch.Tensor) -> torch.Tensor:
+    def _known_city_first(self, plane: torch.Tensor, order: torch.Tensor | None = None) -> torch.Tensor:
         """[B, ND] long — `lookCities` over the plots of `plane` [B, T]: per
         known-city slot (`_known_trade_cands`' order) the first plot, in
-        index order, holding a district of the city standing there (its
-        centre, a district placed, a wonder's plot); T where none does"""
+        index order (or the least of `order` [B, T], each below T), holding a
+        district of the city standing there (its centre, a district placed,
+        a wonder's plot); T where none does"""
         T = self.T
         held = ((self.district >= 0) | (self.built_wonder >= 0) | self._centre_plane()) & plane
-        key = torch.where(held, self._arange_bt, torch.full_like(self._arange_bt, T))
+        key = torch.where(held, self._arange_bt if order is None else order, torch.full_like(self._arange_bt, T))
         none = torch.full_like(key, T)
         out = []
         for s2 in range(self.S):

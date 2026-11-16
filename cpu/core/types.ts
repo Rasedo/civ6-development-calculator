@@ -115,7 +115,10 @@ export interface City {
   /** The seat this city was FOUNDED as the capital of; -1 for every other
    * city. It does NOT move with the Palace — a relocated capital is a new
    * capital, not an original one — so `origCapitalSeat !== seat` is exactly
-   * "somebody else is sitting in this seat's first city". */
+   * "somebody else is sitting in this seat's first city". A taken
+   * city-state's capital keeps the city-state's seat here (the city's flag
+   * +0x648 and original owner +0x218 pass through every transfer); the
+   * readers that mean a major's capital test `isCiv`. */
   origCapitalSeat?: number;
   /** The seat that FOUNDED this city, whoever holds it now. What the
    *  grievance decay's occupation modifier asks about ("occupying a city or

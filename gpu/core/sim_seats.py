@@ -6027,11 +6027,12 @@ class SimSeats:
         return (self.seat_alliance_type[:, row, : self.n_majors] == ty) & (self._alliance_levels_of(row) >= lvl)
 
     def _occupied_capitals(self, row: int) -> torch.Tensor:
-        """[B] f64 — ORIGINAL CAPITALS this row holds that it did not found
-        (`occupiedCapitals`'s twin). A city whose founder is gone still counts:
-        the penalty is for sitting in it."""
+        """[B] f64 — ORIGINAL CAPITALS of other majors this row holds
+        (`occupiedCapitals`'s twin, 0x595c90: a taken city-state's capital
+        counts for none). A city whose founder is gone still counts: the
+        penalty is for sitting in it."""
         orig = self.city_orig_cap[:, row]
-        return ((orig >= 0) & (orig != row) & self.city_alive[:, row]).sum(dim=1).double()
+        return ((orig >= 0) & (orig < self.n_majors) & (orig != row) & self.city_alive[:, row]).sum(dim=1).double()
 
     def _suzerains_held(self, row: int) -> torch.Tensor:
         """[B] f64 — the minors this row is suzerain of (`suzerainCount`'s
@@ -14732,7 +14733,9 @@ class SimSeats:
             _ut = u_type.take(rows)[mnr]
             _up = u_promos.take(rows)[mnr]
             self._minor_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
-                             self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
+                             self._unit_sight(_ut, _up), self._sees_through(_ut, _up),
+                             movers=torch.cat([gslot.unsqueeze(1), rider], dim=1).index_select(0, rows)[mnr],
+                             from_tile=here.take(rows)[mnr])
             self._suzerain_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
                                 self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
         # each member's look taken where it now stands, the old one dropped
@@ -15485,7 +15488,9 @@ class SimSeats:
                                 from_tile=None if from_tile is None else from_tile[major])
         mnr = (seat >= 100) & (seat < 100 + self.S)
         if bool(mnr.count_nonzero()):
-            self._minor_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
+            self._minor_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr],
+                             movers=None if movers is None else movers[mnr],
+                             from_tile=None if from_tile is None else from_tile[mnr])
             self._suzerain_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
 
     def _pool_of(self, atk_kind: str):

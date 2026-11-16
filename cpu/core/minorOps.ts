@@ -121,7 +121,8 @@ export function minorCampsLook(state: GameState, cs: CityState, aged: boolean): 
  *  stands (0x5e7ae0). An entry whose city stands no more leaves the list (a
  *  capture mints a new id, which joins at the end). Every entry's district
  *  entries are filled anew (0x5efaf0, `lookDistricts`): its readers until
- *  the next look read the city as this look found it */
+ *  the next look read the city as this look found it, and as a unit's
+ *  sight of one of its districts since (`sightCities`) */
 export function minorCitiesLook(state: GameState, cs: CityState): void {
   const revealed = cs.revealed ?? [];
   const looked = (p: number) => revealed[p] === 1;

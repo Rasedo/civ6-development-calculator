@@ -74,7 +74,9 @@
     - recording: 1103
       value: "Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104), from 382 and 365;"
   impl: [cpu/data/seats.ts:moment]
-  readings: ["C-94: the game era, the ages and the founding moments — READ"]
+  readings:
+    - "C-94: the game era, the ages and the founding moments — READ"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "...n the wonder's era is the game era or later, else PAST_ERA_WONDER (3). A city transferred 0x3088a0 (paid to the new owner): TO_ORIGINAL_OWNER when its original owner (+0x218) is the new ow..."
   review: reviewed

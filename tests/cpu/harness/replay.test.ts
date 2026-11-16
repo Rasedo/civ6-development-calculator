@@ -39,7 +39,7 @@ function player(id: number, over: Partial<DumpPlayer> = {}): DumpPlayer {
 
 function city(over: Partial<DumpCity> = {}): DumpCity {
   return {
-    owner: 0, id: 65536, name: 'LOC_CITY_NAME_ROMA', x: 2, y: 2, pop: 3, capital: true, originalOwner: 0, occupied: false,
+    owner: 0, id: 65536, name: 'LOC_CITY_NAME_ROMA', x: 2, y: 2, pop: 3, capital: true, originalCapital: true, originalOwner: 0, occupied: false,
     yields: [0, 0, 0, 0, 0, 0], food: 4, foodSurplus: 2, growthThreshold: 16, turnsToGrow: 6, housing: 5, housingParts: [],
     housingGrowthMod: 1, happinessGrowthMod: 0, overallGrowthMod: 1, amenities: 2, amenitiesNeeded: 2, happiness: 4,
     amenityParts: [], culture: 7, cultureYield: 2, nextPlot: 20, nextPlotCost: 10, turnsToExpand: 2, loyalty: 100,
@@ -110,7 +110,7 @@ describe('InferredActions', () => {
   it('finds a founding on a plot no city stood on, with the Settler it spent', () => {
     const a = record(10, { units: [unit(1, 7, 0, 1, 4)] });
     const b = record(11);
-    b.cities.push(city({ owner: 1, id: 131073, name: 'LOC_CITY_NAME_CHANGSHA', x: 1, y: 4, capital: false }));
+    b.cities.push(city({ owner: 1, id: 131073, name: 'LOC_CITY_NAME_CHANGSHA', x: 1, y: 4, capital: false, originalCapital: false }));
     const ds = src.decisions(a, b, CAT);
     expect(of(ds, 'found')).toEqual([{ kind: 'found', phase: 'after', player: 1, plot: 33, unit: '1:7' }]);
     expect(of(ds, 'unitGone')).toEqual([{ kind: 'unitGone', phase: 'after', player: 1, unit: '1:7', why: 'founded' }]);

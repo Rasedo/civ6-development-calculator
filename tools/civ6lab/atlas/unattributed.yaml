@@ -702,6 +702,7 @@
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
     - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -2827,6 +2828,7 @@
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
     - "C-95: an operation's enemy strength"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...
@@ -3789,6 +3791,7 @@
   readings:
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-129: a unit's sight hands the knowledge base a city; a taken capital keeps its original-capital flag — READ (0x787180 on game signal +0x10c8 bound at 0x7864c0, 0x5f0280; 0x1e8880 at 0x1e8925, 0x595c90), both twins"
   context:
     - "...— READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - ...IV (0x469db0) and a district that is its city's centre (0x24c250), unless Rules CanRaze 0x533e50 (the city, the player) answers true the amount is cut to GetMaxDamage - the damage - 1...

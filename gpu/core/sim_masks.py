@@ -3723,10 +3723,15 @@ class SimMasks:
         return torch.where(on_tunnel & (pick < BIG) & (tiles >= 0), pick, out)
 
     def _minor_look(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
-                    see_through: torch.Tensor) -> None:
+                    see_through: torch.Tensor, movers: torch.Tensor | None = None,
+                    from_tile: torch.Tensor | None = None) -> None:
         """`minorLook`: minor `s` ([K] long)'s unit stands on `tiles`
-        ([K]) and looks, in the games `rows` ([K], unique); the plots the
-        look takes in join the minor's revealed plots (`mops_revealed`); every
+        ([K]) and looks, in the games `rows` ([K], unique); the plots newly
+        visible to it that hold a district hand its knowledge base their
+        cities (`_sight_cities`; `movers` [K, R] / `from_tile` [K] the units
+        whose step the look is and the plot they left, `Look.mover`); the
+        plots the look takes in join the minor's revealed plots
+        (`mops_revealed`); every
         major one of whose plots or units the look takes in meets it
         (`_meet_citystates`), and so does every major that sees the plot
         (`seatSeesPlot`), the majors in seat order; then every other
@@ -3738,6 +3743,7 @@ class SimMasks:
         at = tiles.clamp(min=0)
         disk = self._los_disk(rows, at, radius, see_through)
         sc = s.clamp(min=0, max=self.S - 1)
+        self._sight_cities(rows, s, at, disk, movers, from_tile)
         self.mops_revealed[rows, sc] = self.mops_revealed[rows, sc] | disk
         own = self.tile_seat[rows]
         # `disk`, `dist` and each `look` are already the games they are
@@ -4216,7 +4222,8 @@ class SimMasks:
         elif 100 <= seat < 100 + self.S:
             _sight = self._unit_sight(type_idx.take(rows), torch.zeros_like(slot))
             _thr = self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)]
-            self._minor_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
+            self._minor_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr,
+                             movers=(slot + self.POOL_LO[pre]).unsqueeze(1), from_tile=torch.full_like(slot, -1))
             self._suzerain_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat["unitHp"]
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0

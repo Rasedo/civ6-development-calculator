@@ -35,11 +35,13 @@
  *     strike strengths, the districts in plot order; kb.cities.list a
  *     city-state's own list of the cities it knows
  *     (`CityState.citiesKnown`), kb.cities.list.order its order where the
- *     members agree.
+ *     members agree. A city-state's list, and a city it held otherwise
+ *     than the record as the pass opened, are read at the moment below.
  *
  * Once the pass's operations ran, before its own moves (`readPassAi`: the
  * moment the game's record of the pass is read at, its city update's
- * standing army and its operations' recruits behind it):
+ * standing army, its operations' recruits and the cities their moves
+ * sighted behind it):
  *
  *   - plan.aiType: a military unit's AI type as the pass's moves take it
  *     (EXPLORE 2, COMBAT 3, DEFENDER 4) against its row of that record.
@@ -63,7 +65,7 @@ import { neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { aiView } from '../core/aiView';
 import { minorKnownUnits, minorOwnedUnits, minorUnitProduction } from '../core/minorBuild';
-import { cityHolders, isBarbSeat, tileSeat } from '../core/seats';
+import { cityHolders, isBarbSeat, isCityStateSeat, tileSeat } from '../core/seats';
 import type { Pass, PlanEntry, Target, TargetType } from '../core/tactical';
 import { NO_SEAT, type CityState, type GameState, type Unit } from '../core/types';
 import { unitDomain, unitExertsZoc, unitsHostile } from '../core/units';
@@ -209,6 +211,65 @@ function orderRead(kind: string, subject: string, ours: readonly string[], game:
 /** a 24.8 number whole where it is, else to four places (1 / 256 apart) */
 const fx = (v: number) => String(+(v / 256).toFixed(4));
 
+/** the cities of a city-state's pass ours held otherwise than the game's
+ *  record as the pass opened: read once its operations ran */
+const sightedLater = new WeakMap<Pass, Set<string>>();
+
+/**
+ * THE KNOWN CITIES of the player of `pass` against the game's record of its
+ * tactical pass: kb.cities per city either side holds, then a city-state's
+ * own list, its members and their order. The record is read once the pass's
+ * operations ran and a known city's record is its last look's or sight's: as
+ * the pass opens (`ran` false) each city is read, standing as the look left
+ * it; once the operations ran (a city-state's `ran` true), the cities ours
+ * held otherwise than the record as it opened (one an operation's move
+ * sighted) are read again, and the list.
+ */
+function knownCityReads(kbCities: NonNullable<ReturnType<GameUnits['at']>>['kbCities'] & object, w: PassWorld, state: GameState, pass: Pass, ran: boolean): StateRead[] {
+  const seat = pass.seat;
+  const out: StateRead[] = [];
+  const xy = (p: number) => `${p % w.W}:${Math.floor(p / w.W)}`;
+  const P = `p${w.playerOf(seat)}`;
+  const theirs = new Map<string, string>();
+  // each side's districts in plot order
+  const inOrder = (ds: [number, string][]) => ds.sort((a, b) => a[0] - b[0]).map((d) => d[1]).join(', ');
+  for (const [c, ds] of kbCities) {
+    const districts: [number, string][] = [];
+    for (let i = 0; i + 8 <= ds.length; i += 8) {
+      districts.push([ds[i + 3] + ds[i + 4] * w.W, `${ds[i + 3]}:${ds[i + 4]} ${fx(ds[i + 5])}/${fx(ds[i + 6])}/${fx(ds[i + 7])}`]);
+    }
+    theirs.set(`${c[2]}:${c[3]}`, `p${c[0] & 0xffff} pop${c[7]} cap${c[5] & 0xff}${(c[5] >>> 8) & 0xff} | ${inOrder(districts)}`);
+  }
+  const ours = new Map<string, string>();
+  for (const k of aiView(state).knownCities(seat)) {
+    ours.set(xy(k.plot), `p${w.playerOf(k.owner)} pop${k.population} cap${k.originalCapital ? 1 : 0}${k.capital ? 1 : 0} | `
+      + inOrder(k.districts.map((d) => [d.plot, `${xy(d.plot)} ${fx(Math.round(d.defense * 256))}/${fx(Math.round(d.walls * 256))}/${fx(Math.round(d.strike * 256))}`])));
+  }
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  const later = sightedLater.get(pass) ?? new Set<string>();
+  for (const plot of ran ? later : new Set([...ours.keys(), ...theirs.keys()])) {
+    const [a, b] = [ours.get(plot) ?? 'none', theirs.get(plot) ?? 'none'];
+    if (!ran && cs && a !== b) {
+      later.add(plot);
+      continue;
+    }
+    out.push({ kind: 'kb.cities', subject: `${P} city ${plot}`, equal: a === b, ours: a, game: b });
+  }
+  if (!ran) sightedLater.set(pass, later);
+  // a city-state's own list of them (`CityState.citiesKnown`): its
+  // members, then their order
+  if (cs && ran) {
+    const centre = (owner: number, id: number) => (id < 0 ? state.cityStates.find((c) => c.seat === owner)?.centerIndex
+      : cityHolders(state).find((h) => h.seat === owner)?.cities.find((c) => c.id === id)?.centerIndex) ?? -1;
+    const listed = (cs.citiesKnown ?? []).map((k) => { const p = centre(k.owner, k.id); return `p${w.playerOf(k.owner)}@${p < 0 ? 'gone' : xy(p)}`; });
+    const held = kbCities.map(([c]) => `p${c[0] & 0xffff}@${c[2]}:${c[3]}`);
+    const members = listRead('kb.cities.list', P, listed, held);
+    out.push(members);
+    if (members.equal) out.push(orderRead('kb.cities.list.order', P, listed, held));
+  }
+  return out;
+}
+
 /**
  * One tactical pass as it opens against the game's record of the player's
  * turn: the kinds above but the unit table's. `leftOut` counts what is not
@@ -271,40 +332,9 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
     if (sets.equal) out.push(orderRead('targets.order', P, ours, theirs));
   }
 
-  // THE KNOWN CITIES
-  if (tp.kbCities) {
-    const theirs = new Map<string, string>();
-    // each side's districts in plot order
-    const inOrder = (ds: [number, string][]) => ds.sort((a, b) => a[0] - b[0]).map((d) => d[1]).join(', ');
-    for (const [c, ds] of tp.kbCities) {
-      const districts: [number, string][] = [];
-      for (let i = 0; i + 8 <= ds.length; i += 8) {
-        districts.push([ds[i + 3] + ds[i + 4] * w.W, `${ds[i + 3]}:${ds[i + 4]} ${fx(ds[i + 5])}/${fx(ds[i + 6])}/${fx(ds[i + 7])}`]);
-      }
-      theirs.set(`${c[2]}:${c[3]}`, `p${c[0] & 0xffff} pop${c[7]} cap${c[5] & 0xff}${(c[5] >>> 8) & 0xff} | ${inOrder(districts)}`);
-    }
-    const ours = new Map<string, string>();
-    for (const k of aiView(state).knownCities(pass.seat)) {
-      ours.set(xy(k.plot), `p${w.playerOf(k.owner)} pop${k.population} cap${k.originalCapital ? 1 : 0}${k.capital ? 1 : 0} | `
-        + inOrder(k.districts.map((d) => [d.plot, `${xy(d.plot)} ${fx(Math.round(d.defense * 256))}/${fx(Math.round(d.walls * 256))}/${fx(Math.round(d.strike * 256))}`])));
-    }
-    for (const plot of new Set([...ours.keys(), ...theirs.keys()])) {
-      const [a, b] = [ours.get(plot) ?? 'none', theirs.get(plot) ?? 'none'];
-      out.push({ kind: 'kb.cities', subject: `${P} city ${plot}`, equal: a === b, ours: a, game: b });
-    }
-    // a city-state's own list of them (`CityState.citiesKnown`): its
-    // members, then their order
-    const cs = state.cityStates.find((c) => c.seat === pass.seat);
-    if (cs) {
-      const centre = (owner: number, id: number) => (id < 0 ? state.cityStates.find((c) => c.seat === owner)?.centerIndex
-        : cityHolders(state).find((h) => h.seat === owner)?.cities.find((c) => c.id === id)?.centerIndex) ?? -1;
-      const listed = (cs.citiesKnown ?? []).map((k) => { const p = centre(k.owner, k.id); return `p${w.playerOf(k.owner)}@${p < 0 ? 'gone' : xy(p)}`; });
-      const held = tp.kbCities.map(([c]) => `p${c[0] & 0xffff}@${c[2]}:${c[3]}`);
-      const members = listRead('kb.cities.list', P, listed, held);
-      out.push(members);
-      if (members.equal) out.push(orderRead('kb.cities.list.order', P, listed, held));
-    }
-  }
+  // THE KNOWN CITIES; a city-state's list and the cities its operations'
+  // moves sight wait for the read they stand behind (`readPassAi`)
+  if (tp.kbCities) out.push(...knownCityReads(tp.kbCities, w, state, pass, false));
 
   // THE PLANNINGS
   if (!tp.plans) return out;
@@ -465,16 +495,20 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
 
 /**
  * One tactical pass once its operations ran against the game's record of
- * the pass, read at that moment: plan.aiType, each military unit's AI type
- * of the units the record names.
+ * the pass, read at that moment: a city-state's list of the cities it knows
+ * and the cities its opening held otherwise (kb.cities.list,
+ * kb.cities.list.order, kb.cities), then plan.aiType, each military unit's
+ * AI type of the units the record names.
  */
 export function readPassAi(game: GameUnits, w: PassWorld, state: GameState, pass: Pass, turn: number): StateRead[] {
   const player = w.playerOf(pass.seat);
-  const rows = game.at('tacpass', turn, player)?.units;
-  if (!Array.isArray(rows)) return [];
+  const tp = game.at('tacpass', turn, player);
+  const out: StateRead[] = [];
+  if (tp?.kbCities && isCityStateSeat(pass.seat)) out.push(...knownCityReads(tp.kbCities, w, state, pass, true));
+  const rows = tp?.units;
+  if (!Array.isArray(rows)) return out;
   const [cId, cAi] = [game.col('m_id'), game.col('m_eAIType')];
   const atPass = new Map(rows.map((row) => [row[cId], row] as const));
-  const out: StateRead[] = [];
   for (const u of state.units) {
     const ai = u.seat === pass.seat ? pass.ai.get(u.id) ?? -1 : -1;
     const key = ai >= 0 ? w.keyOf(u) : undefined;
