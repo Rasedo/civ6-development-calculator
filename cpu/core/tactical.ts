@@ -1171,12 +1171,27 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   const out: Reach[] = [];
   const room = reachRoom(state, unit);
   search(state, unit, maxTurns, false, (n, ground) => {
-    // a plot the unit may not stand on it only passes (`stand`), its own
-    // plot listed whatever holds it, none of ground closed to a city-state
-    if (out.length < room && (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile)))))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    if (out.length < room && planningLists(unit, n, ground)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
+}
+
+/** the planning's list test on a closed node (0x26d890): the unit's own
+ *  plot whatever holds it; else none of ground closed to it and none the
+ *  location test 0x586900 under flags 9 refuses (`fits`), an attack's
+ *  neither — a land unit that may not embark lists no water it never
+ *  revealed, a ship no land, whatever unit at war stands there; an attack
+ *  none where it and the plot's other units are all embarked (`boarded`),
+ *  another plot only where it may stand (`stand`) (runs/h1_duels1117 t19:
+ *  city-state 4's Warrior 131073 on 28:4 lists no 25:3, the barbarian Galley
+ *  on it never revealed; h1_duels1161 t175: the barbarians' embarked Builder
+ *  4718598 on 0:8 lists no 3:8, player 0's embarked unit on it never
+ *  revealed; the game's own plannings) */
+function planningLists(unit: Unit, n: PNode, ground: Ground): boolean {
+  if (n.tile === unit.tileIndex) return true;
+  if (ground.closed(n.tile) || !ground.fits(n.tile)) return false;
+  return n.attack ? !ground.boarded(n.tile) : ground.stand(n.tile);
 }
 
 /** the room of a unit's planning list (the planning's set-up 0x7920d0 at
@@ -2306,14 +2321,14 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     }
   };
   search(state, unit, PLAN_TURNS, false, (n, ground) => {
-    // a plot the unit may not stand on it only passes (`stand`), its own
-    // plot listed whatever holds it (runs/h1_duelv1117 t115: city-state
-    // 3's Crossbowman on 41:13 lists 41:13 first, China's Trader on it by the
-    // turn's end); none of ground closed to a city-state, an attack's neither
-    // (0x26d890's 0x586900 under 9 -> 0x586360's territory test; runs/
-    // h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of
-    // 11:10, the barbarian Swordsman's on player 1's ground, AI_Planning.csv)
-    if (reach.length < room && (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile)))))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    // the list test (`planningLists`): its own plot whatever holds it
+    // (runs/h1_duelv1117 t115: city-state 3's Crossbowman on 41:13 lists
+    // 41:13 first, China's Trader on it by the turn's end); none of ground
+    // closed to a city-state, an attack's neither (0x26d890's 0x586900 under
+    // 9 -> 0x586360's territory test; runs/h1_duely1127 t70-74: city-state
+    // 4's Catapult on 10:10 lists none of 11:10, the barbarian Swordsman's on
+    // player 1's ground, AI_Planning.csv)
+    if (reach.length < room && planningLists(unit, n, ground)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   }, entries.length ? onLink : undefined, undefined, false, true);
   let wins = false;

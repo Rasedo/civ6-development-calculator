@@ -209,9 +209,9 @@ interface Ctx {
    *  turn's close heals it: the barbarians, the turn's last player, take
    *  their turn before that heal (`barbarianAi`) */
   barbCentres: Map<number, { hp: number; outerHp?: number }>;
-  /** each major's best strengths trained as the next turn's start opens,
-   *  and the chassis of every unit then standing (`bestsBeforeStart`) */
-  startBests?: { best: Map<number, [number, number | undefined]>; types: Map<Unit, string> };
+  /** each major's best strengths trained as the minors' turns opened, before
+   *  the next turn's start's units (`bestsBeforeStart`) */
+  startBests?: Map<number, [number, number | undefined]>;
   /** the units the pair's record took off (`unitGone`), by key: the
    *  barbarians' turn may open before the game's loss (`barbarianAi`) */
   gone: Map<string, Unit>;
@@ -1074,9 +1074,9 @@ function capturedInto(acts: readonly unknown[][], key: string, open: number, bar
 }
 
 /** the majors' best strengths trained in a copy of the turn t's close (the
- *  minors' and the barbarians' turns): as the next turn's start opened
- *  (`Ctx.startBests`), raised by each unit of the copy made or upgraded since
- *  (`raiseBestTrained`); the next turn's start's units, out of the copy
+ *  minors' and the barbarians' turns): as the minors' turns opened
+ *  (`Ctx.startBests`, `madeInTurnBests`), raised by each unit of the copy
+ *  made or upgraded since; the next turn's start's units, out of the copy
  *  (`unbornUnits`), raise nothing (runs/h1_duely1124 t87: Rome's first
  *  Archer 1900552 made at its start of t88, Rome striking at 3 in t87, the
  *  barbarians' Man-at-Arms 4063235 and Swordsman 3932165 two plots off it
@@ -1085,14 +1085,33 @@ function bestsBeforeStart(ctx: Ctx, copy: GameState, twin: ReadonlyMap<Unit, Uni
   const at = ctx.startBests;
   if (!at) return;
   for (const s of copy.seats) {
-    const was = at.best.get(s.seat);
+    const was = at.get(s.seat);
     if (!was) continue;
     [s.bestMeleeCS, s.bestRangedCS] = was;
   }
-  for (const c of copy.units) {
-    const u = twin.get(c);
-    if (!u || unborn.has(u) || !isCiv(c.seat) || at.types.get(u) === c.type) continue;
-    raiseBestTrained(copy, c.seat, c.type, c.formation ?? 0);
+  madeInTurnBests(ctx, copy, twin, unborn);
+}
+
+/** the majors' best strengths trained raised by each unit of `target` its
+ *  owner made or upgraded in turn t (`raiseBestTrained`): one the record of
+ *  turn t's start holds under no key of that owner, or under another type;
+ *  one that changed hands none, nor the next turn's start's (`unborn`)
+ *  (runs/h1_duels1117 t204: player 1's Field Cannon 7208989 made on 37:13 in
+ *  its turn, the city-states' and the barbarians' looks reading its cities'
+ *  strike at 60, the start's 25 before it) */
+function madeInTurnBests(ctx: Ctx, target: GameState, twin: ReadonlyMap<Unit, Unit> | null, unborn: ReadonlySet<Unit>): void {
+  const startType = new Map<string, string | null | undefined>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, engineRowOf(ctx.cat, 'unit', r.type)] as const));
+  const startIds = new Set(ctx.prev.units.map((r) => r.id));
+  const keyOf = new Map<Unit, string>();
+  for (const [key, u] of ctx.units) keyOf.set(u, key);
+  for (const c of target.units) {
+    const u = twin ? twin.get(c) : c;
+    if (!u || unborn.has(u) || !isCiv(c.seat)) continue;
+    const key = keyOf.get(u);
+    if (key === undefined) continue;
+    const was = startType.get(key);
+    if (was === undefined ? startIds.has(Number(key.slice(key.indexOf(':') + 1))) : was === c.type) continue;
+    raiseBestTrained(target, c.seat, c.type, c.formation ?? 0);
   }
 }
 
@@ -6343,10 +6362,14 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  importer reads a city-state's none), the turn its city was founded, its
  *  district projects' Great Person points (the record shows their sum alone,
  *  its Faith a turn), its one-time projects completed (the importer reads
- *  none); the trade graph's paths (runs/h1_duelz1124 Shenyang ->
+ *  none); a Free City's seat it revolted from, which its centre's strength
+ *  stands on (runs/h1_duels1143 t209: Taiyuan, revolted from player 1 at
+ *  t208, in the Free Cities' look at 71 on player 1's 81); the trade graph's
+ *  paths (runs/h1_duelz1124 Shenyang ->
  *  Bologna t180 on the path laid at t147) */
 const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
 const SEAT_STORES = ['barbKills', 'netIncome'] as const;
+const CITY_STORES = ['formerSeat'] as const;
 const MINOR_STORES = ['prodOverflow', 'repairWait', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
 
 /** the progress a city-state's districts, projects and repairs it switched
@@ -6612,7 +6635,7 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     }
     for (const c of to.cities ?? []) {
       const o = from.cities?.find((x) => x.centerIndex === c.centerIndex);
-      if (o) carryFields(o, c, CITY_MEMORY);
+      if (o) carryFields(o, c, [...CITY_MEMORY, ...CITY_STORES]);
     }
   };
   world.seats.forEach((s, i) => { if (state.seats[i]) seatPair(state.seats[i], s, false); });
@@ -7619,6 +7642,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         applyPhase(ctx, [d], 'after', b, b, new Set([p]));
         state.rngState = rng;
       });
+      // the majors' best strengths trained as the minors' turns open: raised
+      // by the units the majors made in the turn (`madeInTurnBests`)
+      madeInTurnBests(ctx, state, null, unbornUnits(ctx, b));
       try {
         minorTurns(state);
         // ...and the last city-state's, its units where its turn left them and
@@ -7696,10 +7722,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       for (const seat of others) seatFavor(state, seat);
       // the next turn's start opens: the best strengths trained before its
       // units (`bestsBeforeStart`)
-      ctx.startBests = {
-        best: new Map(state.seats.map((s) => [s.seat, [s.bestMeleeCS, s.bestRangedCS]] as const)),
-        types: new Map(state.units.map((u) => [u, u.type] as const)),
-      };
+      ctx.startBests = new Map(state.seats.map((s) => [s.seat, [s.bestMeleeCS, s.bestRangedCS]] as const));
       // ...without its units the pair lost, gone by then to the later
       // players' blows the turn's last decisions land: they pay no upkeep
       // there (runs/h1_duelq1117 t49: Rome's 983048 killed in the

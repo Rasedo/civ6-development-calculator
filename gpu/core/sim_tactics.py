@@ -1708,8 +1708,13 @@ class SimTactics:
             if boarded_n is not None:
                 kept_out = kept_out | boarded_n
         stand = ~kept_out | atk_n
+        # ...an attack's none where the unit and the plot's other units are
+        # all embarked (the list's 0x586900 under 9 -> 0x586360; `planningLists`)
+        if not zoc and not stand_mode and boarded_n is not None:
+            stand = stand & ~boarded_n
         # a plot the player never revealed the reach lists only where it passes
-        # the location test (the list's 0x586900 -> 0x586360; `groundOf`'s fits)
+        # the location test (the list's 0x586900 -> 0x586360; `groundOf`'s fits),
+        # an attack's too
         fits = torch.ones(N, T, dtype=torch.bool, device=dev)
         if rv_n is not None:
             land_f, wat_f = self._tac_enter(seat, False, foes=False)

@@ -18580,3 +18580,53 @@ harness's seizure (`barbarianAi`, the `seize` decision, cpu/harness/replay.ts).
   major's building values carry no `CorpsFacts` (their Seaport's analysis
   0); the resource value's shortfall term (`minorResourceFacts`) still
   reads the bank's income.
+
+## C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins
+
+- THE LIST TEST ON AN ATTACK: the planning's list (NotifyList 0x26d890, a
+  node closing) runs 0x586900 under flags 9 (0x26d9cb..0x26da37) on every
+  closed node but the unit's own plot, an attack's too: no exception for
+  the attack bits. On a plot the player never revealed that is the
+  location test with no unit counted (`groundOf`'s `fits`: a land unit
+  that may not embark takes no water, a ship no land, whatever unit at
+  war stands there), and 0x586360's refusal where the unit and the plot's
+  other units are all embarked (`boarded`) holds for an attack as for any
+  plot. The search still links such a node (its validity tests the
+  location on a revealed plot alone) and steps past it. Ported:
+  `planningLists` (cpu/core/tactical.ts, `reachPlots` and `planUnit`);
+  `_tac_search`'s list (gpu/core/sim_tactics.py: `fits` on the attack
+  nodes, `boarded_n` off them).
+- Confirmed (the game's plannings, one-seed aimem windows): runs/h1_duels1117
+  t19 city-state 4's Warrior 131073 on 28:4 lists no 25:3, the barbarian
+  Galley 720906 on that water it never revealed; runs/h1_duels1161 t175 the
+  barbarians' embarked Builder 4718598 on 0:8 lists no 3:8, player 0's
+  embarked unit 1572882 on it never revealed (t170-177 9 of 10 plan.reach
+  rows gone); runs/h1_duels1175 t24-27 city-state 2's Builder 262144 on 14:8
+  lists no 15:10; runs/h1_duels1124 t20 the barbarian Galley 262147 on 40:14
+  no land 36:10 under a unit (t15-30 nothing else moved).
+- THE MAJORS' BEST STRENGTHS IN THE MINORS' LOOKS: PlayerStats
+  m_iMaxMeleeStrengthTrained / m_iMaxRangedStrengthTrained rise as a major
+  makes a unit in its own turn, before the minors and the barbarians look:
+  their known cities' district entries (0x5efaf0) read a centre's strength
+  and strike on the raised values. The replay raises the majors' bests by
+  the units each made or upgraded in the turn (a key the turn's start
+  record lacks, or another type there; one that changed hands none, the
+  next turn's start's units none) before the minors' turns (`madeInTurnBests`,
+  cpu/harness/replay.ts) and in the minors' and barbarians' copies
+  (`bestsBeforeStart`).
+- Confirmed: runs/h1_duels1117 t204 player 1's Field Cannon 7208989 made on
+  37:13 in its turn: every look holds its cities' strike at 60 (the start's
+  record 25, record t205 60), 18 rows gone; runs/h1_duels1157 t231 / t234,
+  runs/h1_duels1135 t202 (16 rows, 8 predicted blows on its cities), 1150
+  t223 (14, 15 blows), 1136 t245 (24).
+- THE FREE CITIES' BASE ACROSS THE PER-TURN IMPORT: a Free City's seat it
+  revolted from (`City.formerSeat`, which its centre's strength stands on)
+  is a store no record shows; the per-turn world carries it from the
+  engine's city on the same centre (`CITY_STORES`). Confirmed:
+  runs/h1_duels1143 t209-214 Taiyuan 8:8 in the Free Cities' look at 71 on
+  player 1's 81 (ours 10 before), the danger the major's map lays on it.
+- Open: runs/h1_duels1157 t170 player 1's cities stand 5 above the game's
+  in every look (65 / 60), the record's melee best 50 at t170 and 55 at
+  t171, the Bombard 5439511 upgraded to the Artillery 6357023 in its turn;
+  runs/h1_duels1143 t212-249 the Free Cities' strike from their own ranged
+  best (15, their Slinger) where `cityStrikeBase` gives them none.

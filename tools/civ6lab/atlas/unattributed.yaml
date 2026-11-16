@@ -1728,7 +1728,11 @@
     - recording: h1_duely1127
       turn: 70
       value: "runs/h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of 11:10, the barbarian Swordsman on player 1's closed ground, AI_Planning.csv."
+    - recording: h1_duels1117
+      turn: 19
+      value: "the 0x586900 test at 0x26da30 runs on an attack's node too: city-state 4's Warrior 131073 on 28:4 lists no 25:3, the barbarian Galley on that water it never revealed (the game's planning); h1_duels1161 t175 the barbarians' embarked Builder 4718598 on 0:8 lists no 3:8, player 0's embarked unit on it never revealed"
   impl:
+    - cpu/core/tactical.ts:planningLists
     - cpu/core/tactical.ts:reachPlots
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:minor
@@ -1748,6 +1752,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
+    - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
