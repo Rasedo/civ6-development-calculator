@@ -964,7 +964,7 @@ export interface GpEffect {
   cityUnit?: string;
   /** CIV6 (Hanno the Navigator, MODIFIER_PLAYER_GRANT_UNIT_OF_ABILITY_WITH_MODIFIER):
    *  the strongest chassis of this promotion class the seat has unlocked,
-   *  granted on the person's plot and carrying `unitMpBonus` Movement for life. */
+   *  granted on the person's plot and carrying `unitMpBonus` Movement until an upgrade replaces it. */
   unitBestClass?: string;
   unitMpBonus?: number;
   /** CIV6 (Jeanne d'Arc, MODIFIER_PLAYER_GRANT_RELIC): one Relic, into the

@@ -16,6 +16,16 @@
   readings:
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   review: reviewed
+- addr: 0x56bf50
+  final: 0x3a1f20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...fault 1, the Great General's and Admiral's four the only rows written false), through 0x56bf50. Nothing copies a modifier attached to the old unit itself, so the Movement of Hanno th...
+  review: imported
 - addr: 0x56c480
   final: 0x3a23e0
   kind: function
@@ -229,6 +239,16 @@
     - ...der onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within...
     - "...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random Direction\" draws pair one to one with the AI_..."
   review: reviewed
+- addr: 0x56d800
+  final: 0x3a3230
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...THE UPGRADE'S ABILITIES (0xa49cb0 at 0xa4a2f0..0xa4a3e6): of the old unit's abilities (0x56d800's list) the new unit is given each it lacks (0x56e4c0) whose UnitAbilities row holds +0..."
+  review: imported
 - addr: 0x56d940
   final: 0x3a3320
   kind: function
@@ -643,9 +663,11 @@
   status: PARTLY
   readings:
     - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
+    - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ff the map or impassable (plot +0x3a bit 3). A unit there holding ABILITY_AUTO_SIEGE (0x56e4c0; the ability exists in a game mode's rows alone, none here) of a player at war with the...
+    - "...): of the old unit's abilities (0x56d800's list) the new unit is given each it lacks (0x56e4c0) whose UnitAbilities row holds +0x28 bit 2, the row's Permanent column (the loader 0xa6..."
   review: imported
 - addr: 0x56e670
   final: 0x3a3f10

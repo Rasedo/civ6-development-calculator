@@ -39,7 +39,7 @@ import { PARK_MIN_APPEAL } from '../data/improvements';
 import { fireFeature, METEOR_GRANT_CLASS } from '../data/disasters';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, type YieldCtx } from './effects';
 import { effectiveAdjacency, buildingVariantAdjacency, darkBuildings, gameEraIndex } from './yields';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, TRAIN_MOVEMENT_CLASSES } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { randRange } from './rand';
 import { createRelic, gwHasRoom, placeGreatWork } from './greatWorks';
@@ -1923,7 +1923,13 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
  *  "UNIT_HEAVY_CHARIOT; UNIT_TREBUCHET" at 63; runs/h1_duely1128 t86
  *  city-state 3's Warrior 655367 in slot 7 -> Man-at-Arms 1179650 in slot
  *  2). Every other record of the old id names a unit gone. Its placement
- *  takes its own look (`takeLook`). */
+ *  takes its own look (`takeLook`). Of the old unit's abilities it takes the
+ *  Permanent ones (UnitAbilities' Permanent, 0xa4a398: its training city's
+ *  Movement among them) and none of the modifiers attached to the old unit
+ *  itself: a Great Person's grant's Movement ends with it
+ *  (runs/h1_duels1170 t174: player 1's Caravel 3276815 of Hanno's grant, 9
+ *  Movement, upgrades to the Ironclad 5046290 at 8, 6 once its Golden age
+ *  ends at t181). */
 export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   (state.unitsDying ??= []).push({ ...unit });
   state.units = state.units.filter((u) => u !== unit);
@@ -1931,6 +1937,7 @@ export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   delete unit.slot;
   delete unit.aiDefender;
   delete unit.aiHomed;
+  if (!TRAIN_MOVEMENT_CLASSES.has(UNIT_PROMO_CLASS[unit.type])) delete unit.mpBonus;
   unit.type = next;
   unit.movesLeft = 0;
   // its placement looks from the plot (0x586d40 -> 0x58f3f0)

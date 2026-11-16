@@ -11071,9 +11071,9 @@ class SimSeats:
     def _res_extracting(self) -> torch.Tensor:
         """[B, T] — does the plot hand its resource to its owner
         (`extractsResource`)? An unpillaged district on it, placed or
-        complete — a city centre included — or else the resource's own
-        unpillaged improvement."""
-        district = (self.centre_slot_at >= 0) | ((self.district >= 0) & ~self.district_pillaged)
+        complete — a city centre and a wonder's plot included — or else the
+        resource's own unpillaged improvement."""
+        district = (self.centre_slot_at >= 0) | (self.built_wonder >= 0) | ((self.district >= 0) & ~self.district_pillaged)
         return (self.res_id >= 0) & (district | ((self.improvement == self.res_imp) & ~self.pillaged))
 
     def _seat_accrue_stockpile(self, row: int) -> None:
@@ -13748,6 +13748,15 @@ class SimSeats:
         self.unit_dying[rows, dst] = False
         self.unit_type[rows, dst] = to_type
         self.unit_mp[rows, dst] = 0
+        # of the old unit's Movement for life the new one keeps an ability's
+        # (its training city's, `TRAIN_MOVEMENT_CLASSES`), none a modifier
+        # on the old unit itself gave (a Great Person's grant's)
+        cls = self.rules_dev.u_promo_class[to_type.clamp(min=0)]
+        keep = torch.zeros_like(cls, dtype=torch.bool)
+        for _amt, classes in self._bvar_train_mp.values():
+            for c in classes:
+                keep = keep | (cls == c)
+        self.unit_mp_bonus[rows, dst] = torch.where(keep, self.unit_mp_bonus[rows, dst], torch.zeros_like(self.unit_mp_bonus[rows, dst]))
         self.unit_fortify[rows, dst] = 0
         self.unit_defender[rows, dst] = False
         self.unit_homed[rows, dst] = False

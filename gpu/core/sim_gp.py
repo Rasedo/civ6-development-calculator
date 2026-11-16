@@ -877,7 +877,7 @@ class SimGp:
                 if bool((born & _xp).count_nonzero()):
                     self._gp_fill_xp(row, born & _xp)
         # CIV6 (Hanno the Navigator): the strongest unlocked chassis of the
-        # class, carrying its Movement for life
+        # class, carrying its Movement until an upgrade replaces it
         bcls = self._gp_fx(cls, at, "unitBestClass").long()
         wantb = m & (bcls >= 0)
         if bool(wantb.count_nonzero()):

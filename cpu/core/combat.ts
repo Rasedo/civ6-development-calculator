@@ -1329,11 +1329,14 @@ export function minorCombatDefense(state: GameState, cs: CityState): number {
  * at least COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, plus a major's Bastions half
  * ("+5 City Ranged Strength", the city's +0x1890). runs/h1_duelw1120:
  * China's cities strike at 25 from t50 (an Archer trained), a city-state
- * that trained no ranged unit at 3 (t217).
+ * that trained no ranged unit at 3 (t217). The Free Cities' is their own
+ * player's, raised by the units their cities train and by none a revolt
+ * hands them (runs/h1_duels1143: their Mechanized Infantry of t208 and t212
+ * leave m_iMaxRangedStrengthTrained 0, Taiyuan's Slinger of t212 makes it
+ * 15, and Taiyuan 8:8 strikes at 15 in every look from t213).
  */
 export function cityStrikeBase(state: GameState, city: City): number {
-  // the Free Cities train toward no ranged base of their own
-  const best = Math.max(isFreeSeat(city.seat) ? 0 : seatOf(state, city.seat)?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS);
+  const best = Math.max(seatOf(state, city.seat)?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS);
   return isCiv(city.seat) ? best + getModifiers(state, city.seat).cityRanged : best;
 }
 

@@ -1278,7 +1278,7 @@ _MUTABLE = [
     "city_lux_amen",  # the luxury amenities the owner's last allocation rebuild stored
     "city_garrison_held",  # the garrison requirement a levied unit's return left met
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
-    "city_free_press", "free_next_city_id", "free_best_melee",  # a FREE CITY's race per major, the Free Cities seat's city-id counter and its best trained melee strength
+    "city_free_press", "free_next_city_id", "free_best_melee", "free_best_ranged",  # a FREE CITY's race per major, the Free Cities seat's city-id counter and its best trained melee and ranged strengths
     "city_founded_turn",  # the turn its owner founded or took the city
     "free_treasury",  # the Free Cities seat's treasury
     "seat_shortfall",  # every city row's holder's last turn shortfall, which bankruptcy reads

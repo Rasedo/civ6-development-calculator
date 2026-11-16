@@ -143,11 +143,16 @@ export function resourceImprovement(tile: Tile): ImprovementId | null {
  * district still building pays (a fit: runs/h1_duely1128 Nazca's Holy Site
  * on its Horses, placed t14, complete t16 — its Horses 4 at t15, 6 at t16
  * by AI_GovtPolicies.csv's Equestrian Orders 5.0 / 7.0, every turn to t31 as
- * logged; the DLL's 0x811b0 reads +0xb08 there, its meaning open).
+ * logged; the DLL's 0x811b0 reads +0xb08 there, its meaning open). A
+ * wonder's plot holds its DISTRICT_WONDER, a district like any other
+ * (runs/h1_duels1164 t160-t178: player 1's Oil 3 a turn in its
+ * m_aAccumulatedResourcePerTurn, its one Oil source under the wonder on
+ * 35:16; runs/h1_duels1149 t191: its Coal 3 and Aluminum 2 under the wonders
+ * on 35:8 and 35:16, no mine on either).
  */
 export function extractsResource(tile: Tile): boolean {
   if (!tile.resource) return false;
-  if (tile.district === 'CITY_CENTER') return true;
+  if (tile.district === 'CITY_CENTER' || tile.builtWonder) return true;
   if (tile.district && !tile.districtPillaged) return true;
   return !tile.pillaged && tile.improvement === resourceImprovement(tile);
 }

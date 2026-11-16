@@ -19019,3 +19019,49 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   Defend Units moves the Ram off 15:8 (no unit of its own beside it,
   Rome's Archer on 15:7 and a Horseman 4 off), the game logs no Protect
   Units (C-95).
+
+## C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins
+
+- THE UPGRADE'S ABILITIES (0xa49cb0 at 0xa4a2f0..0xa4a3e6): of the old
+  unit's abilities (0x56d800's list) the new unit is given each it lacks
+  (0x56e4c0) whose UnitAbilities row holds +0x28 bit 2, the row's
+  Permanent column (the loader 0xa6ec70's filler 0xad1aa0: Inactive bit 1,
+  Permanent bit 2, ShowFloatTextWhenEarned bit 4; the schema's default 1,
+  the Great General's and Admiral's four the only rows written false),
+  through 0x56bf50. Nothing copies a modifier attached to the old unit
+  itself, so the Movement of Hanno the Navigator's grant
+  (MODIFIER_PLAYER_GRANT_UNIT_OF_ABILITY_WITH_MODIFIER attaching
+  HANNO_FREE_UNIT_MOVEMENT_BUFF to the unit) ends with the unit, where a
+  training city's ability (ABILITY_ORDU_INCREASED_MOVEMENT) stays
+  (`upgradeAnew` on `TRAIN_MOVEMENT_CLASSES`; `_upgrade_anew`).
+- A WONDER'S PLOT (0x4aaa70's district arm): the plot holds its
+  DISTRICT_WONDER, a district like any other, and hands its resource to
+  its owner (`extractsResource`, `_res_extracting`).
+- THE FREE CITIES' STRIKE (0x249ee0 over 0x4c1a30): their cities strike on
+  their own player's m_iMaxRangedStrengthTrained, which the units their
+  cities train raise and the units a revolt hands them do not
+  (`cityStrikeBase`, `_strike_base` on `free_best_ranged`).
+- THE REPLAY: a unit the pair lost stands embarked or ashore as the last
+  plot of its logged walk leaves it.
+- Confirmed: runs/h1_duels1170 t174 player 1's Caravel 3276815 of Hanno's
+  grant (9 Movement: 4, Mathematics' 1, Hic Sunt Dracones' 2, the grant's
+  2) upgrades to the Ironclad 5046290 at 8, 6 from t181 as its Golden age
+  ends; the barbarians' danger map of t179-t198 lays its 70 on the game's
+  plots (9 rows gone). runs/h1_duels1164 t160-t178 player 1's
+  m_aAccumulatedResourcePerTurn holds Oil 3, its one Oil source under the
+  Pyramids on 35:16; runs/h1_duels1184 t200-t204 Oil 3 under the Pyramids
+  on 30:8; runs/h1_duels1149 t191 Coal 3 and Aluminum 2 under the wonders
+  on 35:8 and 35:16: its Artillery, Infantry and Ironclads stand fuelled
+  (plan.blow 145 rows gone on 1164 to t222, 99 on 1184 to t225).
+  runs/h1_duels1143 t208-t213 the Free Cities' Mechanized Infantry of t208
+  and t212 leave their best strengths 0, Taiyuan's Slinger of t212 makes
+  them 5 / 15, and Taiyuan 8:8 strikes at 15 from t213 (danger.major 8 -> 2
+  and kb.cities 15 -> 6 on t207-t222). runs/h1_duels1164 t187 / t189
+  player 0's Warrior walks onto the Coast of 15:14 and falls there, its
+  embarked 15 in player 1's and city-state 3's danger maps.
+- Open: the suzerain's share of a city-state's strategic sources
+  (runs/h1_duels1184 t202: player 1, suzerain of city-states 3 and 4 with
+  an Iron mine each, holds no Iron in m_aAccumulatedResourcePerTurn, where
+  `accumulatedPerTurn` pays it both; the copy at 0x44eff0 unread);
+  runs/h1_duels1150 t184 player 1's Tank fights at full strength with no
+  Oil income from t150 on (C-125).

@@ -1374,6 +1374,12 @@ export function effectiveBuilding(civ: string | null | undefined, id: string): B
   return out;
 }
 
+/** the promotion classes a unique building's training Movement names
+ *  (ABILITY_ORDU_INCREASED_MOVEMENT's): an ability, which a unit keeps
+ *  through its upgrades */
+export const TRAIN_MOVEMENT_CLASSES: ReadonlySet<string> = new Set(Object.values(BUILDINGS)
+  .flatMap((b) => (b.civVariants ?? []).flatMap((v) => (v.trainMovement ? v.trainMovementClasses ?? [] : []))));
+
 /** the unique variant of `id` this civilization builds, or undefined. */
 export function buildingVariantFor(civ: string | null | undefined, id: string): BuildingVariant | undefined {
   if (!civ) return undefined;

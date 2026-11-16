@@ -19,6 +19,9 @@
     - recording: h1_duelz1117
       turn: 91
       value: "city-state 4's Catapult 1114113 (slot 1) -> Trebuchet 1179651 (slot 3): City Defense CATAPULT x4 at 100 to the end look; at t92 its slot 1 holds the Crossbowman 1245185"
+    - recording: h1_duels1170
+      turn: 174
+      value: "player 1's Caravel 3276815 of Hanno's grant, 9 Movement, upgrades to the Ironclad 5046290 at 8 (5, Mathematics' 1, Hic Sunt Dracones' 2), 6 from t181: the grant's modifier is not the new unit's (0xa4a398 copies the Permanent abilities alone)"
   impl:
     - cpu/core/units.ts:upgradeAnew
     - cpu/core/units.ts:upgradeUnit
@@ -29,6 +32,7 @@
   readings:
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+    - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
   notes:
     - "unread: +0x890, +0x5f0, 0x55e4a0 / 0x55dc00's fixed value, the ObjectPairingManager pairing 0x9293b0 re-keys, whether the create raises the owner's knowledge signal"
   review: reviewed

@@ -4816,6 +4816,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         u.fortifyTurns = 0;
         for (const p of d.path) revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
         u.tileIndex = d.path[d.path.length - 1];
+        // ...embarked or ashore as that plot leaves it (runs/h1_duels1164
+        // t187 / t189: player 0's Warrior walks onto the Coast of 15:14 and
+        // falls to city-state 3's Ironclad there, laying its embarked 15 in
+        // player 1's and city-state 3's danger maps)
+        if (!UNITS[u.type]?.naval && !waterWalks(u.type) && unitDomain(u.type) !== 'air' && unitDomain(u.type) !== 'spy') u.embarked = embarksOn(state.map.tiles[u.tileIndex]) || undefined;
         break;
       }
       case 'camp': {

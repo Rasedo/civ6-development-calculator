@@ -1803,6 +1803,9 @@ class SimInit:
         # the strongest melee Combat Strength the Free Cities have trained
         # (`freeSeat.bestMeleeCS`; their centres stand on a flat base of their own)
         self.free_best_melee = torch.zeros(B, dtype=torch.long, device=device)
+        # the strongest Ranged Strength they have trained
+        # (`freeSeat.bestRangedCS`), their cities' strike
+        self.free_best_ranged = torch.zeros(B, dtype=torch.long, device=device)
         self.free_treasury = torch.zeros(B, dtype=dtype, device=device)
         # every city row's holder's last turn SHORTFALL in whole Gold
         # (`Seat.goldShortfall`) — majors, minors and the Free Cities alike

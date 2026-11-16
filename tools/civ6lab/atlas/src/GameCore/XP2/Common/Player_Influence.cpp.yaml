@@ -266,6 +266,7 @@
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-132 / C-125 / C-129: an upgrade keeps the Permanent abilities alone; a wonder's plot extracts its resource; the Free Cities' own best Ranged Strength — READ (0xa49cb0 at 0xa4a2f0..0xa4a3e6, 0xa6ec70), LAB (the records), both twins"
   context:
     - ...ict and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
     - "...y-state's own resource change re-hands its copies to its recipients (the signal handler 0x44eff0, Player_Influence.cpp: the luxury and strategic recipient counts +0x8a0 / +0x918 per pl..."

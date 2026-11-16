@@ -5517,6 +5517,10 @@
         "why": "the Free Cities seat's best trained melee strength (TS `freeSeat.bestMeleeCS`, a seat the seat group does not enumerate), read by the operations' enemy strength: compared through its effect, the operations' readiness and moves."
       },
       {
+        "plane": "free_best_ranged",
+        "why": "the Free Cities seat's best trained Ranged Strength (TS `freeSeat.bestRangedCS`, a seat the seat group does not enumerate), their cities' strike: compared through its effect, the strikes' damage and the danger maps."
+      },
+      {
         "plane": "bcap_id",
         "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
       },

@@ -608,7 +608,7 @@ class SimMasks:
     def _strike_base(self, row: int) -> torch.Tensor:
         """[B] long — `cityStrikeBase` before a major's Bastions half: the
         holder's best Ranged Strength made (`civ_best_ranged`, a minor's
-        `citystate_best_ranged`; the Free Cities none), at least
+        `citystate_best_ranged`, the Free Cities' `free_best_ranged`), at least
         COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, no damage loss
         (GameCore_XP2_Release.dll 0x249ee0)."""
         minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
@@ -616,6 +616,8 @@ class SimMasks:
             best = self.civ_best_ranged[:, row].long()
         elif minor:
             best = self.citystate_best_ranged[:, row - self._CITY_MINOR0].long()
+        elif row == self.FREE_ROW:
+            best = self.free_best_ranged.long()
         else:
             best = torch.zeros(self.B, dtype=torch.long, device=self.device)
         return best.clamp(min=self._city_min_strike)
@@ -3972,8 +3974,8 @@ class SimMasks:
         runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
         runs/h1_duelw1107 t176 and t229), nor a unit whose Units_XP2 row forms
         no military formation (0x4bffa0: the Giant Death Robot,
-        runs/h1_duels1124 t225); the Free Cities keep no best Ranged
-        Strength. The melee best rises to the unit's Combat as it stands
+        runs/h1_duels1124 t225); the Free Cities' best Ranged Strength
+        is `free_best_ranged`. The melee best rises to the unit's Combat as it stands
         (0x56dc90 with 0): an `embarked` land unit's its owner's embarked
         strength (runs/h1_duels1185 t213, h1_duels1138 t135)."""
         if isinstance(type_idx, int):
@@ -4009,6 +4011,7 @@ class SimMasks:
                 self.citystate_best_ranged[:, s], rs.to(self.citystate_best_ranged.dtype))
         elif row == self.FREE_ROW:
             self.free_best_melee = torch.maximum(self.free_best_melee, cs.to(self.free_best_melee.dtype))
+            self.free_best_ranged = torch.maximum(self.free_best_ranged, rs.to(self.free_best_ranged.dtype))
 
     def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False, stack: bool = False) -> torch.Tensor:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes

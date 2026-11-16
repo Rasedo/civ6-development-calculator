@@ -467,7 +467,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     }
   }
   // CIV6 (Hanno the Navigator): the strongest unlocked chassis of the class,
-  // carrying its Movement for life — born with it, as a trained unit is —
+  // carrying its Movement until an upgrade replaces it (`upgradeAnew`) —
   // and raising the seat's best strengths as a named grant does
   // (runs/h1_duelq1127 t202: China's Ironclad, its best melee 65 -> 70,
   // Chengdu's 66 + 5 in the barbarians' danger map of the turn)
