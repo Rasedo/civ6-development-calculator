@@ -649,6 +649,16 @@ export function completeQueueItem(
           if (unitSeat(u) === owner.seat && isGreatEngineer(u.type)) u.charges = (u.charges ?? 0) + fx.engineerCharges;
         }
       }
+      // CIV6 (Pyramids, MODIFIER_PLAYER_UNITS_ADJUST_BUILDER_CHARGES over
+      // COLLECTION_PLAYER_UNITS): the charge reaches the Builders already
+      // standing too, before the wonder's own Builder is granted
+      // (runs/h1_duels1178 t44: China's four Builders +1 at the completion,
+      // 786434 on the site 1 -> 2 before its wonder charge spends one)
+      if (fx?.buildCharges) {
+        for (const u of state.units) {
+          if (unitSeat(u) === owner.seat && u.type === 'BUILDER') u.charges = (u.charges ?? 0) + fx.buildCharges;
+        }
+      }
       // CIV6 (Apadana): +2 envoys each time ANY wonder completes in its city,
       // itself included — so the count is read AFTER this tile went complete.
       const envoys = completedWonders(state, city).reduce((n, w) => n + (w.def.effects?.envoysPerWonder ?? 0), 0);

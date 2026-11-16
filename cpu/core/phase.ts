@@ -997,6 +997,15 @@ export function holdBankruptDisband(fn: typeof disbandHeld): void {
   disbandHeld = fn;
 }
 
+/** THE REPLAY'S HOLD on a seat's start-of-turn completions
+ *  (`holdCompletions`): a technology or civic it holds stays in hand, its
+ *  progress banked, the record's completions landing the seat's research.
+ *  Null outside a replay. */
+let completionHeld: ((seat: number, id: string) => boolean) | null = null;
+export function holdCompletions(fn: typeof completionHeld): void {
+  completionHeld = fn;
+}
+
 /** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat
  *  alike — a major's, a city-state's and the Free Cities': the whole Gold its
  *  treasury stands below 0 is the turn's shortfall (`goldShortfall`, which
@@ -3286,7 +3295,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // lump grants (applyLumpGrant, goody maps) add to the same field.
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
     let techDone = false;
-    while (rsr.tech && rsr.techProgress >= researchCost(state, rsr.tech, false, actor.seat)) {
+    while (rsr.tech && rsr.techProgress >= researchCost(state, rsr.tech, false, actor.seat) && completionHeld?.(actor.seat, rsr.tech) !== true) {
       rsr.techProgress -= researchCost(state, rsr.tech, false, actor.seat);
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       researchAward(actor, TECHS[rsr.tech].effects);
@@ -3376,7 +3385,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     const _govBefore = seatGovernment(state, actor.seat);
     const _slotsBefore = governmentSlots(state, actor.seat);
     let civicDone = false;
-    while (rsr.civic && rsr.civicProgress >= researchCost(state, rsr.civic, true, actor.seat)) {
+    while (rsr.civic && rsr.civicProgress >= researchCost(state, rsr.civic, true, actor.seat) && completionHeld?.(actor.seat, rsr.civic) !== true) {
       rsr.civicProgress -= researchCost(state, rsr.civic, true, actor.seat);
       researchAward(actor, CIVICS[rsr.civic].effects);
       if (!rsr.civics.includes(rsr.civic)) rsr.civics.push(rsr.civic);

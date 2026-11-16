@@ -1963,6 +1963,19 @@ class SimPhase:
                             _mine, _ec.reshape(-1, 1).expand_as(self.major_unit_charges),
                             torch.zeros_like(self.major_unit_charges))
                         self._gen_ver += 1
+                # CIV6 (Pyramids, MODIFIER_PLAYER_UNITS_ADJUST_BUILDER_CHARGES
+                # over COLLECTION_PLAYER_UNITS): the charge reaches the
+                # Builders already standing too, before the wonder's own
+                # Builder is granted.
+                if int(self._wond_build_ch.sum()) > 0 and self._builder_idx >= 0:
+                    _bc = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _bc[wr] = self._wond_build_ch[wi[wr]]
+                    if bool((_bc > 0).count_nonzero()):
+                        _mine = self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._builder_idx)
+                        self.major_unit_charges += torch.where(
+                            _mine, _bc.reshape(-1, 1).expand_as(self.major_unit_charges),
+                            torch.zeros_like(self.major_unit_charges))
+                        self._gen_ver += 1
                 # CIV6 (Big Ben): the treasury is multiplied once, at completion.
                 tmul = self._wond_treasury[wi[wr]]
                 self.civ_treasury[wr, row] = self.civ_treasury[wr, row] * tmul.to(self.civ_treasury.dtype)

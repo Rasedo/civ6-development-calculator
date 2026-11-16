@@ -43,7 +43,7 @@ import { advanceTurn, refreshDistrictDiscount, minorTurns, turnChange, turnClose
 import { completeQueueItem, keepItem, keptKey, resumeItem, takeKept } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
-  seatPhase, worldCongress, holdBankruptDisband, completeResearchNow } from '../core/phase';
+  seatPhase, worldCongress, holdBankruptDisband, completeResearchNow, applySeatPolicies, holdCompletions } from '../core/phase';
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
@@ -1040,24 +1040,26 @@ function goneAfterBarbs(ctx: Ctx, b: TurnRecord, turn: number): Unit[] {
 
 /** a unit the log adds in the turn before row `before` and no record holds
  *  (made and lost inside the turn), as a new unit of `copy` on its plot: its
- *  type the city's completion or purchase row that follows its addition */
+ *  type the addition row's Units index, whatever made it (a completion, a
+ *  purchase, a belief's grant: runs/h1_duels1150 t38, China's Religious
+ *  Settlements Settler 655360 on Xi'an, no completion row, taken on 13:10 by
+ *  the barbarians' unit 2031635) */
 function madeInTurn(ctx: Ctx, copy: GameState, acts: readonly unknown[][], key: string, before: number): Unit | undefined {
-  const j = acts.findIndex((x) => x[2] === 'UnitAddedToMap' && `${x[3]}:${x[4]}` === key && (x[0] as number) < before);
-  if (j < 0) return undefined;
-  const player = acts[j][3];
-  let type: string | null = null;
-  for (const x of acts.slice(j + 1, j + 4)) {
-    if (x[3] !== player) continue;
-    if (x[2] === 'CityMadePurchase' && x[7] === PURCHASE_UNIT_HASH) type = engineRowOf(ctx.cat, 'unit', x[8] as number);
-    else if (x[2] === 'CityProductionCompleted' && x[5] === 0) type = engineRowOf(ctx.cat, 'unit', x[6] as number);
-    if (type) break;
-  }
-  const seat = seatOfP(ctx, player as number);
-  if (!type || seat === NO_SEAT) return undefined;
-  const tileIndex = (acts[j][6] as number) * ctx.W + (acts[j][5] as number);
+  const made = madeRow(ctx, acts, key, before);
+  if (!made) return undefined;
+  const { type, seat, tileIndex } = made;
   const c: Unit = { id: copy.nextUnitId++, type, seat, tileIndex, movesLeft: 0, hp: UNIT_HP, charges: UNITS[type].charges ?? null, xp: 0, level: 1 };
   c.movesFull = unitFullMoves(copy, c);
   return c;
+}
+
+/** the log's addition of `key` before row `before`: its engine type, seat and plot */
+function madeRow(ctx: Ctx, acts: readonly unknown[][], key: string, before: number): { type: string; seat: number; tileIndex: number } | undefined {
+  const r = acts.find((x) => x[2] === 'UnitAddedToMap' && `${x[3]}:${x[4]}` === key && (x[0] as number) < before);
+  const type = typeof r?.[7] === 'number' ? engineRowOf(ctx.cat, 'unit', r[7]) : null;
+  const seat = r ? seatOfP(ctx, r[3] as number) : NO_SEAT;
+  if (!r || !type || seat === NO_SEAT) return undefined;
+  return { type, seat, tileIndex: (r[6] as number) * ctx.W + (r[5] as number) };
 }
 
 /** the barbarian unit the log's capture of `key` in their turn (its
@@ -1070,8 +1072,6 @@ function capturedInto(acts: readonly unknown[][], key: string, open: number, bar
   }
   return undefined;
 }
-
-const PURCHASE_UNIT_HASH = gameHash('UNIT');
 
 /** the majors' best strengths trained in a copy of the turn t's close (the
  *  minors' and the barbarians' turns): as the next turn's start opened
@@ -1321,6 +1321,26 @@ function landRepairs(ctx: Ctx, b: TurnRecord, turn: number, takes: (player: numb
       t.pillaged = false;
       if (onto === ctx.state) count(ctx, 'repair', 'applied', acting);
     }
+  }
+}
+
+/** the meteor sites a major's unit claimed in its turn (`takes`) are gone for
+ *  the players after it: the log's GoodyHutReward on the plot the unit's
+ *  steps reached, a site record t+1 no longer holds (runs/h1_duels1165 t47:
+ *  player 0's unit 655364 steps onto 29:19 and claims the site there, out
+ *  of the barbarians' t47 target list) */
+function claimSites(ctx: Ctx, b: TurnRecord, turn: number, takes: (player: number) => boolean): void {
+  const stand = new Map<string, number>();
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== turn) continue;
+    const key = `${x[3]}:${x[4]}`;
+    if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') stand.set(key, (x[6] as number) * ctx.W + (x[5] as number));
+    if (x[2] !== 'GoodyHutReward' || !takes(x[3] as number)) continue;
+    const plot = stand.get(key) ?? unitOf(ctx, key)?.tileIndex;
+    const t = plot === undefined ? undefined : ctx.state.map.tiles[plot];
+    if (!t?.meteor || ctx.next.state.map.tiles[t.index].meteor) continue;
+    t.meteor = false;
+    count(ctx, 'meteor:claim', 'applied', x[3] as number);
   }
 }
 
@@ -3172,11 +3192,15 @@ function turnStartCompletions(ctx: Ctx, b: TurnRecord, turn: number): Map<number
  *  and its actions' (runs/h1_duelz1128 t220: China's Schrödinger, whom the
  *  engine never recruited, boosts Advanced Flight complete in China's
  *  actions; city-states 2 and 3 take it at its cost less one and research
- *  it). Counted as `research:completed`. */
-function completeRecordedResearch(ctx: Ctx, a: TurnRecord, b: TurnRecord, turn: number): void {
+ *  it). A completion the log holds inside a minor's turn lands at the next
+ *  minor's start (`before`, its PlayerTurnActivated row; runs/h1_duels1153
+ *  t55: China's Political Philosophy, a boost in city-state 2's turn, out of
+ *  city-state 2's civic values, in city-state 3's). Counted as
+ *  `research:completed`. */
+function completeRecordedResearch(ctx: Ctx, a: TurnRecord, b: TurnRecord, turn: number, before = Infinity): void {
   const seen = new Set<number>();
   for (const x of [...((a as { actions?: unknown[][] }).actions ?? []), ...((b as { actions?: unknown[][] }).actions ?? [])]) {
-    if (!Array.isArray(x) || x[1] !== turn || seen.has(Number(x[0]))) continue;
+    if (!Array.isArray(x) || x[1] !== turn || seen.has(Number(x[0])) || Number(x[0]) >= before) continue;
     seen.add(Number(x[0]));
     if (x[2] !== 'ResearchCompleted' && x[2] !== 'CivicCompleted') continue;
     const seat = ctx.seatOfPlayer.get(Number(x[3]));
@@ -3257,6 +3281,57 @@ function policyIds(ctx: Ctx, d: PolicyDecision): { gid: string | null; ids: stri
   return { gid, ids: layout.filter((x): x is string => !!x), layout };
 }
 
+/** a staged set on the wire: its government's row and the layout on the
+ *  slots of the government the record's set is laid in */
+function policyWire(ctx: Ctx, d: PolicyDecision): Pick<SeatActionRecord, 'government' | 'policies'> {
+  const seat = seatOfP(ctx, d.player);
+  const { gid, layout } = policyIds(ctx, d);
+  const gi = gid ? GOVERNMENT_LIST.findIndex((g) => g.id === gid) : -1;
+  const slots = governmentSlots(ctx.state, seat, gid ?? seatGovernment(ctx.state, seat));
+  return { government: gi >= 0 ? gi : null, policies: policyWireOf(slots, layout) };
+}
+
+/** does the seat hold the staged set, slot by slot */
+function policiesInPlace(ctx: Ctx, d: PolicyDecision): boolean {
+  const s = seatOf(ctx.state, seatOfP(ctx, d.player));
+  if (!s) return true;
+  const { gid, layout } = policyIds(ctx, d);
+  return (!gid || s.government.chosen === gid) && s.government.policies.length === layout.length
+    && layout.every((c, i) => (s.government.policies[i] ?? null) === c);
+}
+
+const POLICY_ROWS = new Set(['GovernmentChanged', 'GovernmentPolicyChanged']);
+
+/** A MAJOR'S SET SLOTTED BEFORE A MINOR'S TURN OPENS (row `open`) that the
+ *  engine's start did not land — its civic completed later in the turn, by
+ *  the record's completion (`completeRecordedResearch`), or inside an
+ *  earlier minor's turn (runs/h1_duels1153 t55: China's Political
+ *  Philosophy completes in city-state 2's turn, its Classical Republic and
+ *  its cards slotted there, before city-state 3's turn): the log's
+ *  GovernmentChanged / GovernmentPolicyChanged rows of turn `turn`, every
+ *  one before `open` and none in a later turn, land at the minor's start
+ *  through the engine's verb (`applySeatPolicies`), else as the record's */
+function landPoliciesBefore(ctx: Ctx, staged: readonly PolicyDecision[], b: TurnRecord, turn: number, open: number, landed: Set<PolicyDecision>): void {
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  for (const d of staged) {
+    if (landed.has(d)) continue;
+    const rows = acts.filter((x) => POLICY_ROWS.has(x[2] as string) && x[3] === d.player);
+    if (!rows.length || rows.some((x) => x[1] !== turn || (x[0] as number) >= open)) continue;
+    landed.add(d);
+    const s = seatOf(ctx.state, seatOfP(ctx, d.player)) as Seat | undefined;
+    if (!s || !isCiv(s.seat) || policiesInPlace(ctx, d)) continue;
+    applySeatPolicies(ctx.state, s, { production: [], tech: null, civic: null, units: [], ...policyWire(ctx, d) });
+    if (policiesInPlace(ctx, d)) {
+      count(ctx, 'policies:inTurn', 'applied', d.player);
+      continue;
+    }
+    const { gid, layout } = policyIds(ctx, d);
+    if (gid) s.government.chosen = gid as typeof s.government.chosen;
+    s.government.policies = layout;
+    count(ctx, 'policies:inTurn', 'fallback', d.player, 'the engine refused the set');
+  }
+}
+
 /** THE PENDING POLICIES. A government or card set the next record shows was
  *  slotted at the start of turn between the two records, after the civics
  *  and before the faith (runs/h1_duelw1116 China t9: God King's Faith
@@ -3269,11 +3344,7 @@ function stagePolicies(ctx: Ctx, ds: Decision[]): PolicyDecision[] {
   for (const d of staged) {
     const seat = seatOfP(ctx, d.player);
     if (seat === NO_SEAT || seat >= ctx.state.seats.length) continue;
-    const { gid, layout } = policyIds(ctx, d);
-    const gi = gid ? GOVERNMENT_LIST.findIndex((g) => g.id === gid) : -1;
-    // the layout on the slots of the government the record's set is laid in
-    const slots = governmentSlots(ctx.state, seat, gid ?? seatGovernment(ctx.state, seat));
-    Object.assign(recOf(seat), { government: gi >= 0 ? gi : null, policies: policyWireOf(slots, layout) });
+    Object.assign(recOf(seat), policyWire(ctx, d));
   }
   for (const d of ctx.envoys) {
     const seat = seatOfP(ctx, d.player);
@@ -3619,9 +3690,8 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
     const s = seatOf(ctx.state, seatOfP(ctx, d.player));
     if (!s) continue;
     const { gid, ids, layout } = policyIds(ctx, d);
-    // the layout slot by slot
     const govOk = !gid || s.government.chosen === gid;
-    const same = govOk && s.government.policies.length === layout.length && layout.every((c, i) => (s.government.policies[i] ?? null) === c);
+    const same = policiesInPlace(ctx, d);
     let why: string | undefined;
     if (!same) {
       const gov = seatGovernment(ctx.state, s.seat);
@@ -4795,14 +4865,19 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a civilian made in its owner's turn that no record holds stands on
         // the plot of its seizure (runs/h1_duels1142 t67: player 1's Builder
         // 983045 made on 29:8, walked to 29:9 and taken there by the
-        // barbarian Swordsman 2686981, Barbarian Builder Capture started)
+        // barbarian Swordsman 2686981, Barbarian Builder Capture started):
+        // the engine's own unit of its type no record unit stands for where
+        // the engine made it too (a pantheon's grant, `grantPantheonUnit`)
         if (!vic && !ctx.units.has(d.victim)) {
           const acts = (b as { actions?: unknown[][] }).actions ?? [];
           const at = acts.find((x) => x[2] === 'UnitCaptured' && `${x[3]}:${x[4]}` === d.victim)?.[0] as number | undefined;
-          const c = at === undefined ? undefined : madeInTurn(ctx, state, acts, d.victim, at);
+          const made = at === undefined ? undefined : madeRow(ctx, acts, d.victim, at);
+          const mapped = new Set(ctx.units.values());
+          const own = made && state.units.find((u) => !mapped.has(u) && u.seat === made.seat && u.type === made.type && u.tileIndex === made.tileIndex);
+          const c = own ?? (at === undefined ? undefined : madeInTurn(ctx, state, acts, d.victim, at));
           if (c) {
+            if (!own) state.units.push(c);
             c.tileIndex = d.plot;
-            state.units.push(c);
             ctx.units.set(d.victim, c);
             vic = c;
           }
@@ -5534,6 +5609,19 @@ function layDigSites(ctx: Ctx, before: Imported, seats: readonly number[]): void
     }
     if (laid) count(ctx, `digSites:${kind}`, 'fallback');
   }
+}
+
+/** a plot's improvement and district pillage */
+interface PillageFlags { pillaged: boolean; district: boolean }
+
+const pillageFlags = (t: Tile): PillageFlags => ({ pillaged: !!t.pillaged, district: !!t.districtPillaged });
+
+const samePillage = (x: PillageFlags, y: PillageFlags) => x.pillaged === y.pillaged && x.district === y.district;
+
+function setPillage(state: GameState, plot: number, f: PillageFlags): void {
+  const t = state.map.tiles[plot];
+  if (!!t.pillaged !== f.pillaged) t.pillaged = f.pillaged;
+  if (!!t.districtPillaged !== f.district) t.districtPillaged = f.district;
 }
 
 /** THE PILLAGES AND REPAIRS: a pillage is a unit's action (the barbarians'
@@ -6800,6 +6888,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
     landRepairs(ctx, b, a.turn, (p, s) => p === activePlayer(a) && isCiv(s));
+    claimSites(ctx, b, a.turn, (p) => p === activePlayer(a));
     // the active player's units stand where its actions left them before its
     // next start (the engine's turn below): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
@@ -6833,6 +6922,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // grown back) and each unit's health, before it and after, and the units
     // it killed but the barbarians' with their places in the unit list
     const eventFeatures = new Map<number, { was: Tile['feature']; now: Tile['feature'] }>();
+    // ...each plot's improvement and district pillage it wrecked (an
+    // eruption's, a storm's), and the flags the turn's own decisions left on
+    // it before the change (`turn`)
+    const eventWrecks = new Map<number, { was: PillageFlags; now: PillageFlags; turn?: PillageFlags }>();
+    // ...each meteor site its Meteor Shower laid, by the flag it took (runs/
+    // h1_duels1165 t38: the shower on 29:19 at the t39 change, out of the
+    // barbarians' t38 target list)
+    const eventSites = new Map<number, boolean>();
     const eventHp = new Map<Unit, { was: number; now: number }>();
     const eventKilled: { u: Unit; at: number }[] = [];
     const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
@@ -6936,6 +7033,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // below), not at their start
     const others = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
     holdFavor((seat) => others.includes(seat));
+    // a major's start completes what record t+1 holds completed alone: a
+    // completion its engine's yields reach early is held, the record's
+    // completions landing at their row (runs/h1_duels1184 t182: player 1's
+    // Refining 498.7 of 500 in record 183, completed in its t183 start, out
+    // of the city-states' t182 research values); counted as
+    // `research:held`, the engine's yields ahead of the game's
+    holdCompletions((seat, id) => {
+      const r = isCiv(seat) ? ctx.next.state.seats[seat]?.research : undefined;
+      const held = !!r && !r.techs.includes(id) && !r.civics.includes(id);
+      if (held) count(ctx, 'research:held', 'fallback', ctx.playerOfSeat.get(seat), id);
+      return held;
+    });
     // THE OTHER MAJORS' ACTIONS, in their own turn after their start and
     // before the city-states' (record t+1 holds them taken)
     const otherMajorsTurn = () => {
@@ -6954,6 +7063,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       }
       applyPhase(ctx, ds, 'after', b, b, otherMajors);
       landRepairs(ctx, b, a.turn, (p, s) => otherMajors.has(p) && isCiv(s));
+      claimSites(ctx, b, a.turn, (p) => otherMajors.has(p));
       // their units stand where their actions left them: their looks reveal
       // and meet in their turn (runs/h1_duelv1127: China meets Rome at t61,
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117
@@ -7049,7 +7159,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       }
       stream.actions(a.turn);
       otherMajorsTurn();
-      completeRecordedResearch(ctx, a, b, a.turn);
+      // the majors' completions before the first minor's turn opens; one
+      // inside a minor's turn lands at the next one's start (`holdMinorStart`)
+      const minorsOpen = ((b as { actions?: unknown[][] }).actions ?? [])
+        .find((x) => x[1] === a.turn && x[2] === 'PlayerTurnActivated' && minorAiSeat(seatOfP(ctx, x[3] as number)))?.[0] as number | undefined;
+      completeRecordedResearch(ctx, a, b, a.turn, minorsOpen);
       // a levied unit the game makes anew on a plot its minor may not stand
       // on is added where the game jumps it (`jumpMadeAnew`), its return
       // landing after the players before the minor moved it (runs/h1_duely1117
@@ -7204,6 +7318,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         return d;
       };
       const hpWas = new Map<Unit, number>();
+      const policiesLanded = new Set<PolicyDecision>();
       const unhurt = () => {
         for (const [u, hp] of hpWas) u.hp = hp;
         hpWas.clear();
@@ -7214,6 +7329,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         if (before !== undefined) ended(before);
         before = ctx.playerOfSeat.get(cs.seat)!;
         const open = opens.get(before);
+        if (open !== undefined) {
+          completeRecordedResearch(ctx, a, b, a.turn, open);
+          landPoliciesBefore(ctx, staged, b, a.turn, open, policiesLanded);
+        }
         for (const [key, killer] of killedBy) {
           // ...a kill in a later player's turn (a unit dying on its own blow
           // against the city-state's) not yet (runs/h1_duely1127 t17: the
@@ -7355,6 +7474,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         traceMinorUpgrade(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }
+      // ...and the majors' completions the log holds after the last minor's
+      // turn opened
+      completeRecordedResearch(ctx, a, b, a.turn);
       // ...a team's member an upgrade took off read as it stood (`unitsDying`)
       ctx.minorLookTypes = new Map([...state.unitsDying ?? [], ...state.units].map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
       ctx.minorDying = state.unitsDying ?? [];
@@ -7381,11 +7503,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       state.units.push(...changing);
       const preChange = state.map.tiles.map((x) => x.improvement ?? null);
       const featurePre = state.map.tiles.map((x) => x.feature);
+      const wreckPre = state.map.tiles.map(pillageFlags);
+      const sitePre = state.map.tiles.map((x) => !!x.meteor);
       const unitsPre = [...state.units];
       const hpBefore = unitsPre.map((u) => u.hp);
       turnChange(state);
+      for (const t of state.map.tiles) if (!!t.meteor !== sitePre[t.index]) eventSites.set(t.index, !!t.meteor);
       for (const t of state.map.tiles) if ((t.improvement ?? null) !== preChange[t.index]) eventPlots.add(t.index);
       for (const t of state.map.tiles) if (t.feature !== featurePre[t.index]) eventFeatures.set(t.index, { was: featurePre[t.index], now: t.feature });
+      for (const t of state.map.tiles) {
+        const now = pillageFlags(t);
+        if (!samePillage(now, wreckPre[t.index]) && (t.improvement ?? null) === preChange[t.index]) eventWrecks.set(t.index, { was: wreckPre[t.index], now });
+      }
       const standingAfter = new Set(state.units);
       unitsPre.forEach((u, i) => {
         if (u.hp !== hpBefore[i]) eventHp.set(u, { was: hpBefore[i], now: u.hp });
@@ -7418,6 +7547,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     } finally {
       holdFavor(null);
+      holdCompletions(null);
     }
     stream.actions(a.turn);
     // ...nor any of its fortification: the turn's dig-in is a standing
@@ -7539,7 +7669,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (a barbarian's own attack moves its tribe's boldness and counts after
     // their rules, `barbarianTurn`)
     const keyOfId = new Map([...ctx.units].map(([k, u]) => [u.id, k] as const));
+    // ...on the plots as they stood before the turn's change wrecked them: a
+    // pillage of the turn lands on the improvement the change's eruption hit
+    // after it (runs/h1_duels1181 t136: the barbarian Man-At-Arms pillages
+    // 7:7's Mine, the t137 eruption beside it damaging the Mine again), the
+    // change's damage standing on them after
+    for (const [p, w] of eventWrecks) if (samePillage(pillageFlags(state.map.tiles[p]), w.now)) setPillage(state, p, w.was);
     applyPhase(ctx, ds, 'after', b, b);
+    for (const [p, w] of eventWrecks) {
+      w.turn = pillageFlags(state.map.tiles[p]);
+      setPillage(state, p, { pillaged: w.turn.pillaged || w.now.pillaged, district: w.turn.district || w.now.district });
+    }
     // ...whose blows on a city centre came before the game's heal at the
     // turn's end: a centre they struck heals on the hit points they left, its
     // close's gate as it stood (runs/h1_duelq1127 t22: the barbarians' Scout
@@ -7598,6 +7738,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // its tactical pass, its danger map 30 plots)
     const tiles = state.map.tiles;
     for (const [p, f] of eventFeatures) if (tiles[p].feature === f.now) tiles[p].feature = f.was;
+    const wrecked = new Map([...eventWrecks.keys()].map((p) => [p, pillageFlags(tiles[p])] as const));
+    for (const [p, w] of eventWrecks) if (w.turn) setPillage(state, p, w.turn);
+    for (const [p, now] of eventSites) if (!!tiles[p].meteor === now) tiles[p].meteor = !now;
     for (const [u, h] of eventHp) if (u.hp === h.now) u.hp = h.was;
     for (const [u, snap] of [...ctx.barbBlows, ...[...ctx.minorBlows].map(([v, x]) => [v, x.snap] as const)]) {
       const h = eventHp.get(u);
@@ -7619,6 +7762,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       barbarianTurn(ctx, b, a.turn);
     } finally {
       for (const [p, f] of eventFeatures) if (tiles[p].feature === f.was) tiles[p].feature = f.now;
+      for (const [p, w] of wrecked) setPillage(state, p, w);
+      for (const [p, now] of eventSites) if (!!tiles[p].meteor !== now) tiles[p].meteor = now;
       for (const [u, h] of eventHp) if (u.hp === h.was) u.hp = h.now;
       const dead = new Set(revived.map(({ u }) => u));
       state.units = state.units.filter((u) => !dead.has(u));

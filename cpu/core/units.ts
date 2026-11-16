@@ -2260,8 +2260,10 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
  *  Public Works give it two more, the Hagia Sophia gives every Missionary
  *  and Apostle an extra spread, and the Mausoleum gives the GREAT Engineer
  *  one more (the game's clause matches the Great Person class, so a Military
- *  Engineer gets nothing). All are paid at CREATION, so a unit that predates
- *  the wonder or the card keeps its own count. */
+ *  Engineer gets nothing). This is the count paid at CREATION; the Pyramids'
+ *  and the Mausoleum's charge also reaches the units standing at the
+ *  wonder's completion (`completeQueueItem`), a card's and the Hagia
+ *  Sophia's do not. */
 export function extraCharges(state: GameState, seat: number, unitType: string, at: Tile): number {
   // CIV6 (EFFECT_ADJUST_UNIT_BUILD_CHARGES): the roster's per-type rows (`UNIT_CHARGE_ROWS`)
   let rows = 0;
