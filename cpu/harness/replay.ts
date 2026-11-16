@@ -1134,6 +1134,37 @@ function buildingsBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState): void {
   }
 }
 
+/** every city's population in a copy of turn t as `player`'s turn opens:
+ *  record t's, moved by the log's rows of turn t before that opening (a
+ *  later major's start, a city-state's growth as its own turn opens), none
+ *  of a later player's, the turn's change or the next start (runs/
+ *  h1_duels1144: player 0's 37:17 grows to 3 at its start of t20, at 2 in
+ *  city-state 3's and the barbarians' t19 known city records; city-state
+ *  4's 34:12 grows to 6 as its t49 turn opens, at 5 in city-state 3's t49
+ *  record, and loses a citizen to the t43 change, at 5 in its own t43) */
+function popAtTurn(ctx: Ctx, b: TurnRecord, copy: GameState, turn: number, player: number): void {
+  const pop = new Map(ctx.prev.cities.map((c) => [`${c.owner}:${c.id}`, c.pop] as const));
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  const open = acts.find((x) => x[2] === 'PlayerTurnActivated' && x[1] === turn && (x[3] as number) >= player)?.[0] as number | undefined;
+  for (const x of acts) {
+    if (x[1] !== turn || x[2] !== 'CityPopulationChanged' || (open !== undefined && (x[0] as number) > open)) continue;
+    pop.set(`${Number(x[3])}:${Number(x[4])}`, Number(x[5]));
+  }
+  for (const c of ctx.prev.cities) {
+    const seat = ctx.seatOfPlayer.get(c.owner);
+    const n = pop.get(`${c.owner}:${c.id}`);
+    if (seat === undefined || n === undefined) continue;
+    const plot = c.y * ctx.W + c.x;
+    if (isCityStateSeat(seat)) {
+      const cs = copy.cityStates.find((x) => x.seat === seat && x.centerIndex === plot);
+      if (cs) cs.population = n;
+      continue;
+    }
+    const city = cityAtIndex(copy, plot)?.city;
+    if (city && city.seat === seat) city.population = n;
+  }
+}
+
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
  * (the record's, landed), their unit pool takes the game's slots (each unit
@@ -1424,13 +1455,14 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   bestsBeforeStart(ctx, copy, twin, unborn);
   researchBeforeStart(ctx, b, copy);
   buildingsBeforeStart(ctx, b, copy);
+  const barbP = ctx.playerOfSeat.get(BARB_SEAT);
+  if (barbP !== undefined) popAtTurn(ctx, b, copy, closing, barbP);
   // ...and every other player's unit, and each of theirs their camps raised,
   // where the log's last step before their turn opens put it, not a later
   // teleport's plot (runs/h1_duely1121 t85: China's Great Scientist walks to
   // 6:17, the barbarians' record of it there at age 0, and is teleported to
   // 6:12 after their turn; h1_duely1124 t17: their Scout added on 42:7)
   const acts = (b as { actions?: unknown[][] }).actions ?? [];
-  const barbP = ctx.playerOfSeat.get(BARB_SEAT);
   const open = acts.find((x) => x[2] === 'PlayerTurnActivated' && x[3] === barbP && x[1] === closing)?.[0] as number | undefined;
   // each unit's last plot, damage and removal in the log before their turn
   // opens
@@ -2072,6 +2104,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     mine.push(c);
   }
   copy.units = copy.units.filter((c) => !gone.has(c));
+  // ...and no major's unit the next turn's start made (runs/h1_duels1144
+  // t20: player 0's Warrior made on its centre 37:17 at its t21 start, out
+  // of city-state 3's t20 known city record, 13 without its garrison)
+  const unborn = unbornUnits(ctx, b);
+  copy.units = copy.units.filter((c) => !(isCiv(c.seat) && unborn.has(twin.get(c)!)));
   // ...its Traders counted against its routes as record t+1 holds them: the
   // city's turn reads the routes its trade step after it starts and ends
   // (runs/h1_duely1121 t150: Antioch's route ends in its turn, its Trader
@@ -2381,6 +2418,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       standLevied(playerOf(cs.seat));
       standLeaving(playerOf(cs.seat));
       standGame(playerOf(cs.seat));
+      popAtTurn(ctx, b, copy, turn, playerOf(cs.seat));
       passPlayer = playerOf(cs.seat);
       // a city founded in the pair ran its second hook at its founding
       if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateMilitary(copy, cs);
@@ -2388,6 +2426,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     standLevied(playerOf(FREE_SEAT));
     standLeaving(playerOf(FREE_SEAT));
     standGame(playerOf(FREE_SEAT));
+    popAtTurn(ctx, b, copy, turn, playerOf(FREE_SEAT));
     passPlayer = playerOf(FREE_SEAT);
     freeCitiesMilitary(copy);
   } finally {
@@ -3573,7 +3612,12 @@ function standAtBlow(ctx: Ctx, ord: number, fighters: readonly Unit[]): () => vo
  *  23 at the CombatLog's DefenderStrMod −4, then dies to a Warrior). */
 function dugIn(ctx: Ctx, d: BattleDecision, def: Unit): void {
   const f = ctx.fortified.get(d.defender);
-  if (f && d.ord > f.ord && f.turns === null) f.turns = Math.min(FORTIFY_MAX_TURNS, (def.fortifyTurns ?? 0) + 1);
+  // (one that stepped in the pair before its order ticks nothing, its
+  // Movement not whole: runs/h1_duels1172 t35 player 1's Archer 458756 steps
+  // to 36:2, orders Fortify and is killed unfortified, the barbarian
+  // Slinger 1048584's planning 34 dealt on it)
+  const stepped = (ctx.steps.get(d.defender) ?? []).some((s) => f !== undefined && s.ord < f.ord);
+  if (f && d.ord > f.ord && f.turns === null) f.turns = stepped ? 0 : Math.min(FORTIFY_MAX_TURNS, (def.fortifyTurns ?? 0) + 1);
   if (f && d.ord > f.ord && f.turns !== null && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
   const m = ctx.undug.get(d.defender);
   if (m && d.ord < m.ord && m.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = m.turns;
@@ -5019,8 +5063,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const def = unitOf(ctx, d.defender);
         if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
         const minorBattle = isBarbSeat(atk.seat) || minorAiSeat(atk.seat);
+        const snapped: [Unit, Unit][] = [];
         for (const [u, at, key] of [[atk, d.from, d.attacker], [def, d.at, d.defender]] as const) {
-          const snap = () => Object.assign(structuredClone(u), { tileIndex: at });
+          const snap = () => {
+            const s = Object.assign(structuredClone(u), { tileIndex: at });
+            snapped.push([u, s]);
+            return s;
+          };
           if (isBarbSeat(atk.seat) && !ctx.barbBlows.has(u)) {
             ctx.barbBlows.set(u, isBarbSeat(u.seat) ? Object.assign(snap(), { tileIndex: barbStart(ctx, key, at) }) : snap());
           }
@@ -5032,6 +5081,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
         if (def.tileIndex !== d.at) def.fortifyTurns = 0;
         dugIn(ctx, d, def);
+        // ...which the units as the blow found them hold (runs/h1_duels1185
+        // t104: player 0's Warrior 786441, ordered to Fortify in its turn,
+        // fortified 1 under the barbarian Quadriremes' planning, killed by
+        // 1900561)
+        for (const [u, s] of snapped) s.fortifyTurns = u.fortifyTurns;
         atk.tileIndex = d.from;
         def.tileIndex = d.at;
         unstack(ctx, b, atk);
@@ -7020,6 +7074,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // h1_duels1165 t38: the shower on 29:19 at the t39 change, out of the
     // barbarians' t38 target list)
     const eventSites = new Map<number, boolean>();
+    // ...the standing resolutions before the turn's Regular Session, which
+    // sits after the barbarians' turn (runs/h1_duels1127: Military Advisory's
+    // +5 on the melee class decided at t121, the barbarians' t121 blows on
+    // player 0's Warriors without it, their t141 blows still with it)
+    let congressWas: GameState['congress'] | null = null;
     const eventHp = new Map<Unit, { was: number; now: number }>();
     const eventKilled: { u: Unit; at: number }[] = [];
     const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
@@ -7581,11 +7640,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // the majors voting the ballots the game's log casts (`loggedBallots`)
       const session = congressLog.get(a.turn);
       holdCongressBallots(session ? (_st, at) => loggedBallots(session, at, ctx, b) : null);
+      const congressPre = state.congress;
       try {
         worldCongress(state);
       } finally {
         holdCongressBallots(null);
       }
+      if (state.congress !== congressPre) congressWas = congressPre;
       const changing = barbs.filter((u) => barbAt.has(u));
       barbs.splice(0, barbs.length, ...barbs.filter((u) => !barbAt.has(u)));
       const barbFrom = new Map(changing.map((u) => [u, u.tileIndex] as const));
@@ -7838,6 +7899,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     const revived = eventKilled.filter(({ u }) => !state.units.some((x) => x.id === u.id && x.seat === u.seat));
     for (const { u, at } of revived) state.units.splice(Math.min(at, state.units.length), 0, u);
+    const congressNow = state.congress;
+    if (congressWas !== null) state.congress = congressWas;
     try {
       minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u)
         && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), new Set(minorBought.keys()), revealedWas);
@@ -7851,6 +7914,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       for (const { seat, attacker } of ctx.lateBlows) recordAttacker(state, attacker, seat);
       barbarianTurn(ctx, b, a.turn);
     } finally {
+      state.congress = congressNow;
       for (const [p, f] of eventFeatures) if (tiles[p].feature === f.was) tiles[p].feature = f.now;
       for (const [p, w] of wrecked) setPillage(state, p, w);
       for (const [p, now] of eventSites) if (!!tiles[p].meteor !== now) tiles[p].meteor = now;
