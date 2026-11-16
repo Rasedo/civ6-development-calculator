@@ -13,9 +13,16 @@ Runs, with the worktree's own launcher and AISCORE_MISSES=1:
 (`--from` left out for a window from turn 1), the dump the seed's recording
 in the main checkout. It scores the turns <from> .. <to>-1.
 
-THE WINDOW RESUMES FROM THE BAR'S SAVED STATE: the newest aimem bar's saves
-of the seed (`.claude/scratchpad/aiscore/p<N>m/state/`, one as every tenth
-turn closes; `--state <dir>` names another directory, `--no-state` none).
+THE BAR is the newest aimem bar holding the seed that ran at a commit of the
+worktree's own history (`bar_of`; its `BAR:` lines name it, every newer bar
+it passed over and the commits of that bar the tree lacks). A bar run at a
+head the tree does not hold is another tree's: its rows differ from the
+window's by those commits, and its saves carry what their code built. Where
+no bar ran in the tree's history the newest is taken, and the line says so.
+
+THE WINDOW RESUMES FROM THE BAR'S SAVED STATE: that bar's saves of the seed
+(`.claude/scratchpad/aiscore/p<N>m/state/`, one as every tenth turn closes;
+`--state <dir>` names another directory, `--no-state` none).
 The harness takes the newest save closing a turn at or before <from>-1
 (`--warm N`: <from>-1-N), runs the turns between unscored and scores from
 <from> on what a whole-game run carries there. The tool prints the save it
@@ -39,8 +46,9 @@ seed a run. A window longer than 120 turns is refused (--span lifts it for
 a task that names one).
 
 Then the compare (`rows.py --cmp`): against `--vs <tag>` (that tag's window
-of the seed), or by default against the newest bar holding the seed, cut to
-the window's turns. A window that resumed from no save opens without what
+of the seed), or by default against the bar, cut to the window's turns;
+`--vs <a bar's directory>` names another, and a `BAR:` line says where that
+bar ran at a head the tree lacks. A window that resumed from no save opens without what
 our own turns before it carried: against a bar, the rows its FIRST TWO turns
 newly miss are counted apart (the README's "A window without a save").
 """
@@ -119,6 +127,47 @@ def git(wt: pathlib.Path, *args: str) -> str:
         return ""
 
 
+def held(wt: pathlib.Path, sha: str | None) -> bool:
+    """whether the commit is the worktree's head or one of its history"""
+    if not sha:
+        return False
+    try:
+        return subprocess.run(["git", "-C", str(wt), "merge-base", "--is-ancestor", sha, "HEAD"], capture_output=True, check=False).returncode == 0
+    except OSError:
+        return False
+
+
+def lacked(wt: pathlib.Path, sha: str | None) -> str:
+    """the commits of `sha`'s history the worktree's head does not hold,
+    counted and named"""
+    if not sha:
+        return "at a head it does not name"
+    shas = git(wt, "log", "--format=%h", f"HEAD..{sha}").split()
+    if not shas:
+        return f"at {sha[:8]}, a commit this worktree does not know"
+    return f"at {sha[:8]}, {len(shas)} commit{'s' if len(shas) > 1 else ''} this tree does not hold ({', '.join(shas[:6])}{' ...' if len(shas) > 6 else ''})"
+
+
+def bar_of(wt: pathlib.Path, seed: str) -> tuple[pathlib.Path | None, list[str]]:
+    """the bar a window of the worktree resumes from and is compared with,
+    and the lines that say so: the newest bar holding the seed that ran at
+    the tree's head or a commit of its history. A newer bar ran at a head
+    the tree lacks: the rows those commits closed are in the window and not
+    in that bar. Where no bar ran in the tree's history the newest is taken."""
+    said: list[str] = []
+    found = common.bars(seed)
+    for bar in found:
+        sha = common.bar_head(bar, seed)
+        if held(wt, sha):
+            return bar, said + [f"BAR: {bar.name} ran at {str(sha)[:8]}, in this tree's history: the window resumes from its saves and is compared with its rows"]
+        said.append(f"BAR: {bar.name} NOT TAKEN: it ran {lacked(wt, sha)}; a row one of those closed is still this tree's, and its saves carry "
+                    f"what their code built")
+    if not found:
+        return None, []
+    return found[0], [f"BAR: no bar holding seed {seed} ran in this tree's history. {found[0].name} TAKEN, which ran {lacked(wt, common.bar_head(found[0], seed))}: "
+                      f"against it the rows those commits closed show as NEW and the rows they opened as GONE, and neither is the window's own"]
+
+
 def tree_against_save(wt: pathlib.Path, save: str, turn: int) -> str:
     """how the worktree's cpu/ stands against the tree that wrote the save:
     the turns to the save's ran under that tree's code, the turns after it
@@ -128,6 +177,9 @@ def tree_against_save(wt: pathlib.Path, save: str, turn: int) -> str:
     was = f"the save's tree {sha[:8]}" + (f" (+{head['dirty']} files changed under cpu/)" if head.get("dirty") else "")
     if not git(wt, "cat-file", "-t", sha):
         return f"STATE: {was} is not a commit this worktree knows: what its code carried to t{turn} cannot be told from yours"
+    if not held(wt, sha):
+        return (f"STATE: the save was written {lacked(wt, sha)}. The turns to t{turn} ran under code this tree lacks and the turns from "
+                f"t{turn + 1} under yours: the window is neither tree's whole game (resume from a bar of this tree's history, or --no-state)")
     files = [f for f in git(wt, "diff", "--name-only", sha, "--", "cpu").splitlines() if f]
     files += [f for f in git(wt, "ls-files", "--others", "--exclude-standard", "--", "cpu").splitlines() if f]
     if not files and not head.get("dirty"):
@@ -151,7 +203,7 @@ def main() -> int:
     ap.add_argument("--rows", nargs="?", type=int, const=0, default=None, metavar="N")
     ap.add_argument("--span", action="store_true", help="allow a window longer than 120 turns")
     ap.add_argument("--no-state", action="store_true", help="open on the record and the game's memory alone")
-    ap.add_argument("--state", metavar="DIR", help="the saves to resume from (default: the newest bar's of the seed)")
+    ap.add_argument("--state", metavar="DIR", help="the saves to resume from (default: the bar's of the seed)")
     ap.add_argument("--warm", type=int, default=0, metavar="N", help="resume from a save closing a turn at or before <from>-1-N")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--unlock", action="store_true")
@@ -189,9 +241,11 @@ def main() -> int:
     if a.turn_from > 1:
         cmd += ["--from", str(a.turn_from)]
     cmd += ["--to", str(a.turn_to)]
+    resumes = a.turn_from > 1 and not a.no_state
+    bar, bar_said = bar_of(wt, a.seed) if (resumes and not a.state) or a.vs == "bar" else (None, [])
     saves = None
-    if a.turn_from > 1 and not a.no_state:
-        saves = pathlib.Path(a.state).resolve() if a.state else common.state_dir(a.seed)
+    if resumes:
+        saves = pathlib.Path(a.state).resolve() if a.state else bar / "state" if bar and common.bar_saves(bar, a.seed) else None
         if saves:
             cmd += ["--load-state", str(saves)] + (["--warm", str(a.warm)] if a.warm else [])
     for t in a.trace:
@@ -227,6 +281,8 @@ def main() -> int:
     rows = common.read_rows(str(log_path))
     done = stem.with_name(stem.name + ".json").exists()
     print(f"window {a.seed} t{a.turn_from}-{a.turn_to} tag {a.tag}: rc={rc} {secs}s, {len(rows)} missed rows, head {meta['head']} ({meta['diff']}) -> {out}")
+    for l in bar_said:
+        print(l)
     if rc != 0 or not done:
         tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-12:]
         print("the run FAILED; the log's tail:\n  " + "\n  ".join(l[:300] for l in tail))
@@ -241,7 +297,8 @@ def main() -> int:
         if a.no_state:
             print("STATE: --no-state: the window opens on the record and the game's memory alone")
         elif not saves:
-            print(f"STATE: NO RESUME (no bar holds a save of seed {a.seed}): the window opens on the record and the game's memory alone")
+            print(f"STATE: NO RESUME ({f'the bar {bar.name} holds no save' if bar else 'no bar holds a report'} of seed {a.seed}): "
+                  f"the window opens on the record and the game's memory alone")
         if resumed:
             print(tree_against_save(wt, m.group(1), int(m.group(2))))
     traces = [l.rstrip("\n") for l in open(log_path, encoding="utf-8", errors="replace") if l.startswith("TRACE ")]
@@ -254,16 +311,20 @@ def main() -> int:
     if a.vs == "none":
         return 0
     if a.vs == "bar":
-        bar = common.newest_bar(a.seed)
         if not bar:
             print("no bar holds the seed: nothing to compare with")
             return 0
         other, is_bar = str(bar), True
     else:
         d = win / a.vs
-        other, is_bar = (str(d) if d.is_dir() else a.vs), not d.is_dir() and "aiscore" in a.vs.replace("\\", "/")
+        other = str(d) if d.is_dir() else a.vs
         if not pathlib.Path(other).exists():
             raise SystemExit(f"--vs {a.vs}: no such tag under {win} and no such directory")
+        is_bar = common.BARS.resolve() in pathlib.Path(other).resolve().parents
+        named = common.bar_head(pathlib.Path(other), a.seed) if is_bar else None
+        if named and not held(wt, named):
+            print(f"BAR: {pathlib.Path(other).name} ran {lacked(wt, named)}: against it the rows those commits closed show as NEW and the rows "
+                  f"they opened as GONE, and neither is the window's own")
     print(f"-- against {other} (A) -> this window (B), seed {a.seed}")
     sys.stdout.flush()
     rows_cmd = [sys.executable, "-X", "utf8", str(common.HERE / "rows.py"), other, "--cmp", str(out), "--seed", a.seed, "--all"]

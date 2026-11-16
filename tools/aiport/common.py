@@ -63,26 +63,37 @@ def files_of(seed: str) -> dict:
             "logs": base.with_name(base.name + ".logs"), "store": base.with_name(base.name + ".logs.sqlite")}
 
 
+def bars(seed: str | None = None) -> list[pathlib.Path]:
+    """the aimem bars (`p<N>m`), newest first: where a seed is named, those
+    whose run of the seed has ended (its report is written)"""
+    found = sorted((d for d in BARS.glob("p[0-9]*m") if d.is_dir()), key=lambda d: int(re.sub(r"\D", "", d.name) or 0), reverse=True)
+    return [d for d in found if seed is None or (d / f"ai{seed}.json").exists()]
+
+
 def newest_bar(seed: str | None = None) -> pathlib.Path | None:
-    """the newest aimem bar (`p<N>m`), the newest holding the seed's report
-    where a seed is named"""
-    bars = sorted((d for d in BARS.glob("p[0-9]*m") if d.is_dir()), key=lambda d: int(re.sub(r"\D", "", d.name) or 0), reverse=True)
-    for d in bars:
-        if seed is None or (d / f"ai{seed}.json").exists():
-            return d
-    return None
+    """the newest aimem bar, the newest holding the seed's report where a
+    seed is named"""
+    return next(iter(bars(seed)), None)
 
 
-def state_dir(seed: str) -> pathlib.Path | None:
-    """the saves of the engine's carried state a window of the seed resumes
-    from (`p<N>m/state/s<seed>_t<turn>.state`, `cpu/harness/stateSave.ts`):
-    the newest aimem bar's whose run of the seed has ended (its report is
-    written) and left saves"""
-    bars = sorted((d for d in BARS.glob("p[0-9]*m") if d.is_dir()), key=lambda d: int(re.sub(r"\D", "", d.name) or 0), reverse=True)
-    for d in bars:
-        if (d / f"ai{seed}.json").exists() and any((d / "state").glob(f"s{seed}_t*.state")):
-            return d / "state"
-    return None
+def bar_saves(bar: pathlib.Path, seed: str) -> list[pathlib.Path]:
+    """a bar's saves of the engine's carried state of a seed, a window's to
+    resume from (`p<N>m/state/s<seed>_t<turn>.state`,
+    `cpu/harness/stateSave.ts`)"""
+    return sorted((bar / "state").glob(f"s{seed}_t*.state"))
+
+
+def bar_head(bar: pathlib.Path, seed: str) -> str | None:
+    """the commit a bar ran at: the sha its saves of the seed name, else the
+    bar script's own note of its head (`m_<tag>_head.txt`, `bar_ai.sh`)"""
+    for save in bar_saves(bar, seed)[:1]:
+        sha = (save_head(str(save)) or {}).get("sha")
+        if sha and sha != "unknown":
+            return str(sha)
+    try:
+        return (SCRATCH / f"m_{bar.name[:-1]}_head.txt").read_text(encoding="utf-8").split()[0]
+    except (OSError, IndexError):
+        return None
 
 
 def save_head(path: str) -> dict | None:

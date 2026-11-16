@@ -46,22 +46,36 @@ seeds and turns both scored; `--rows` lists them (`-` gone, `+` new).
 
 Scores turns `<from>..<to>-1` with `<wt>`'s own harness (`bundled.mjs`,
 `--memory aimem`, AISCORE_MISSES=1) into `<wt>/.claude/scratchpad/win/<tag>/`,
-then prints the compare against `--vs <tag>` (default: the newest bar
-holding the seed, cut to the window's turns; `--vs none` for none). It
+then prints the compare against `--vs <tag>` (default: THE BAR, cut to the
+window's turns; `--vs none` for none). It
 REFUSES to start while another window of the worktree runs (`win/.lock`),
 takes one seed, and refuses more than 120 turns without `--span`.
 `--trace` (below) passes through; its lines land in `ai<seed>.log`.
 
-The window RESUMES from the newest bar's saved state of the seed (below):
+THE BAR of a window is the newest bar holding the seed that ran at your
+tree's head or at a commit of its history, not the newest bar there is: a
+bar run at a head your tree does not hold is another tree's. Its `BAR:`
+lines name the bar taken and every newer one passed over, with the commits
+of it your tree lacks. Against a bar of a later head the rows those commits
+closed show as NEW in your window and the rows they opened as GONE, and
+neither is your window's own (seed 1189 t14-22 at the head of bar p95m,
+against p96m four commits on: gone 1, new 17, the 17 a row set one of the
+four closed; against p95m: gone 0, new 0). Where no bar ran in your tree's
+history the newest is taken and the line says so; `--vs <a bar's
+directory>` of such a bar prints the same warning.
+
+The window RESUMES from that bar's saved state of the seed (below):
 it prints the save it took, or why it took none, and how your tree's cpu/
 differs from the tree that wrote the save. `--no-state` opens on the record
 alone, `--state <dir>` names other saves, `--warm N` resumes at least N
 turns before `<from>`.
 
-    window 1124 t124-130 tag a1: rc=0 15s, 6 missed rows, head e04ce61d (2 files changed ...) -> ...\win\a1
-    STATE: RESUMED from ...\aiscore\p92m\state\s1124_t0120.state (seed 1124, turn 120 closed, saved by 0ea12241); turns 121-123 run unscored
-    STATE: this tree's cpu/ differs from the save's tree 0ea12241 in 2 files (tactical.ts, aiView.ts; merge-base 0ea12241). The turns to t120 ran under the save's code ...
-    gone 0 (A holds, B does not), new 0 (B holds, A does not)
+    window 1189 t14-22 tag a1: rc=0 9s, 21 missed rows, head ed0c8794 (1 file changed ...) -> ...\win\a1
+    BAR: p96m NOT TAKEN: it ran at 9059bbc9, 4 commits this tree does not hold (9059bbc9, 7d6552ad, 16035acb, c4bc4d3a); a row one of those closed is still this tree's, and its saves carry what their code built
+    BAR: p95m ran at ed0c8794, in this tree's history: the window resumes from its saves and is compared with its rows
+    STATE: RESUMED from ...\aiscore\p95m\state\s1189_t0010.state (seed 1189, turn 10 closed, saved by ed0c8794); turns 11-13 run unscored
+    STATE: this tree's cpu/ differs from the save's tree ed0c8794 in 1 files (tactical.ts; merge-base ed0c8794). The turns to t10 ran under the save's code ...
+    gone 1 (A holds, B does not), new 0 (B holds, A does not)
     kind                          A      B   gone    new
 
 ## SHOW: the game's own records of a turn
@@ -139,9 +153,22 @@ in its header.
 newest save closing a turn at or before T-1, runs the turns from the save's
 to T unscored and scores from T on: the rows are a whole-game run's rows of
 those turns, row for row and in order, and the state it carries on is that
-run's (seeds 1124 and 1121, windows at t36, t124, t218 and t33, t137, t201;
-a run resumed at t31 of 1121 and taken to the end holds the whole game's
-160 rows and its 21 later saves). One line on stderr says what happened:
+run's. Proved on five recordings, the window's tree the tree that wrote the
+saves:
+
+- seeds 1124 and 1121: windows at t36, t124, t218 and t33, t137, t201; a
+  run resumed at t31 of 1121 and taken to the end holds the whole game's
+  160 rows and its 21 later saves;
+- seeds 1189, 1143 (the Free Cities from t208) and 1171: windows at t14,
+  t105, t226; t33, t127, t212; t38, t118, t203, each the bar's rows of its
+  turns in the bar's order (22, 3, 6; 16, 1, 154; 18, 5, 2 rows), with one
+  to seven turns run unscored;
+- the same three resumed at t11 and taken to the end: the whole game's 231,
+  437 and 116 rows of t11 on in order, and each one's 23 later saves equal
+  to the bar's at every path (`statecmp.mjs`); resumed again at t185, t201
+  and t121: the 16 saves after them equal.
+
+One line on stderr says what happened:
 
 - `STATE: RESUMED from <save> (..., saved by <sha>); turns A-B run unscored`,
   with `NOT IN THE SAVE: <fields>` where your tree carries a field the
@@ -164,7 +191,10 @@ window writes yours).
 The bar's saves are written by the bar's tree; your window runs your tree,
 at a later head and with your patch. The turns up to the save's ran under
 the bar's code, the turns after it under yours, and the window says how the
-two trees' cpu/ differ. What that does to the rows:
+two trees' cpu/ differ. (A save written at a head your tree does NOT hold,
+which `--state <dir>` alone can name, is worse: its turns ran under code
+your tree lacks, the window is neither tree's whole game, and its `STATE:`
+line says so.) What a save of an earlier head does to the rows:
 
 - Nothing, where your change is to a decision, a value or a memory the
   engine builds anew each turn (a move, a build, a score, an analysis, the
@@ -206,10 +236,28 @@ rows for the whole game's 1; t124-135: 184 for 27, 13 of the 27 missing):
 compare it with a window of your BASE tree over the same turns, start it
 five turns before the case, and do not count its first two turns.
 
-## What a resumed window still lacks
+## What a resumed window can still differ in
 
-Nothing the two proof seeds show. Known and not carried: the generator
-hold's marks of the log's draws already taken (`streamHold`'s own, kept
-inside it: a run resumed 219 turns before its end drew as the whole game
-did), and the combat log on the two records before the window, which
-nothing reads.
+From the whole-game run of the SAME tree, on the same recording: nothing
+the five proof recordings show, in a row or at a path of the carried state.
+Known and not carried: the generator hold's marks of the log's draws
+already taken (`streamHold`'s own, kept inside it: the runs resumed at t11
+drew as the whole games did to their ends), and the combat log on the two
+records before the window, which nothing reads. The history the records
+before the window leave (`History`, the tribes' and the savings' folds) is
+folded anew from those records, as a whole game folds it.
+
+From the rows you compare it with, where the two are not one tree's:
+
+- THE BAR'S HEAD IS NOT YOURS. A bar run at a commit your tree lacks holds
+  that commit's rows: what it closed is NEW in your window, what it opened
+  is GONE. The tool takes the bar of your tree's history and says which
+  (`BAR:`); a `--vs` you name yourself is yours to check.
+- YOUR TREE IS PAST THE BAR'S HEAD. The rows the commits between closed or
+  opened differ from the bar's, the same in a whole game of your tree:
+  compare your change against a window of your BASE tree (`--vs base`),
+  never against the bar alone.
+- THE SAVE'S TREE CARRIED OTHERWISE ("A save from another tree"): a store
+  built up over the turns before the save holds the save's tree's values.
+- The report's counts (`ai<seed>.json`, `.md`) are of the scored turns
+  alone; the turns run unscored print no row and no count.
