@@ -38,7 +38,7 @@ from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the sha
 from .sim_citytrees import (
     building_event, city_contracts, defense_event, district_event, free_slots, goals_reached,
     improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget, _cset,
-    city_tree_tables, gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
+    city_tree_tables, faith_purchasable, gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
 )
 from .sim_cityvalue import _FX_MIN, _SLOT_SLUSH, _SLOT_UNITS, _MinorFacts, _gold_boost_of, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
@@ -193,6 +193,50 @@ class SimMinorAi:
         return (self.gp_offer[:, cols] != -2).any(dim=1)
 
     def _minor_contract_purchases(self, s: int, act: torch.Tensor, units: torch.Tensor | None = None) -> None:
+        """`minorContractPurchases` where `act`: the Economic AI's contract
+        purchases (`_minor_gold_purchases`), then the Religious AI's
+        (`_minor_religious_purchases`)"""
+        self._minor_gold_purchases(s, act, units)
+        self._minor_religious_purchases(s, act)
+
+    def _minor_religious_purchases(self, s: int, act: torch.Tensor) -> None:
+        """`religiousPurchases` where `act` (0x74fbf0 at 0x74fce1..0x74fe0c):
+        the religious AI's list keeps the contracts alive, ACCEPTED and
+        faith-bought; each, the higher value first, of equals in id order,
+        tries its Faith purchase: a building's (0x7522c0, `minorFaithBuilding`)
+        where the city follows a religion, the queue's CanConstruct and the
+        Faith covering the price, COMPLETED where it buys; a unit's buys none"""
+        ai = self.cityai
+        cs = (slice(None), s)
+        live = ai.c_id[cs] >= 0
+        faith = faith_purchasable(ai, ai.c_unit[cs], ai.c_building[cs], ai.c_district[cs])
+        keep = ai.c_faith[cs] & live & (ai.c_progress[cs] == CP_ACCEPTED) & faith
+        ai.c_faith[cs] = torch.where(act.unsqueeze(1), keep, ai.c_faith[cs])
+        blds = act.unsqueeze(1) & ai.c_faith[cs] & (ai.c_unit[cs] < 0) & (ai.c_building[cs] >= 0)
+        if not bool(blds.any()):
+            return
+        E = self._cv_tables()["engine"]
+        eb = torch.tensor(E["building"] or [-1], dtype=torch.long, device=self.device)
+        follows = self._minor_followed()[:, s] >= 0
+        # the higher value first, of equals in arrival (id) order (0x749cf0)
+        key = torch.where(blds, -ai.c_value[cs].long(), torch.full_like(ai.c_id[cs], 1 << 40))
+        order = torch.argsort(key * (1 << 20) + ai.c_id[cs].clamp(min=0), dim=1)
+        for r in range(order.shape[1]):
+            j = order[:, r]
+            on = blds.gather(1, j.unsqueeze(1)).squeeze(1) & follows
+            if not bool(blds.gather(1, j.unsqueeze(1)).squeeze(1).any()):
+                break
+            if not bool(on.any()):
+                continue
+            bi = torch.where(on, eb.take(_cget(ai.c_building, s, j).clamp(min=0)), torch.full_like(j, -1))
+            on = on & (bi >= 0)
+            mk = torch.where(on, self._mk_b0 + bi.clamp(min=0), torch.full_like(bi, -1))
+            ok = on & self._minor_queue_ok(s, mk, torch.full_like(bi, -1))
+            price = self._purchase_step(self._minor_item_cost(s, mk) * float(self.rules.faith_purchase_mult))
+            bought = self._minor_buy_building(s, ok, bi.clamp(min=0), price, faith=True)
+            _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
+
+    def _minor_gold_purchases(self, s: int, act: torch.Tensor, units: torch.Tensor | None = None) -> None:
         """`purchaseContracts` where `act` (0x687bf0 after the savings): the
         purchase list keeps the contracts alive, ACCEPTED and gold-bought;
         each unit's, the higher priority first, of equals in id order, tries TryPurchaseUnits in the minor's city
@@ -2587,8 +2631,10 @@ class _MinorWorld:
             bi = int(self.E["building"][r])
             if bi < 0:
                 return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-            # a pillaged one's repair it takes
-            return sim.city_bldg[:, self.row, 0, bi] & ~sim.city_bldg_pillaged[:, self.row, 0, bi]
+            # a pillaged one's repair it takes; one with outer defences
+            # under Urban Defenses (`urbanRefused`)
+            held = sim.city_bldg[:, self.row, 0, bi] & ~sim.city_bldg_pillaged[:, self.row, 0, bi]
+            return held | sim._cv_urban_refused(self.f, self.T["bld_rows"][r])
         return self._rows_apply(row, one) | (row < 0)
 
     def district_blocked(self, row, plot):

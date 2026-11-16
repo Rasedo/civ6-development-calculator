@@ -19734,3 +19734,64 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   district argument, 0x4ac8d0 reading +0xb08) for a luxury or bonus
   resource under a district still building, unread: `extractsResource`
   hands those over from the placement.
+
+## C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported
+
+- The city update (0x5ce680) runs the City Defense event (0x5cced0, which
+  opens with the defensive cancel 0x5d7640) before the building-or-unit
+  event (0x5cd150); the building event reads its best building (0x5d0860,
+  flags 0, 0) at its own call, on the queue the cancel left: a building
+  the cancel took out of the queue is valued again and is the event's
+  tree's building (`minorAiTurn`'s `city.eventBuilding` after
+  `minorDefensiveCancel`; the GPU's `building_event` reads
+  `w.event_building()` at the event).
+- CanConstruct (0x170450) at 0x17107a..0x171090: a building with
+  OuterDefenseStrength (Buildings +0x44 above 0: the Walls, the Castle, the
+  Star Fort, the Tsikhe) is refused for good (the result's second byte,
+  0x1713a4) where Player_Cities +0xf4 is above 0. The writer is
+  EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES (its effect class's vt +0x60
+  0xb69900 -> 0x3726c0, +0xf4 its Amount), Steel's STEEL_UNLOCK_URBAN_DEFENSES.
+  The walls-prerequisite test (0x170644..0x170716) runs before it, so a
+  damaged walls prerequisite still refuses only for now. The contract
+  eligibility's CanConstruct (0x5f6050 at 0x5f6233) reads the second byte:
+  a building contract under Urban Defenses is ineligible, the in-hand check
+  0x5d7e00 CANCELS it and clears the production (`urbanRefused` in `refused`
+  and the minor's `buildingBlocked`; `_cv_urban_refused`, `building_blocked`;
+  `CityBuildFacts.urbanDefenses` the seat holding Steel).
+- The Religious AI's turn (0x74fbf0) runs its purchase list (ReligiousAI
+  +0x3c8, filled by its listener 0x751830 with every contract vt +0x78
+  0x5f6920 passes): 0x749b40 (over 0x749840) keeps the entries whose
+  contract is alive, ACCEPTED (+0x100 3) and passes vt +0x78, the rest
+  erased (0x5e56b0); each kept entry's vt +0x48 (0xbe4aa0, true); 0x749cf0 a stable
+  merge sort by the contract's value (+0x3a0, the larger first: 0x7498c0's
+  compare on +0x3a0); then, for a player no human drives (0x469d70), each
+  entry's vt +0x18, the Faith purchase 0x5f3ee0 (`religiousPurchases`,
+  `ContractBook.faith`; GPU `_minor_religious_purchases`, `CityAi.c_faith`).
+- 0x5f3ee0: in the city the contract binds (+0x588, Player_Cities lookup
+  0x36f660) or, binding none, every city. A building's (+0x468) through
+  0x7522c0: the first city whose religion (City +0x1910) is not -1 whose
+  purchase request on YIELD_FAITH (0x977490 with the yield global
+  0xf2f988, its test vt +0x48, its execution vt +0x50) passes; bought, the
+  contract COMPLETED (0x1e60f0 on +0xa8 with 7). Its log line runs under a
+  test of the contract's unit (0x5f4208), so a building's purchase prints
+  no "FAITH PURCHASE" line (`minorFaithBuilding`: the majority religion,
+  `minorQueueOk`, `minorBuyBuilding` in Faith at the cost times
+  FAITH_PURCHASE_MULT). A unit's (+0x408) through 0x752440: per city, a
+  threatened city (CityBuildAI +0x1b8 above -1) takes no unit of Combat 0;
+  a unit with ReligiousStrength (+0x78) not Faith-enabled in the city
+  (0x1b2930) needs the AI's religion (+0x1c0) to be the city's; then the
+  purchase request 0x977570 on YIELD_FAITH; its line "FAITH PURCHASE".
+- Confirming: runs/h1_duels1138 t101-t102 Vatican City: the Default
+  Specialization's Cathedral at 508.8 with contract 327 submitted at t101
+  (no majority religion yet), the city's religion 11 from t102, 190 Faith
+  spent (2152.05 -> 1962.05) and contract 327 COMPLETED with no purchase
+  line, the Cathedral held at t103; the same rows gone on 1159 t83 and
+  1165 t169. runs/h1_duels1186 t196 Mohenjo-Daro: Steel complete at t195's
+  end, the Star Fort contract 742 in hand CANCELLED and the Sewer picked at
+  155.8 under the Star Fort's 979.7. runs/h1_duels1133 t145 Kandy: the Star
+  Fort cancelled at 745.0 by the defensive cancel, the Build City Building
+  tree's contract 580 the Star Fort at 744.0 (ours had the Lighthouse);
+  1170 t159, 1184 t161 the same.
+- Open: the unit branch (0x752440) is not ported — a minor's Faith unit
+  (runs/h1_duels1170 t239-t243 Lahore's Nihang contracts 1123 / 1142 /
+  1158) stays ACCEPTED in ours (C-96).

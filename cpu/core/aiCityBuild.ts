@@ -227,6 +227,9 @@ export interface CityBuildFacts {
   worship: string | null;
   /** the city centre beside a river */
   riverside: boolean;
+  /** the player holds Urban Defenses (Player_Cities +0xf4 above 0, set by
+   *  EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES: Steel's modifier) */
+  urbanDefenses: boolean;
   /** what the city's own ground refuses (a Flood Barrier with no coastal
    *  lowland) */
   groundRefuses(building: string): boolean;
@@ -461,6 +464,16 @@ export function wallsPrereq(f: CityBuildFacts, b: AiBuildingRow): 'lacking' | 'd
   return null;
 }
 
+/** CanConstruct's Urban Defenses test (0x17107a..0x171090): a building with
+ *  OuterDefenseStrength (+0x44 above 0) is refused for good once the player
+ *  holds Urban Defenses (Player_Cities +0xf4 above 0; runs/h1_duels1186
+ *  Mohenjo-Daro t196: Steel complete at t195's end, its Star Fort contract
+ *  in hand CANCELLED and the Sewer picked at 155.8 under the Star Fort's
+ *  979.7) */
+export function urbanRefused(f: CityBuildFacts, b: AiBuildingRow): boolean {
+  return f.urbanDefenses && b.outerDefenseStrength > 0;
+}
+
 /** what CanConstruct (its test with the research waived) refuses outright:
  *  a building whose walls prerequisite the city lacks (`wallsPrereq`); a
  *  building the city holds whole (a pillaged one stands to be repaired:
@@ -469,10 +482,13 @@ export function wallsPrereq(f: CityBuildFacts, b: AiBuildingRow): 'lacking' | 'd
  *  government building above the tier run, a worship building the city's
  *  religion does not offer, a riverside building away from a river, and
  *  what the city's ground refuses — none of them under a walls prerequisite
- *  whose outer defences are damaged, which ends the test before them */
+ *  whose outer defences are damaged, which ends the test before them; a
+ *  building with OuterDefenseStrength under the player's Urban Defenses
+ *  (0x17107a..0x171090, refused for good at 0x1713a4) */
 export function refused(f: CityBuildFacts, b: AiBuildingRow): boolean {
   const walls = wallsPrereq(f, b);
   if (walls !== null) return walls === 'lacking';
+  if (urbanRefused(f, b)) return true;
   if ((f.hasBuilding(b.type) && !f.buildingPillaged(b.type)) || b.exclusive.some((x) => f.hasBuilding(x))) return true;
   if (b.capital && !f.capital) return true;
   if (b.governmentTier > f.governmentTier) return true;

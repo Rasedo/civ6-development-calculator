@@ -3435,6 +3435,15 @@
           "note": "the ids of the contracts on the minor's economic AI purchase list (`ContractBook.purchase`), ascending"
         },
         {
+          "name": "minorFaithList",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_c_faith"
+          ],
+          "note": "the ids of the contracts on the minor's religious AI purchase list (`ContractBook.faith`), ascending"
+        },
+        {
           "name": "minorReservations",
           "compare": "exact",
           "covers": [],

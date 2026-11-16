@@ -45,7 +45,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { RING_DIRS, axialToOffset, hexDistance, inBounds, neighborTile, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
 import { isCoastalLand, isImpassable } from '../../world/query';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, cityBuildingsPass, defaultSpecialization, housingValue, specializationBests, unitTable,
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, cityBuildingsPass, defaultSpecialization, housingValue, specializationBests, unitTable, urbanRefused,
   type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
@@ -59,7 +59,7 @@ import {
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
 } from './aiCityTrees';
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
-import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type BuildingPurchaseCity, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
+import { newEconomicMemory, purchaseContracts, purchaseTurn, religiousPurchases, purchasePick, savingsTurn, type BuildingPurchaseCity, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { seatListed, unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
@@ -71,7 +71,7 @@ import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
 import { unitBuildable } from './operations/unitRows';
 import { minorCity, minorFoodFocus } from './cityStates';
-import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats, extractionChanged, seenResourceAt } from './city';
@@ -665,12 +665,14 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     foundedTurn: cs.foundedTurn ?? -99,
     currentValue: cs.prodSetValue ?? FX_MIN,
     // CanConstruct refuses for good a building the city holds unpillaged
-    // (0x18e9f0 / 0x18fe60 at 0x1707f1), a district it holds complete and
+    // (0x18e9f0 / 0x18fe60 at 0x1707f1), one with outer defences under
+    // Urban Defenses (`urbanRefused`), a district it holds complete and
     // unpillaged (a pillaged one's repair it takes: runs/h1_duely1121
     // Ayutthaya's pillaged Shipyard, contract 649 queued t215)
     buildingBlocked: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id));
+      return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id))
+        || urbanRefused(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]);
     },
     districtBlocked: (d, plot) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d) || districtOverLimit(d)
       || (plot >= 0 && contractPlotRefused(state, cs, d, plot)),
@@ -1204,6 +1206,21 @@ export function minorContractPurchases(state: GameState, cs: CityState,
   const bcity = minorBuildingPurchaseCity(state, cs, units);
   purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
     (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
+  religiousPurchases(cs.cityAi, false, () => false, (_c, b) => minorFaithBuilding(state, cs, b));
+}
+
+/** the Religious AI's building purchase (0x7522c0) in the minor's one city
+ *  (the city the contract binds, or every city where it binds none): the
+ *  city following a religion (City +0x1910, its majority religion:
+ *  runs/h1_duels1138 Vatican City's Cathedral contract of t101, a majority
+ *  religion from t102, bought then); the purchase request in Faith
+ *  (0x977490 on YIELD_FAITH, its test vt +0x48 and its execution vt +0x50):
+ *  the queue's CanConstruct and the Faith covering the price
+ *  (`minorBuyBuilding`) */
+function minorFaithBuilding(state: GameState, cs: CityState, b: string): boolean {
+  if (majorityReligionOf(state, cs.seat) < 0) return false;
+  const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+  return !!id && minorQueueOk(state, cs, { building: id }) && minorBuyBuilding(state, cs, id, 'faith');
 }
 
 /** a Great Person class is available in the game (0x2f7eb0, the majors'
@@ -1264,7 +1281,7 @@ function minorBuildingPurchaseCity(state: GameState, cs: CityState, units: numbe
     },
     goldCost: (b) => {
       const x = id(b);
-      return x ? minorBuildingPrice(state, cs, x) : -1;
+      return x ? minorBuildingPrice(state, cs, x, 'gold') : -1;
     },
     value: (b) => {
       table ??= cityBuildingsPass(minorBuildFacts(state, cs, minorKnownUnits(cs), false, units)).buildings;
@@ -1273,7 +1290,7 @@ function minorBuildingPurchaseCity(state: GameState, cs: CityState, units: numbe
     goldValue: (amount) => yieldValue(view, cs.seat, amount, 'YIELD_GOLD'),
     purchase: (b) => {
       const x = id(b);
-      return !!x && minorBuyBuilding(state, cs, x);
+      return !!x && minorBuyBuilding(state, cs, x, 'gold');
     },
   };
 }
@@ -1334,7 +1351,6 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   freeSlots(ai, w, city.id);
   inHandCheck(ai, city, () => minorSetItem(state, cs, null));
   city.current = currentItem(cs);
-  city.eventBuilding = eventBuilding(tables, pf);
   city.bestImprovement = pickImprovement(ai, w, evals);
   const list = AI_CITY_EVENTS[AI_CITY_EVENT_LISTS.MINOR_CIV_DEFAULT_TRAIT];
   if (!fresh) {
@@ -1349,6 +1365,11 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
       tracer?.(`t${state.turn} ${cs.name} Canceling current build ${was ?? '-'}, OLD VALUE ${(cancelled / FX).toFixed(1)}`);
     }
     defenseEvent(ai, w, city, list.CITY_UNDER_THREAT ?? null);
+    // the building event's best building (0x5cd150 -> 0x5d0860) on the
+    // queue the cancel left: a cancelled building is valued again
+    // (runs/h1_duels1133 Kandy t145: its Star Fort cancelled at 745.0, the
+    // tree's contract the Star Fort's)
+    city.eventBuilding = eventBuilding(tables, pf);
     buildingEvent(ai, w, city, list.CITY_EVENT_UNIT_OR_BUILDING);
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);
     improvementEvent(ai, w, city, list.CITY_EVENT_IMPROVEMENT);

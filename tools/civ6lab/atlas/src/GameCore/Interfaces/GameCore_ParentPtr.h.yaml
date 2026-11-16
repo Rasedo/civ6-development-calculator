@@ -123,3 +123,19 @@
     - "...s Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "...76e70: the owner of the last unit on the plot); an improvement of a Free City pillaged (0x276ff0: the owner of the last unit on the plot); 0x276a40 (a Free City with a flag, the plot's..."
   review: reviewed
+- addr: 0x3726c0
+  final: 0x266f50
+  kind: function
+  name: SetUrbanDefenses
+  semantics: Player_Cities +0xf4 = the amount (EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES through 0xb69900), then the player's signal 0x93556d2d; CanConstruct refuses an OuterDefenseStrength building while it is above 0.
+  status: READ
+  cases:
+    - recording: h1_duels1186
+      turn: 196
+      value: Mohenjo-Daro's Star Fort contract CANCELLED the turn after Steel
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  context:
+    - "...lls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the b..."
+    - ...r is EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES (its effect class's vt +0x60 0xb69900 -> 0x3726c0, +0xf4 its Amount), Steel's STEEL_UNLOCK_URBAN_DEFENSES. The walls-prerequisite test (0...
+  review: reviewed

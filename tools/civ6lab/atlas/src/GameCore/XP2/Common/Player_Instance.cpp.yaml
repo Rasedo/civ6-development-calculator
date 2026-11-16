@@ -354,6 +354,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...gate (pressure   above it), else pressure x value. A failed gate (-9999) is skipped for a   human (0x469d70: the slot status 3) and otherwise adds -100% to the stack:   the score 0. Less the danger << 8. AI_..."
   context:

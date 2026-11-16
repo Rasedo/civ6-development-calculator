@@ -411,7 +411,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
   - LAB (repairs): unconfirmed: a Free City's building under its pillaged district, and a major's queue of several items behind a refused building head (`headLetGo` pops each refused building head in turn); the five duelq recordings hold neither, 1124 Wuhan t236 (a one-item queue) the one major case
-  - LAB (contracts): the improvement tree the game starts and ends the turn it starts, ours laying its improvement: duels1169 p3 t211-t214 the Solar Farm on 41:7 (the game's m_bestImprovementToMake 38 at 120.5, m_eventTrees slot 3 a new id each end look, no tree held), ours lays it (builder.improve; the Solar Farm rows of 1178, 1171, 1174, 1185, 1140 alike, untraced)
+  - LAB (contracts): the improvement tree the game starts and ends the turn it starts, ours laying its improvement: duels1169 p3 t211-t214 the Solar Farm on 41:7 (the game's m_bestImprovementToMake 38 at 120.5, m_eventTrees slot 3 a new id each end look, no tree held), ours lays it (builder.improve; the Solar Farm rows of 1178, 1171, 1174, 1185, 1140 alike, untraced); on 1169 t211 ours' tree (pool slot 3) ticks before the Neighborhood's Build City District tree on the same plot 349 (slot 5), its Builder 1769479 on 43:7 unmoved in the record
 - **C-126. CITY-STATES' PURCHASES, TREASURY, UPGRADES AND DISBANDS.** Weight 2.
   - LAB (treasury): a minor's treasury off the record's: duelz1121 Hunza t155 677 for 691.43
   - LAB (treasury): a minor's treasury off the record's: 1124 Cardiff t189 156 for 163.84
@@ -419,7 +419,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (treasury): a minor's treasury off the record's: 1127 Hattusa t178
   - LAB (purchases): 1128 Nazca t25 a Builder PURCHASE (0x5f3c40) ours trains
   - LAB (purchases): unit purchases of the game ours does not make: duels1134 city-state 3 t47 a Spearman (threat 1, ours 98.9 Gold), 1146 city-state 2 t43 a Galley (ours 2.0 Gold), 1137 city-state 3 t178 a Caravel, 1146 city-state 3 t208 an AT Crew (untraced)
-  - BUILD (purchases): a city-state's Faith purchase is in neither twin (its purchase AI buys with Gold alone; the suzerain's Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK alike): duels1170 Lahore buys a Nihang t239 and t243 (unit.bought), its Build City Building contract of the Nihang gone, ours none bought and the contract held t239-t243
+  - BUILD (purchases): a city-state's Faith purchase of a unit (0x752440) is in neither twin (the suzerain's Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK alike): duels1170 Lahore buys a Nihang t239 and t243 (unit.bought), its Build City Building contract of the Nihang gone, ours none bought and the contract held t239-t243
   - LAB (upgrades): an upgrade past an obsolete rung (1128 t110 Hong Kong's Warrior 1966081: the game's Man-at-Arms 2097159, ours a Swordsman)
   - LAB (upgrades): duels1135 city-state 3's Trebuchet 1310722 upgrades at t126 in ours, at t127 in the game (untraced)
   - LAB (disbands): 0x4dd270's disband count floor(S/10) against runs/bankrupt_m35's one a turn
@@ -431,7 +431,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvements): 1128 t48 272 Camp
   - LAB (improvements): 1124 p3's t149 / t159 Builder tree a turn late (untraced)
   - BUILD (improvements): the GPU has no city-state builder lay (`minorBuilderLays`)
-  - LAB (improvements): the district tree's Find Available Unit (node 16) finds a free Builder and its tree holds no unit at the end look (95 of 95 looks with the node SUCCESS on duels1146 / 1139 / 1124; 1146 Kandy t138 Builder 1310723 found by Build City District 83:7, assigned to Build City Improvement 84:8): how it lets the unit go unread, the engines' Check Plot handing the district's tree no Builder type
+  - LAB (improvements): the district tree's Find Available Unit (node 16) finds a free Builder and its tree holds no unit at the end look (95 of 95 looks with the node SUCCESS on duels1146 / 1139 / 1124; 1146 Kandy t138 Builder 1310723 found by Build City District 83:7, assigned to Build City Improvement 84:8): how it lets the unit go unread; ours keeps it in the district's tree where its Check Plot fails, its improvement tree's node 21 failing and submitting a Builder contract the game lacks (duels1145 Kandy t14 Builder 262144, 1172 t17)
   - LAB (envoys): a start envoy our purse cannot fund lands after the minors' turns (1128 t81 Bologna FARM@444 for PLANTATION@398)
   - LAB (route value K): the route value K, a missed meeting: 1127 t47 China / Hattusa via Hattusa's Trader to Mexico City (our Hattusa queues the Granary at t33 for the game's Trader, Value 61.4, K 2.50)
   - LAB (route value K): the route value K, a missed meeting: 1127 t61 China / Muscat as China meets Rome

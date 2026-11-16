@@ -8,7 +8,7 @@
  */
 import type { City, CityState, DistrictId, GameState, QueueItem, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { UNITS, formationCost } from '../data/units';
+import { UNITS, URBAN_DEFENSES_TECH, formationCost } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
@@ -220,6 +220,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     governmentTier: GOVERNMENTS[seatGovernment(state, seat) ?? '']?.tier ?? 0,
     worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),
+    urbanDefenses: r.techs.includes(URBAN_DEFENSES_TECH),
     groundRefuses: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       if (!id) return true;

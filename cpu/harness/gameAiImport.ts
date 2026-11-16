@@ -44,7 +44,7 @@
  * their trigger (a raid's tribe) ours. A remembered turn (Turn Limiter's)
  * is ours of the game's (`ImportWorld.turnShift`).
  */
-import { CP_IN_PROGRESS, type AiContract } from '../core/aiContracts';
+import { CP_IN_PROGRESS, faithPurchasable, type AiContract } from '../core/aiContracts';
 import { SLOT_DEFENSE, SLOT_DISTRICT, SLOT_IMPROVEMENT, SLOT_UNIT_OR_BUILDING, type CityAi, type CityTree, type CityTreeTrigger } from '../core/aiCityTrees';
 import { BT_FRESH, BT_SUCCESS, type AiTreeNode, type BtMemory } from '../core/behaviorTree';
 import { opsOf, type OpsAi } from '../core/operations/manager';
@@ -494,6 +494,9 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   ai.city = { [-1]: (city?.list ?? []).filter((id) => held.has(id)) };
   ai.inHand = { [-1]: city && held.has(city.hand) ? city.hand : -1 };
   ai.purchase = (read.holders?.economic ?? []).filter((id) => held.has(id));
+  // the religious AI's list the reader does not hold: its listener takes
+  // every contract faithPurchasable at its submission, in arrival (id) order
+  ai.faith = contracts.filter((c) => faithPurchasable(c)).map((c) => c.id).sort((a, b) => a - b);
   ai.nextContract = Math.max(ai.nextContract, ...contracts.map((c) => c.id + 1));
   return { trees: trees.length, contracts: contracts.length };
 }

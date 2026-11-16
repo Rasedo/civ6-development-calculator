@@ -87,7 +87,7 @@ export interface CityAi extends ContractBook {
 }
 
 export const newCityAi = (): CityAi => ({
-  contracts: [], city: {}, inHand: {}, purchase: [], trees: [], slots: {}, reservations: [], techContracts: {}, plotContracts: {},
+  contracts: [], city: {}, inHand: {}, purchase: [], faith: [], trees: [], slots: {}, reservations: [], techContracts: {}, plotContracts: {},
   nextContract: 1,
 });
 

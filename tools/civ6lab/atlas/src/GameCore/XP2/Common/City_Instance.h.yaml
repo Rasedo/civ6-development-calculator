@@ -20,6 +20,24 @@
   context:
     - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."
   review: reviewed
+- addr: 0x752440
+  final: 0x4ef780
+  kind: function
+  name: the Religious AI's unit purchase
+  semantics: "over the player's cities (the one passed, else each): a threatened city (CityBuildAI +0x1b8 above -1) takes no unit of Combat 0; a unit with ReligiousStrength (+0x78) the city may not Faith-buy (0x1b2930) needs the AI's religion (+0x1c0) to be the city's; then the purchase request 0x977570 on YIELD_FAITH. Not ported."
+  status: PARTLY
+  cases:
+    - recording: h1_duels1170
+      turn: 239
+      value: Lahore's FAITH PURCHASE of the Nihang, contract 1123
+  impl: [cpu/core/aiEconomic.ts:religiousPurchases]
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  context:
+    - ...171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported
+    - "...BuyBuilding` in Faith at the cost times FAITH_PURCHASE_MULT). A unit's (+0x408) through 0x752440: per city, a threatened city (CityBuildAI +0x1b8 above -1) takes no unit of Combat 0;..."
+    - "- Open: the unit branch (0x752440) is not ported — a minor's Faith unit (runs/h1_duels1170 t239-t243 Lahore's Nihang cont..."
+  review: reviewed
 - addr: 0xb354a0
   kind: function
   status: PARTLY

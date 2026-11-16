@@ -2117,6 +2117,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     governmentTier: 0,
     worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),
+    urbanDefenses: r.techs.includes(URBAN_DEFENSES_TECH),
     groundRefuses: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       if (!id) return true;
@@ -2492,20 +2493,22 @@ export function minorRaiseBuilding(state: GameState, cityState: CityState, id: s
   }
 }
 
-/** A building's Gold purchase price for the minor: its Production price
- *  times the purchase multiplier (runs/h1_duely1121 t178 Hunza: the Stock
- *  Exchange's 165 at 660, the record's buy row) */
-export function minorBuildingPrice(state: GameState, cityState: CityState, id: string): number {
-  return purchaseStep(minorBuildingCost(state, cityState, id) * GOLD_PURCHASE_MULT);
+/** A building's purchase price for the minor: its Production price times
+ *  the currency's multiplier (runs/h1_duely1121 t178 Hunza: the Stock
+ *  Exchange's 165 at 660 Gold; runs/h1_duels1138 t102 Vatican City: the
+ *  Cathedral's 95 at 190 Faith, the record's buy rows) */
+export function minorBuildingPrice(state: GameState, cityState: CityState, id: string, currency: 'gold' | 'faith'): number {
+  return purchaseStep(minorBuildingCost(state, cityState, id) * (currency === 'faith' ? FAITH_PURCHASE_MULT : GOLD_PURCHASE_MULT));
 }
 
 /** THE MINOR BUYS A BUILDING in its city (the purchase request 0x977490):
  *  the purse covers the price; the building rises, and leaves the queue
  *  where the city produced it. Whether it bought. */
-export function minorBuyBuilding(state: GameState, cityState: CityState, id: string): boolean {
-  const price = minorBuildingPrice(state, cityState, id);
-  if (!goldAffordable(cityState.treasury, price)) return false;
-  cityState.treasury -= price;
+export function minorBuyBuilding(state: GameState, cityState: CityState, id: string, currency: 'gold' | 'faith'): boolean {
+  const price = minorBuildingPrice(state, cityState, id, currency);
+  if (!goldAffordable(currency === 'faith' ? cityState.faith : cityState.treasury, price)) return false;
+  if (currency === 'faith') cityState.faith -= price;
+  else cityState.treasury -= price;
   if (cityState.prodItem === minorItemKey({ building: id })) minorSetItem(state, cityState, null);
   minorRaiseBuilding(state, cityState, id);
   return true;

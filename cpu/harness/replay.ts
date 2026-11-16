@@ -4248,16 +4248,21 @@ function applyBuyBuilding(ctx: Ctx, d: Extract<Decision, { kind: 'buyBuilding' }
   // treasury holds and spent through the building purchase's spend on its
   // savings (`purchaseSpend`, the UNITS slot then the SLUSH slot), so its
   // next savings turn shares only the treasury's own change (runs/h1_duely1121
-  // t178 Hunza's Stock Exchange: no fall at t179, its Line Infantry kept)
+  // t178 Hunza's Stock Exchange: no fall at t179, its Line Infantry kept);
+  // a Faith purchase is its Religious AI's (`religiousPurchases`), imposed
+  // the same way from its Faith
   const minor = state.cityStates.find((c) => c.centerIndex === d.city && c.seat === seat);
-  if (minor && id && d.currency === 'gold') {
+  if (minor && id && (d.currency === 'gold' || d.currency === 'faith')) {
     if ((minor.buildings ?? []).includes(id)) return void count(ctx, 'minorAi:buyBuilding', 'applied', d.player);
-    const price = minorBuildingPrice(state, minor, id);
-    minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
-    if (minor.economy) purchaseSpend(minor.economy, price * FX, false);
+    const price = minorBuildingPrice(state, minor, id, d.currency);
+    if (d.currency === 'faith') minor.faith -= Math.min(price, Math.max(0, minor.faith));
+    else {
+      minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
+      if (minor.economy) purchaseSpend(minor.economy, price * FX, false);
+    }
     if (minor.prodItem === minorItemKey({ building: id })) minorSetItem(state, minor, null);
     minorRaiseBuilding(state, minor, id);
-    return void count(ctx, 'minorAi:buyBuilding', 'fallback', d.player, `${id}: the engine bought none (gold ${minor.treasury})`);
+    return void count(ctx, 'minorAi:buyBuilding', 'fallback', d.player, `${id}: the engine bought none (${d.currency} ${d.currency === 'faith' ? minor.faith : minor.treasury})`);
   }
   if (!actor || !city || !id) return void count(ctx, 'buyBuilding', 'refused', d.player);
   if (city.buildings.includes(id)) return void count(ctx, 'buyBuilding', 'refused', d.player);
@@ -6937,7 +6942,7 @@ function foldSavings(savings: Map<number, EconomicMemory>, imp: Imported, decisi
       const cs = minorAt(d.player, d.city);
       const id = engineRowOf(cat, 'building', d.building);
       const eco = cs && savings.get(cs.seat);
-      if (cs && id && eco) purchaseSpend(eco, minorBuildingPrice(state, cs, id) * FX, false);
+      if (cs && id && eco) purchaseSpend(eco, minorBuildingPrice(state, cs, id, 'gold') * FX, false);
     } else if (d.kind === 'upgrade') {
       const eco = savings.get(imp.seatOfPlayer.get(d.player) ?? NO_SEAT);
       if (eco) upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX);

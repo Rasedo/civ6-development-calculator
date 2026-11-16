@@ -286,6 +286,9 @@ class CityAi:
         # the economic AI's purchase list holds it (`ContractBook.purchase`;
         # its order the contracts' ids)
         self.c_purchase = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
+        # the religious AI's purchase list holds it (`ContractBook.faith`;
+        # its order the contracts' values, of equals their ids)
+        self.c_faith = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         self.in_hand = torch.full((B, S), -1, dtype=L, device=dev)
         # the plot reservations
         R = N_RESERVATIONS
@@ -485,7 +488,9 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
     unit, bld, dist = _cget(ai.c_unit, s, j), _cget(ai.c_building, s, j), _cget(ai.c_district, s, j)
     gold = gold_purchasable(ai, unit, bld, dist)
     _cset(ai.c_purchase, s, j, True, mask & gold)
-    taken = gold | faith_purchasable(ai, unit, bld, dist)
+    faith = faith_purchasable(ai, unit, bld, dist)
+    _cset(ai.c_faith, s, j, True, mask & faith)
+    taken = gold | faith
     el = mask & contract_eligible(ai, s, j, w)
     _cset(ai.c_listed, s, j, True, el)
     _cset(ai.c_shown, s, j, CP_SUBMITTED, el)
@@ -622,12 +627,14 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
     ai.c_released[:, s] |= rel
     held = live & ~owned & city
     ai.c_purchase[:, s] &= ~held
+    ai.c_faith[:, s] &= ~held
     ai.c_in_tree[:, s] &= ~held
     ai.c_queued[:, s] &= ~held
     gone = live & ~owned & ~city
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
     ai.c_purchase[:, s] &= ~gone
+    ai.c_faith[:, s] &= ~gone
     ai.c_in_tree[:, s] &= ~gone
     ai.c_queued[:, s] &= ~gone
     ai.c_released[:, s] &= ~gone

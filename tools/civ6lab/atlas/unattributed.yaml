@@ -1411,6 +1411,16 @@
     - "- 0x7a51f0: T past H FX(−9999); an unowned plot pays its price 0x1b1cb0 (+0x1688; −1 beyond gp +0x124 or with no owned neighbour) at the yield value, discoun..."
     - "...it; PV; Housing / TilesRequired at 0x7a3d70; the claims (+0x1380, 0x39de20; 0x7a10c0: 0x1b1cb0 × 0.5, 0x79f0c0); the modifiers 0x7a4b20. The Farm's second Housing: \"C-127: the improv..."
   review: reviewed
+- addr: 0x1b2930
+  final: 0x121bd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...nit of Combat 0; a unit with ReligiousStrength (+0x78) not Faith-enabled in the city (0x1b2930) needs the AI's religion (+0x1c0) to be the city's; then the purchase request 0x977570...
+  review: imported
 - addr: 0x1e60f0
   final: 0x2ca0f0
   kind: function
@@ -1445,6 +1455,7 @@
     - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
     - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
     - "C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
     - "...operation's units (0x6092c0: +0x7d0, +0x770) to its type's own AI type (+0x168, setter 0x1e60f0, via 0x79b9c0) at 0x81cb90..0x81cbd3, before the strengths (0x73f7d0): it leaves the st..."
@@ -4312,6 +4323,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - "...turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. /..."
     - "- The city's turn 0x5ce680 (from 0x5c2650): on a full update 0x5d7e00, 0x5cadc0, 0x5cbd10 (advantages and weights; logged 0x5cdd70, adv 0x5d83c0, the YIELD..."
@@ -4421,16 +4433,20 @@
 - addr: 0x5f3ee0
   final: 0x3f8af0
   kind: function
-  status: PARTLY
+  name: the contract's Faith purchase
+  semantics: "vt +0x18: in the city +0x588 binds (or every city): a unit's (+0x408) 0x752440, a building's (+0x468) 0x7522c0; bought, progress 7 COMPLETED through the holder +0xa8, its \"FAITH PURCHASE\" line printed under a test of the contract's unit (a building's prints none)."
+  status: READ
   cases:
-    - recording: h1_duelv1117
-      value: "- MEASURED: 7,582 / 22,991 values within 0.005 at the reconstructed T over   runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128."
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
-  notes:
-    - ".claude/scratchpad/cb/notes.txt: ...yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD f2f97c GOLD f2f980 SCI f..."
+    - recording: h1_duels1138
+      turn: 102
+      value: contract 327 COMPLETED with no purchase line
+  impl: [cpu/core/aiEconomic.ts:religiousPurchases]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - ...0, 0x5cd4e0), the contract lines (0x5f4cd0, 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancel 0x5d7640.
-  review: imported
+  review: reviewed
 - addr: 0x5f5d50
   final: 0x3fa5e0
   kind: function
@@ -4491,6 +4507,7 @@
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
     - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed
@@ -4515,6 +4532,8 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:faithPurchasable]
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x600800
@@ -5068,7 +5087,10 @@
     - recording: 1124
       turn: 27
       value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
-  impl: [cpu/core/aiEconomic.ts:purchaseContracts, gpu/core/sim_minorai.py:_minor_contract_purchases]
+  impl:
+    - cpu/core/aiEconomic.ts:purchaseContracts
+    - gpu/core/sim_minorai.py:_minor_contract_purchases
+    - gpu/core/sim_minorai.py:_minor_gold_purchases
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
@@ -6249,6 +6271,63 @@
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 → 0x7265b0): the named definition's candidate (0x747fa0 vt +8, 0x73e610, 0x73e870)."
     - "...ation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   review: reviewed
+- addr: 0x749840
+  final: 0x4e8b30
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiEconomic.ts:religiousPurchases]
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...by its listener 0x751830 with every contract vt +0x78 0x5f6920 passes): 0x749b40 (over 0x749840) keeps the entries whose contract is alive, ACCEPTED (+0x100 3) and passes vt +0x78, th..."
+  review: imported
+- addr: 0x7498c0
+  final: 0x4e8bb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...true); 0x749cf0 a stable merge sort by the contract's value (+0x3a0, the larger first: 0x7498c0's compare on +0x3a0); then, for a player no human drives (0x469d70), each entry's vt..."
+  review: imported
+- addr: 0x749b40
+  final: 0x4e8e30
+  kind: function
+  name: the Religious AI's purchase list prune
+  semantics: "remove_if over the list's entries (16 bytes, the contract handle): kept where the contract is alive, ACCEPTED (+0x100 3) and its vt +0x78 (0x5f6920, faith-purchasable) passes (0x749840 the first to go)."
+  status: READ
+  cases:
+    - recording: h1_duels1138
+      turn: 102
+      value: contract 327 kept ACCEPTED and bought
+  impl: [cpu/core/aiEconomic.ts:religiousPurchases]
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  context:
+    - ...READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purc...
+    - "...+0x3c8, filled by its listener 0x751830 with every contract vt +0x78 0x5f6920 passes): 0x749b40 (over 0x749840) keeps the entries whose contract is alive, ACCEPTED (+0x100 3) and pass..."
+  review: reviewed
+- addr: 0x749cf0
+  final: 0x4e8fe0
+  kind: function
+  name: the Religious AI's purchase list sort
+  semantics: a stable merge sort (0x749be0 -> 0x748d40, 0x7498c0) of the list by the contract's value +0x3a0, the larger first.
+  status: READ
+  cases:
+    - recording: h1_duels1138
+      turn: 102
+      value: one entry, contract 327
+  impl:
+    - cpu/core/aiEconomic.ts:religiousPurchases
+    - gpu/core/sim_minorai.py:_minor_religious_purchases
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  context:
+    - ...d150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not p...
+    - "...sses vt +0x78, the rest erased (0x5e56b0); each kept entry's vt +0x48 (0xbe4aa0, true); 0x749cf0 a stable merge sort by the contract's value (+0x3a0, the larger first: 0x7498c0's com..."
+  review: reviewed
 - addr: 0x7513f0
   final: 0x4eeb90
   kind: function
@@ -6296,9 +6375,30 @@
   impl: [cpu/core/aiContracts.ts:faithPurchasable]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - ...750fe0, belief add 0x751430, Belief Analysis start 0x74ea60 (full civs only, 0x469db0), 0x751830, 0x74e390, 0x7513f0.
   review: imported
+- addr: 0x7522c0
+  final: 0x4ef600
+  kind: function
+  name: the Religious AI's building purchase
+  semantics: "over the player's cities (the one passed, else each): the first whose religion (City +0x1910) is not -1 whose purchase request on YIELD_FAITH (0x977490, the yield global 0xf2f988; its test vt +0x48, its execution vt +0x50) passes buys the building; true where it bought."
+  status: READ
+  cases:
+    - recording: h1_duels1138
+      turn: 102
+      value: Vatican City's Cathedral of contract 327 bought for 190 Faith, its city's religion 11 from t102
+  impl:
+    - cpu/core/aiEconomic.ts:religiousPurchases
+    - cpu/core/minorCityAi.ts:minorFaithBuilding
+    - gpu/core/sim_minorai.py:_minor_religious_purchases
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  context:
+    - ...17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported
+    - "...r_Cities lookup 0x36f660) or, binding none, every city. A building's (+0x468) through 0x7522c0: the first city whose religion (City +0x1910) is not -1 whose purchase request on YIELD..."
+  review: reviewed
 - addr: 0x75d530
   final: 0x4f60d0
   kind: function
@@ -10711,6 +10811,15 @@
     - "- THE COUNT 0x4c1a30, as a unit is made (the city's create 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0), after the best strengths, adds one to PlayerStats m_aiNumU..."
     - "...eligibility terms failed for Stonehenge (the major's city threat unread in its memory); 0xb67b30 / 0xb02c60 (the other grant effects calling 0x4c1a30: GRANT_UNITS_IN_DISTRICTS, a free..."
   review: reviewed
+- addr: 0xb69900
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0. The writer is EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES (its effect class's vt +0x60 0xb69900 -> 0x3726c0, +0xf4 its Amount), Steel's STEEL_UNLOCK_URBAN_DEFENSES. The walls-prerequi...
+  review: imported
 - addr: 0xb69d50
   final: 0x801630
   kind: function
@@ -11089,6 +11198,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
     - ".../ 0x6889b0; merge sort 0x684bf0 → 0x6839c0 → 0x6846d0 by +0x160); each entry vt +0x50 (0xbe4aa0) runs vt +0x20 (0x5f3c40): a unit TryPurchaseUnits (+0x408; COMPLETED, the PURCHASE lin..."

@@ -22,8 +22,10 @@
     - cpu/core/aiEconomic.ts:BuildingPurchaseCity
     - cpu/core/minorBuild.ts:minorBuyBuilding
     - gpu/core/sim_minors.py:_minor_buy_building
+    - cpu/core/minorCityAi.ts:minorFaithBuilding
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - ...ryPurchaseUnits' savings test without its threatened-city balance; the purchase request 0x977490 (city +0x158, YIELD_GOLD) and the command vt +0x48 / +0x50; the spend SLUSH -= max(0, p...
   review: reviewed
@@ -45,9 +47,11 @@
     - cpu/core/minorCityAi.ts:minorPurchaseCity
     - gpu/core/sim_minorai.py:_minor_contract_purchases
     - gpu/core/sim_minorai.py:_minor_purchases
+    - gpu/core/sim_minorai.py:_minor_gold_purchases
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   notes:
     - "builds the purchase request; the command it submits validates it — the CanTrain refusal is read off the records, its code unread"
   context:

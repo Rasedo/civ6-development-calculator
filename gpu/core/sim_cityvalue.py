@@ -1143,6 +1143,14 @@ class SimCityValue:
             undecided = undecided & has & ~dmg
         return lacking, damaged
 
+    def _cv_urban_refused(self, f, b: dict) -> torch.Tensor:
+        """`urbanRefused`: a building with OuterDefenseStrength under the
+        player's Urban Defenses, refused for good"""
+        like = f.like()
+        if b["outerDefenseStrength"] <= 0:
+            return torch.zeros_like(like, dtype=torch.bool)
+        return _t(f.urban_defenses(), like).bool()
+
     def _cv_refused(self, f, b: dict) -> torch.Tensor:
         """`refused`: what CanConstruct refuses outright"""
         like = f.like()
@@ -1158,6 +1166,7 @@ class SimCityValue:
         if b["adjacentRiver"]:
             no = no | ~_t(f.riverside(), like).bool()
         no = no | _t(f.ground_refuses(b["type"]), like).bool()
+        no = no | self._cv_urban_refused(f, b)
         # the walls prerequisite test ends CanConstruct before the rest: for
         # good where the city lacks it, for now under damaged outer defences
         lacking, damaged = self._cv_walls_prereq(f, b)
@@ -2296,6 +2305,11 @@ class _MinorFacts:
 
     def riverside(self):
         return self.sim.tile_river.gather(1, self._centre().clamp(min=0).unsqueeze(1)).squeeze(1)
+
+    def urban_defenses(self):
+        # `CityBuildFacts.urbanDefenses`: the seat holds Urban Defenses' tech
+        t = self.sim._urban_def_tech
+        return self.sim.citystate_techs[:, self.s, t] if t >= 0 else self._bools(False)
 
     def ground_refuses(self, b):
         bi = self._building_index(b)

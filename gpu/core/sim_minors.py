@@ -373,7 +373,7 @@ class SimMinors:
         ai.c_progress[:, s] = torch.where(on, torch.full_like(prog, CP_COMPLETED), prog)
         ai.c_goal_held[:, s] &= ~(on | rel)
         ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
-        for f in (ai.c_purchase, ai.c_in_tree, ai.c_queued, ai.c_released):
+        for f in (ai.c_purchase, ai.c_faith, ai.c_in_tree, ai.c_queued, ai.c_released):
             f[:, s] &= ~gone
 
     def _minor_completion_choice(self, s: int, fire: torch.Tensor, idx: int, cur: torch.Tensor, sci: torch.Tensor) -> None:
@@ -2733,15 +2733,17 @@ class SimMinors:
         self._bldg_version += 1
         self._eff_version += 1
 
-    def _minor_buy_building(self, s: int, mask: torch.Tensor, bi: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
+    def _minor_buy_building(self, s: int, mask: torch.Tensor, bi: torch.Tensor, price: torch.Tensor,
+                            faith: bool = False) -> torch.Tensor:
         """`minorBuyBuilding` where `mask` (the purchase request 0x977490):
-        the treasury covers the price; engine building `bi` [B] rises, and
-        leaves the queue where the city produced it; [B] the games where it
-        bought"""
-        go = mask & self._afford(self.citystate_treasury[:, s], price)
+        the treasury (`faith`: the Faith) covers the price; engine building
+        `bi` [B] rises, and leaves the queue where the city produced it; [B]
+        the games where it bought"""
+        purse = self.citystate_faith if faith else self.citystate_treasury
+        go = mask & self._afford(purse[:, s], price)
         if not bool(go.count_nonzero()):
             return go
-        self.citystate_treasury[:, s] -= torch.where(go, price, torch.zeros_like(price))
+        purse[:, s] -= torch.where(go, price, torch.zeros_like(price)).to(purse.dtype)
         held = go & (self.citystate_item[:, s] == self._mk_b0 + bi)
         if bool(held.any()):
             self._minor_set_item(s, held, -1)

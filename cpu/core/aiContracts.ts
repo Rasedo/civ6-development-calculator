@@ -121,9 +121,12 @@ export interface ContractBook {
   /** the economic AI's purchase list (AI::Economic +0x5d0): the ids of the
    *  contracts its listener took, in arrival order */
   purchase: number[];
+  /** the religious AI's purchase list (ReligiousAI +0x3c8): the ids of the
+   *  contracts its listener took, in arrival order */
+  faith: number[];
 }
 
-export const newContractBook = (): ContractBook => ({ contracts: [], city: {}, inHand: {}, purchase: [] });
+export const newContractBook = (): ContractBook => ({ contracts: [], city: {}, inHand: {}, purchase: [], faith: [] });
 
 export function contractById(book: ContractBook, id: number): AiContract | undefined {
   return book.contracts.find((c) => c.id === id);
@@ -225,14 +228,17 @@ export function faithPurchasable(c: ContractItem): boolean {
  *  Warrior kept under the Harbor contract), clears the city's production; the economic AI's
  *  (goldPurchasable, into its purchase list `ContractBook.purchase`; a
  *  city-state's too: AI_CityBuild.csv's PURCHASE lines of players 2+) and
- *  the religious AI's (faithPurchasable); any taker makes it ACCEPTED */
+ *  the religious AI's (faithPurchasable, into its purchase list
+ *  `ContractBook.faith`); any taker makes it ACCEPTED */
 export function submitContract(book: ContractBook, c: AiContract, cities: readonly ContractCity[], turn: number,
   clearProduction: (city: ContractCity) => void, line: (city: ContractCity, c: AiContract) => void): void {
   c.progress = CP_SUBMITTED;
   book.contracts.push(c);
   const gold = goldPurchasable(c);
   if (gold) book.purchase.push(c.id);
-  let taken = gold || faithPurchasable(c);
+  const faith = faithPurchasable(c);
+  if (faith) book.faith.push(c.id);
+  let taken = gold || faith;
   for (const city of cities) {
     if (!contractEligible(c, city)) continue;
     (book.city[city.id] ??= []).push(c.id);
@@ -379,8 +385,9 @@ export function reapContracts(book: ContractBook, held: ReadonlySet<number>): nu
   const kept = (id: number): boolean => held.has(id) || hand.has(id) || listed.has(id);
   const gone = book.contracts.filter((c) => !kept(c.id)).map((c) => c.id);
   book.contracts = book.contracts.filter((c) => kept(c.id));
-  // the purchase list's handles empty with them
+  // the purchase lists' handles empty with them
   book.purchase = book.purchase.filter((id) => held.has(id));
+  book.faith = book.faith.filter((id) => held.has(id));
   return gone;
 }
 

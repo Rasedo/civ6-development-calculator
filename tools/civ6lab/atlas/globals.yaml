@@ -2261,7 +2261,9 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - "...d2d10: list > 0 -> 1, < 0 -> -1) is -1, x2 where 1 (a MustPurchase row of the district @0xf2f988 x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain..."
   review: imported

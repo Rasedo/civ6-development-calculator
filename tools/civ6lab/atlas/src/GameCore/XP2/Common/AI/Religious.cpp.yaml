@@ -76,9 +76,13 @@
   kind: function
   semantics: "the religious AI's turn: the pantheon pick 0x74e2b0 while m_mustFoundPantheon holds."
   status: PARTLY
+  impl:
+    - cpu/core/aiEconomic.ts:religiousPurchases
+    - gpu/core/sim_minorai.py:_minor_religious_purchases
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+    - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
   context:
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief A..."
   review: reviewed

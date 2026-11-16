@@ -29,7 +29,7 @@
  */
 import { AI_DEFAULT_SAVINGS } from '../data/aiTables';
 import { FX, fmul } from './aiValue';
-import { CP_ACCEPTED, CP_COMPLETED, contractById, goldPurchasable, type AiContract, type ContractBook } from './aiContracts';
+import { CP_ACCEPTED, CP_COMPLETED, contractById, faithPurchasable, goldPurchasable, type AiContract, type ContractBook } from './aiContracts';
 
 /** the savings slots by SavingTypes order */
 export const SLOT_SLUSH = 0;
@@ -229,6 +229,42 @@ export function purchaseContracts(e: EconomicMemory, book: ContractBook, human: 
       const city = buildingCity(c);
       if (!city || c.building === null || !tryPurchaseBuilding(e, city, c.building)) continue;
     }
+    c.progress = CP_COMPLETED;
+    bought.push(c);
+  }
+  return bought;
+}
+
+/** THE RELIGIOUS AI'S PURCHASES (its turn 0x74fbf0 at 0x74fce1..0x74fe0c):
+ *  the purchase list (ReligiousAI +0x3c8, the contracts its listener took at
+ *  their submission) keeps the contracts still alive, ACCEPTED and
+ *  faithPurchasable (0x749b40 over 0x749840, vt +0x78), the higher value
+ *  first, of equals in arrival order (0x749cf0, a stable merge sort by the
+ *  contract's value +0x3a0); then, for a player no human drives, each tries
+ *  its Faith purchase (vt +0x18 0x5f3ee0): a unit's through `unit`
+ *  (0x752440), a building's through `building` (0x7522c0), each in the city
+ *  the contract binds (every city where it binds none), COMPLETED where it
+ *  buys — a unit's "FAITH PURCHASE" line; a building's prints none, its line
+ *  under a test of the contract's unit (0x5f4208) (runs/h1_duels1138 t102:
+ *  Vatican City's Cathedral of contract 327, submitted at t101, bought for
+ *  190 Faith as its city's majority religion stood, the contract COMPLETED
+ *  with no line). The contracts bought. */
+export function religiousPurchases(book: ContractBook, human: boolean,
+                                   unit: (c: AiContract, unit: string) => boolean,
+                                   building: (c: AiContract, building: string) => boolean): AiContract[] {
+  const kept = book.faith.filter((id) => {
+    const c = contractById(book, id);
+    return !!c && c.progress === CP_ACCEPTED && faithPurchasable(c);
+  });
+  // a stable sort, the higher value first
+  book.faith = kept.map((id, k) => ({ id, k, v: contractById(book, id)!.value }))
+    .sort((a, b) => b.v - a.v || a.k - b.k).map((x) => x.id);
+  const bought: AiContract[] = [];
+  if (human) return bought;
+  for (const id of book.faith) {
+    const c = contractById(book, id)!;
+    const ok = c.unit !== null ? unit(c, c.unit) : c.building !== null ? building(c, c.building) : false;
+    if (!ok) continue;
     c.progress = CP_COMPLETED;
     bought.push(c);
   }
