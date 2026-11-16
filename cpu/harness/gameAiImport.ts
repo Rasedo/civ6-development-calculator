@@ -47,12 +47,12 @@
 import { CP_IN_PROGRESS, faithPurchasable, type AiContract } from '../core/aiContracts';
 import { SLOT_DEFENSE, SLOT_DISTRICT, SLOT_IMPROVEMENT, SLOT_UNIT_OR_BUILDING, type CityAi, type CityTree, type CityTreeTrigger } from '../core/aiCityTrees';
 import { BT_FRESH, BT_SUCCESS, type AiTreeNode, type BtMemory } from '../core/behaviorTree';
-import { opsOf, type OpsAi } from '../core/operations/manager';
+import { CITY_AI_PASS, opsOf, type OpsAi } from '../core/operations/manager';
 import { NO_PLOT, type Operation, type OpTeam } from '../core/operations/operation';
 import type { CityState } from '../core/types';
 import { treeFirstGen, treeGen, treeHeld, treeSlot } from '../core/treePool';
 import { AI_CITY_TREES } from '../data/aiCityTrees';
-import { AI_OP_DEFS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES } from '../data/aiOperations';
+import { AI_MINOR_TRIGGERS, AI_OP_DEFS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_TRIGGERED_TREES } from '../data/aiOperations';
 import type { GameContract, GameMemoryRead, GameOperation, GameTree, MemoryNames } from './aiMemory';
 
 /** the city trees a city-state runs and the slot each takes */
@@ -386,12 +386,49 @@ function contractOf(w: ImportWorld, c: GameContract, trees: Record<string, GameT
   };
 }
 
+/** a tree object's id (the city's `m_eventTrees`) as its control's: the
+ *  tree pool and the control pool take their slots and generations in step,
+ *  the control's two ahead in each (every tree of every end look of
+ *  runs/h1_duels1132-1151: controlId - treeId = 2:2) */
+const TREE_TO_CONTROL = 2 * 0x10000 + 2;
+
+const UPGRADE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade Units' && AI_MINOR_TRIGGERS.includes(t.trigger))?.priority ?? 0;
+
+/** the controls a city-state's turn ended after its `log` read, each with
+ *  its walk's priority, in the order the destroy loops freed them (the
+ *  priorities highest first, of equals in slot order): those the log lists
+ *  and the end look does not, and the city's event trees the end look names
+ *  anew, none of them running (runs/h1_duels1169 city-state 3 t211: the
+ *  Upgrade Units tree 204:5 at the log, the Build City District and
+ *  Improvement trees 203:1 / 204:5 in `m_eventTrees`, controls 205:3 and
+ *  206:7) */
+function endedControls(read: GameMemoryRead, log: GameMemoryRead | undefined): { id: number; priority: number }[] {
+  if (!log?.trees || !read.trees) return [];
+  const live = new Set(Object.keys(read.trees).map(Number));
+  const out: { id: number; priority: number }[] = [];
+  for (const [k, g] of Object.entries(log.trees)) {
+    const id = Number(k);
+    if (live.has(id)) continue;
+    const op = (g.operation ?? -1) !== -1 ? (log.ops ?? []).find((o) => o.treeControlId === id) : undefined;
+    out.push({ id, priority: op ? AI_OP_DEFS[op.name ?? '']?.priority ?? CITY_AI_PASS : g.name === 'Upgrade Units' ? UPGRADE_PRIORITY : CITY_AI_PASS });
+  }
+  const events = (r: GameMemoryRead) => (r.holders?.cities ?? []).flatMap((c) => ((c as { fields?: { m_eventTrees?: number[] } }).fields?.m_eventTrees ?? []).slice(1));
+  const before = new Set(events(log));
+  for (const t of events(read)) {
+    const id = t + TREE_TO_CONTROL;
+    if (t < 0 || before.has(t) || live.has(id) || out.some((e) => e.id === id)) continue;
+    out.push({ id, priority: CITY_AI_PASS });
+  }
+  return out.sort((a, b) => b.priority - a.priority || treeSlot(a.id) - treeSlot(b.id));
+}
+
 /**
  * The game's city AI of one city-state onto ours (`read` its end look;
  * `opIds` per game operation tree the id our operation holds it under,
  * `importOps`); returns the trees and contracts taken.
  */
-export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld, opIds: ReadonlyMap<number, number>): { trees: number; contracts: number } {
+export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld, opIds: ReadonlyMap<number, number>,
+  log?: GameMemoryRead): { trees: number; contracts: number } {
   const ai = cs.cityAi as CityAi | undefined;
   if (!ai || !read.trees || !read.contracts) return { trees: 0, contracts: 0 };
   // each game city tree under its control id; ours the game lacks end
@@ -420,12 +457,15 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   // Units tree 2883589 in slot 5), the next generation past the highest
   const controls = Object.keys(read.trees).map(Number);
   const taken = new Set(controls.map(treeSlot));
-  cs.opsNext = Math.max(cs.opsNext ?? treeFirstGen(cs.seat), ...controls.map((c) => treeGen(c) + 1));
-  cs.treeSlots = Math.max(cs.treeSlots ?? treeHeld(cs.seat), ...controls.map((c) => treeSlot(c) + 1));
-  const ours = (cs.treeFree ?? []).filter((s) => !taken.has(s) && s < cs.treeSlots!);
+  const ended = endedControls(read, log);
+  const seen = [...controls, ...ended.map((e) => e.id)];
+  cs.opsNext = ended.length ? Math.max(...seen.map((c) => treeGen(c) + 1)) : Math.max(cs.opsNext ?? treeFirstGen(cs.seat), ...seen.map((c) => treeGen(c) + 1));
+  cs.treeSlots = Math.max(cs.treeSlots ?? treeHeld(cs.seat), ...seen.map((c) => treeSlot(c) + 1));
+  const now = ended.map((e) => treeSlot(e.id)).filter((s, k, a) => !taken.has(s) && a.indexOf(s) === k);
+  const ours = (cs.treeFree ?? []).filter((s) => !taken.has(s) && s < cs.treeSlots! && !now.includes(s));
   const rest: number[] = [];
-  for (let s = treeHeld(cs.seat); s < cs.treeSlots; s++) if (!taken.has(s) && !ours.includes(s)) rest.push(s);
-  cs.treeFree = [...rest, ...ours];
+  for (let s = treeHeld(cs.seat); s < cs.treeSlots; s++) if (!taken.has(s) && !ours.includes(s) && !now.includes(s)) rest.push(s);
+  cs.treeFree = [...rest, ...ours, ...now];
   // every contract of a tree taken — the city trees' and the operations':
   // its owner's, else the taken tree whose list holds it — and every one
   // the research or culture AI holds (a civic goal's contract is owned by

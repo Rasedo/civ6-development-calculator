@@ -13,12 +13,17 @@
     - recording: 1121
       turn: 9
       value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
-  impl: [cpu/core/aiCityTrees.ts:tickCityTrees, cpu/core/treePool.ts:freeEndedTrees]
+  impl:
+    - cpu/core/aiCityTrees.ts:tickCityTrees
+    - cpu/core/treePool.ts:freeEndedTrees
+    - cpu/core/operations/manager.ts:OpsEnv
+    - cpu/core/operations/manager.ts:operationsRun
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+    - "C-99 / C-96: the tree pool freed after each priority's walk, the city's event trees as controls, no build without Movement, a held worship building's repair — READ (0x7ffdd0 -> 0x7cb2e0 per priority), LAB (the rest), both twins"
   context:
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or whose +0x308 is set with its root ne..."
   review: reviewed
@@ -223,6 +228,7 @@
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
     - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
+    - "C-99 / C-96: the tree pool freed after each priority's walk, the city's event trees as controls, no build without Movement, a held worship building's repair — READ (0x7ffdd0 -> 0x7cb2e0 per priority), LAB (the rest), both twins"
   context:
     - "...e homeland (0x70a370) release their units (-1) as they end. A tree's units each tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree marked (+0x3c8) with no opera..."
   review: reviewed

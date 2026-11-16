@@ -1548,18 +1548,20 @@ class SimMinors:
 
     def _minor_worship(self, s: int) -> torch.Tensor:
         """[B] long — `minorWorship`: the worship building minor `s`'s majority
-        religion's Worship belief names, -1 where none or while its city holds
-        a worship building."""
+        religion's Worship belief names, -1 where none; while its city holds a
+        worship building, that building (its repair)."""
         fol = self._minor_followed()[:, s]
         n = self.civ_worship.shape[1]
         wi = torch.where((fol >= 0) & (fol < n),
                          self.civ_worship.gather(1, fol.clamp(min=0, max=n - 1).unsqueeze(1)).squeeze(1),
                          torch.full_like(fol, -1))
+        held = self.city_bldg[:, self._CITY_MINOR0 + s, 0] & self._b_worship.unsqueeze(0)
+        holds = held.any(dim=1)
+        hb = held.long().argmax(dim=1)
         if self._worship_bidx.numel() == 0:
-            return torch.full_like(wi, -1)
+            return torch.where(holds, hb, torch.full_like(wi, -1))
         wb = self._worship_bidx[wi.clamp(min=0, max=self._worship_bidx.numel() - 1)]
-        holds = (self.city_bldg[:, self._CITY_MINOR0 + s, 0] & self._b_worship.unsqueeze(0)).any(dim=1)
-        return torch.where((wi >= 0) & ~holds, wb, torch.full_like(wi, -1))
+        return torch.where(holds, hb, torch.where(wi >= 0, wb, torch.full_like(wi, -1)))
 
     def _pave_plot(self, rows: torch.Tensor, tiles: torch.Tensor, keep: tuple[int, ...] = ()) -> None:
         """`paveGround` — the ground a district or a wonder takes, for every

@@ -2193,9 +2193,11 @@ class SimMinorOps:
 
         if not bool(on.any()):
             if upg:
-                # their slot order alone: no operation runs
+                # their slot order alone: no operation runs; the destroy
+                # loop closes their priority's walk
                 for q in self._mops_walk_slots(s, upg_ids):
                     upgrade_trees(q)
+                self._mops_free_trees(s, act)
             city_hook(_CITY_AI_PASS)
             self._mops_free_trees(s, act)
             return
@@ -2212,8 +2214,12 @@ class SimMinorOps:
         # each that runs as the walk opens
         op_ids = torch.where(self.mops_def[:, s] >= 0, self.mops_id[:, s], torch.full_like(self.mops_id[:, s], -1))
         slots = self._mops_walk_slots(s, op_ids if upg_ids is None else torch.cat([op_ids, upg_ids], dim=1))
-        prios = {int(Tm.defs[d]["priority"]) for d in Tm.trees} | ({Tm.upgrade_priority} if upg else set())
+        prios = ({int(Tm.defs[d]["priority"]) for d in Tm.trees} | ({Tm.upgrade_priority} if upg else set())
+                 | ({_CITY_AI_PASS} if hook[0] else set()))
         for prio in sorted(prios, reverse=True):
+            # the destroy loop closes each priority's walk (`OpsEnv.destroy`)
+            if prio != max(prios):
+                self._mops_free_trees(s, act)
             city_hook(prio)
             for q in slots:
                 for k in range(N_OPS):

@@ -20361,3 +20361,56 @@ gpu/core/sim_economy.py) and `_tac_chase`.
   16:13 sees the camp's Spearman, and one (flags 0x9101) at t61 / t63, where
   it does not; neither branch read here gives that in the tactical pass
   (+0x590 unread for an AI's unit).
+
+## C-99 / C-96: the tree pool freed after each priority's walk, the city's event trees as controls, no build without Movement, a held worship building's repair — READ (0x7ffdd0 -> 0x7cb2e0 per priority), LAB (the rest), both twins
+
+`operationsRun`'s passes and `OpsEnv.destroy` (cpu/core/operations/manager.ts),
+`cityStateMilitary`'s `destroy` (cpu/core/minorOps.ts), `freeCitiesMilitary`
+(cpu/core/freeOps.ts); `endedControls`, `TREE_TO_CONTROL` and the pool in
+`importCityAi` (cpu/harness/gameAiImport.ts); the tree world's `improve`
+order (cpu/core/minorCityAi.ts); `minorWorship` (cpu/core/minorBuild.ts).
+GPU `_mops_run`'s per-priority `_mops_free_trees` (gpu/core/sim_minorops.py),
+`order`'s improve (gpu/core/sim_minorai.py), `_minor_worship`
+(gpu/core/sim_minors.py).
+
+- THE DESTROY LOOP PER PRIORITY: the tree manager's tick 0x7ffdd0 runs once
+  per priority and ends in its destroy loop 0x7cb2e0, so a tree ended at a
+  higher priority frees its slot (to the free list's head) before the trees
+  of a lower one end. Each turn a city-state's Upgrade Units tree (priority
+  3) and its Build City District / Improvement trees (priority 2) end in the
+  turn they start: the next turn's first new tree takes the slot of the
+  last priority-2 tree freed. Confirmed: runs/h1_duels1169 city-state 3
+  t187-191 (Upgrade Units 150:5 then Build City Improvement 151:4 ended,
+  t188's improvement tree 152:4), t211 the district tree in slot 3 ticking
+  before the Solar Farm tree in slot 7 (builder.improve t211-214 gone);
+  1178 t226-247, 1171 t248, 1174 t220, 1185 t237 the Solar Farm rows gone.
+- THE CITY'S EVENT TREES (`m_eventTrees`, CityBuildAI) hold TREE ids, not
+  control ids: every tree of every end look of runs/h1_duels1132-1151 has
+  controlId - treeId = 2:2 (both pools allocate and free in step, the
+  control pool's two standing slots ahead). The aimem import reads the
+  controls a turn ended after its `log` read: those the log lists and the
+  end look does not (their priority their operation's, Upgrade Units 3, a
+  city tree 2) and each event tree the end look names anew and none runs
+  (its control the tree id two generations and two slots on, priority 2), and puts their slots at the
+  free list's head in the destroy loops' order; the next generation is the
+  highest seen + 1 (1169 t211: 205:3 and 206:7; 1174 t221 the Solar Farm
+  laid on 468 as the game's).
+- A BUILD NEEDS MOVEMENT: a Builder with no Movement left starts no
+  improvement (UnitOperations "Can't Start" on UNITOPERATION_BUILD_IMPROVEMENT,
+  runs/h1_duels1140 Muscat t228: the Builder 2228232 off the boat onto 41:19
+  with mv0, the Solar Farm laid at t229). Also gone: 1137 t175, 1160 t170,
+  1170 t221, 1180 t249.
+- A HELD WORSHIP BUILDING is the one the city is offered: its repair is
+  valued (doubled, as any pillaged building) and queued (runs/h1_duels1184
+  La Venta t229: the Wat bought for Faith at t184, pillaged with the
+  Lighthouse at t224; the game's Build City Building contract 1212 BUILDING_WAT
+  at 826.0, ours the Lighthouse).
+- READING: 0x1e60f0 is the watched variable's setter (the value at the
+  watch's +0x58): on the unit's watch +0x778 it writes the assignment
+  +0x7d0. A tree's release (0x7d2190) through it sets +0x7d0 to -1; the
+  earlier reading that the job stays the tree's until another takes it
+  reads the setter on a field it does not write (its runs/h1_duelq1128 t144
+  case fits a unit whose turn was done, which the release passes over).
+- OPEN: the bought Nihang's Corps at runs/h1_duels1170 t241 is Make
+  Military Formation's (the Nihang 1900547 on 27:11 logs Heal, the bought
+  one on the centre 26:11 beside it; UnitFormCorps after PlayerTurnActivated).

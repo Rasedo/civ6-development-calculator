@@ -86,6 +86,9 @@ export interface OpsEnv {
    *  pass (`CITY_AI_PASS`): after the trees of a higher priority, before
    *  those of its own or lower */
   cityHook?: () => void;
+  /** the tree manager's destroy loop (0x7cb2e0), after each priority's
+   *  walk: the slots of the trees ended so far free */
+  destroy?: () => void;
   /** the units those trees hold, out of the operations' offers */
   held?: () => readonly number[];
   /** the units whose turn is done in the pass (+0x530) */
@@ -383,21 +386,21 @@ export const CITY_AI_PASS = 2;
  *  the tree manager's tick in a pass, so the hook runs after the trees of a
  *  priority above `CITY_AI_PASS` and before the rest (runs/h1_dueld1127
  *  city-state 4 t16: City Defense's Warrior steps onto the centre, no
- *  purchase) */
+ *  purchase). Each priority's walk closes with the tick's destroy loop
+ *  (`OpsEnv.destroy`, 0x7cb2e0): a tree ended at a higher priority frees
+ *  its slot before the trees of a lower one end (runs/h1_duels1169
+ *  city-state 3 t187: the Upgrade Units tree 150:5 ends at priority 3, the
+ *  Build City Improvement tree 151:4 at priority 2, and t188's improvement
+ *  tree takes slot 4) */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   const order = [...opsOf(ai).map((op) => ({ priority: opDef(op).priority, slot: treeSlot(op.id), tick: () => tickTree(ai, env, op) })), ...(env.trees ?? [])]
     .sort((a, b) => b.priority - a.priority || a.slot - b.slot);
-  let hooked = !env.cityHook;
-  const hook = (priority: number) => {
-    if (hooked || priority > CITY_AI_PASS) return;
-    hooked = true;
-    env.cityHook!();
-  };
-  for (const t of order) {
-    hook(t.priority);
-    t.tick();
+  const passes = [...new Set([...order.map((t) => t.priority), ...(env.cityHook ? [CITY_AI_PASS] : [])])].sort((a, b) => b - a);
+  for (const p of passes) {
+    if (p === CITY_AI_PASS) env.cityHook?.();
+    for (const t of order) if (t.priority === p) t.tick();
+    env.destroy?.();
   }
-  hook(CITY_AI_PASS);
 }
 
 /** the operations' run before the trees tick: each operation's target and

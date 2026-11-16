@@ -424,7 +424,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
   - LAB (repairs): unconfirmed: a Free City's building under its pillaged district, and a major's queue of several items behind a refused building head (`headLetGo` pops each refused building head in turn); the five duelq recordings hold neither, 1124 Wuhan t236 (a one-item queue) the one major case
-  - LAB (contracts): the improvement tree the game starts and ends the turn it starts, ours laying its improvement: duels1169 p3 t211-t214 the Solar Farm on 41:7 (the game's m_bestImprovementToMake 38 at 120.5, m_eventTrees slot 3 a new id each end look, no tree held), ours lays it (builder.improve; the Solar Farm rows of 1178, 1171, 1174, 1185, 1140 alike, untraced)
 - **C-126. CITY-STATES' PURCHASES, TREASURY, UPGRADES AND DISBANDS.** Weight 2.
   - LAB (treasury): a minor's treasury off the record's: duelz1121 Hunza t155 677 for 691.43
   - LAB (treasury): a minor's treasury off the record's: 1124 Cardiff t189 156 for 163.84
@@ -433,7 +432,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (purchases): 1128 Nazca t25 a Builder PURCHASE (0x5f3c40) ours trains
   - LAB (purchases): unit purchases of the game ours does not make: duels1134 city-state 3 t47 a Spearman (threat 1, ours 98.9 Gold), 1146 city-state 2 t43 a Galley (ours 2.0 Gold), 1137 city-state 3 t178 a Caravel, 1146 city-state 3 t208 an AT Crew (untraced)
   - BUILD (purchases): the suzerain's Faith purchase of the Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK (0x752440 for a major) is in neither twin
-  - LAB (purchases): duels1170 t241 Lahore's Nihang bought for Faith (contract 1142, 350 Faith) forms a Corps with its Nihang 1900547 at once (UnitFormCorps, no new unit in record t242), ours keeps two units (unit.trained t241); 0x1b2930, a city's own Faith test of a religious unit, unread
+  - LAB (purchases): 0x1b2930, a city's own Faith test of a religious unit, unread
   - LAB (upgrades): an upgrade past an obsolete rung (1128 t110 Hong Kong's Warrior 1966081: the game's Man-at-Arms 2097159, ours a Swordsman)
   - LAB (upgrades): duels1135 city-state 3's Trebuchet 1310722 upgrades at t126 in ours, at t127 in the game (untraced)
   - LAB (disbands): 0x4dd270's disband count floor(S/10) against runs/bankrupt_m35's one a turn
@@ -518,9 +517,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (cadence and trees): a pre-turn draw (seed9235 t12)
   - LAB (cadence and trees): duels1137 t22 city-state 4's Attack Barb Camp on 14:11 stands in ours with its two Warriors, the game's gone with the camp its knowledge base drops that turn (knowledge.camps 14:11 // none)
   - LAB (cadence and trees): duels1135 city-state 3: t148 ours' Attack Barb Camp is gone, the game's stands; t167 ours' stands, the game's none
-  - LAB (cadence and trees): duels1146 city-state 2 t25-t26: the tree pool frees each priority's ended trees in its own pass (0x7ffdd0 / 0x7cb2e0: City Defense's slot 7 before Build City District's 4 and Build City Improvement's 8), ours every ended slot in one pass in slot order: t26's Build City District takes slot 7 for the game's 4 and ticks after the Improvement tree on the same plot 40:12, whose Irrigation contract stands at the end look where the game's tree is gone
-  - LAB (cadence and trees): duels1136 Singapore t244: the game's Wind Farm tree takes pool slot 2 and its Neighborhood tree (which ends that turn, the Neighborhood held) slot 3 (10878978 / 10813443), ours slots 5 / 3: our district tree ticks first, its reservation of 5:15 refuses the Wind Farm's, the game's Builder contract missed
-  - LAB (cadence and trees): the Fort picked beside a district tree: duels1140 Johannesburg t136, duels1154 city-state 2 t134 and duels1185 city-state 4 t166 the game's Build City District tree reserves its plot and holds its Urbanization Civic Contract, the Fort tree gone; ours ticks the Fort tree first (1140: its pool slot 5, the district tree's 6, the game's district control in slot 4), its reservation of 16:16 at 52.45 failing the district tree's Reserve Plot at 42.36
   - BUILD (garrison city): Garrison City's swap 0x972880
   - BUILD (garrison city): the garrison's and candidate's AI types post-swap (0x1e60f0 on +0x168)
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
@@ -557,6 +553,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (claims and strikes): the strikers' garrison clause (0x775340 at 0x77541f, not HIGH) ported with no confirming case
   - LAB (claims and strikes): 1127 t127 Knight 1114117's Wander onto 6:9 under the barbarian Spearman 3473440, which the game takes only as a strike (the destination test 0x208b80 on the mover's layer: a destination held by a unit at war is an attack, not a move)
   - LAB (claims and strikes): duelq1127 t145 city-state 4's Skirmisher 1638401 on 4:11 takes Chase Target on the barbarian Musketman 4325382 on 5:7 (80 damage after the Bombard 1703944's 24) and stands, the game's Wanders to 3:10 (plot 488 // 443)
+  - LAB (claims and strikes): duels1170 t241 Lahore's Nihang 1900547 on 27:11 logs Heal (Make Military Formation) and forms a Corps with the Nihang bought for Faith that turn on the centre 26:11 (UnitFormCorps after PlayerTurnActivated, no new unit in record t242); ours keeps two units (unit.trained t241)
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
   - LAB (city defense): where the goal or the planning plot lies on a chokepoint's line the game takes a planning plot the flood puts across that line: duels1157 t13 43:23 / 43:22, where duels1180 t46-t55 34:17 / 35:17 and duels1184 t29 12:19 / 11:19 are passed (the three maps' regions as before under the chokepoint records)

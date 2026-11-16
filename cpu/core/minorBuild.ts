@@ -1151,10 +1151,13 @@ function minorBuildingCost(state: GameState, cityState: CityState, id: string): 
 }
 
 /** The worship building the minor's city is offered (`worshipOffered`): the
- *  one its majority religion's Worship belief names, none while it holds a
- *  worship building. */
+ *  one its majority religion's Worship belief names; while it holds a
+ *  worship building, that one, its repair valued and queued (runs/h1_duels1184
+ *  La Venta t229: its Wat, bought at t184 and pillaged with its Lighthouse at
+ *  t224, the Build City Building contract 1212 at 826.0) */
 function minorWorship(state: GameState, cityState: CityState): string | undefined {
-  if ((cityState.buildings ?? []).some((b) => BUILDINGS[b]?.worship)) return undefined;
+  const held = (cityState.buildings ?? []).find((b) => BUILDINGS[b]?.worship);
+  if (held) return held;
   const rel = majorityReligionOf(state, cityState.seat);
   return rel < 0 ? undefined : worshipBuildingOf(seatOf(state, rel)?.religion.worship);
 }

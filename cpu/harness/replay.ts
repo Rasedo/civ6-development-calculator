@@ -6847,7 +6847,7 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     // window's first turn, before the engine's turn has run one)
     if (nodes && read.ops?.length) s.ops ??= newOpsAi(s.seat);
     const ops = nodes && s.ops ? importOps(s.ops, read, w, turn, cityState).ids : new Map<number, number>();
-    if (cityState && nodes) importCityAi(s as CityState, read, w, ops);
+    if (cityState && nodes) importCityAi(s as CityState, read, w, ops, ctx.gameMemory!.at('log', turn, pid!));
     else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
     if (s === world.barbSeat) spawns.push(...gameSpawnChanges(read, ops));
   }

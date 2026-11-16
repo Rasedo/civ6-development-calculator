@@ -197,11 +197,10 @@ export function freeCitiesMilitary(state: GameState): void {
   freeCityTactics(state, (pass) => {
     const ops = opsOfFree(state);
     // the units whose turn is done out of the operations' offers (0x60a8c0)
-    const env = { ...freeEnv(state, pass), held: () => [...pass.done] };
+    // the destroy loop after each priority's walk: the ended trees' slots free
+    const env = { ...freeEnv(state, pass), held: () => [...pass.done], destroy: () => freeEndedTrees(freeSeatOf(state), opsOf(ops).map((o) => o.id)) };
     operationsRefresh(ops, env);
     operationsRun(ops, env);
-    // the destroy loop after the walk: the ended trees' slots free
-    freeEndedTrees(freeSeatOf(state), opsOf(ops).map((o) => o.id));
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = unitOf(state, id);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

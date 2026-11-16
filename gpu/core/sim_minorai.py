@@ -3162,6 +3162,8 @@ class _MinorWorld:
             adj = torch.tensor(sim._imp_adj_plot + [False], dtype=torch.bool, device=sim.device)
             beside = (sim.neigh[ut.clamp(min=0)] == plot.unsqueeze(1)).any(dim=1) & (ut >= 0)
             here = here | (alive & (imp >= 0) & (k >= 0) & adj[k.clamp(min=0)] & beside)
+            # a unit with no Movement left starts no build
+            here = here & (sim.unit_mp.gather(1, uid.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
         if not bool(here.count_nonzero()):
             return
         ch = sim.major_unit_charges.gather(1, g.unsqueeze(1)).squeeze(1)

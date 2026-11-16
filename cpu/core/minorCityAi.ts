@@ -845,6 +845,10 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         const beside = !!IMPROVEMENTS[id as keyof typeof IMPROVEMENTS]?.adjacentPlot
           && neighbors(state.map, tile).some((n) => n.index === unit.tileIndex);
         if (unit.tileIndex !== plot && !beside) return;
+        // a unit with no Movement left starts no build (runs/h1_duels1140
+        // Muscat t228: the Builder 2228232 off the boat onto 41:19 with no
+        // Movement, UNITOPERATION_BUILD_IMPROVEMENT "Can't Start")
+        if (unit.movesLeft <= 0) return;
         // the repair of the plot's own pillaged improvement: no charge
         if (tile.improvement === id && tile.pillaged) {
           tile.pillaged = false;
@@ -1430,7 +1434,8 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
       + ` best b ${name('b', b.building.index)} ${(b.building.value / FX).toFixed(1)} u ${name('u', b.unit.index)} ${(b.unit.value / FX).toFixed(1)} p ${b.project.index} ${(b.project.value / FX).toFixed(1)}`
       + ` imp ${city.bestImprovement} slots ${JSON.stringify(ai.slots[city.id] ?? [])}`
       + ` trees [${ai.trees.map((t) => `${t.id}:${t.name.split(' ').pop()}:${t.trigger.building ?? t.trigger.unit ?? t.trigger.district ?? t.trigger.improvement}@${t.trigger.plot}`).join(' ')}]`
-      + ` contracts [${ai.contracts.map((c) => `${c.id}:${c.unit ?? c.building ?? c.district ?? ai.techContracts[c.id] ?? 'PLOT'}:${c.progress}:${(c.value / FX).toFixed(1)}`).join(' ')}] hand ${ai.inHand[city.id] ?? -1}`);
+      + ` contracts [${ai.contracts.map((c) => `${c.id}:${c.unit ?? c.building ?? c.district ?? ai.techContracts[c.id] ?? 'PLOT'}:${c.progress}:${(c.value / FX).toFixed(1)}`).join(' ')}] hand ${ai.inHand[city.id] ?? -1}`
+      + ` pool next ${cs.opsNext ?? '-'} made ${cs.treeSlots ?? '-'} free [${(cs.treeFree ?? []).join(',')}] upgrade [${(cs.upgradeTrees ?? []).map((u) => u.id).join(' ')}]`);
   }
 }
 

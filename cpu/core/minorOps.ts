@@ -624,9 +624,9 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       // unit bought this turn among them (runs/h1_duely1124 t72 city-state
       // 3's City Defense recruits no Heavy Chariot bought that turn, t73 it)
       held: () => [...upgradeHeld(cs), ...pass.done],
-      done: () => pass.done });
-    // the destroy loop after the walk: the ended trees' slots free
-    minorFreeTrees(cs);
+      done: () => pass.done,
+      // the destroy loop after each priority's walk: the ended trees' slots free
+      destroy: () => minorFreeTrees(cs) });
     for (const id of opsOf(ops).flatMap(opJobUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);
