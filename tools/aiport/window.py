@@ -2,16 +2,28 @@
 compared with an earlier tag's window or with the bar's rows of those turns.
 
     python tools/aiport/window.py <worktree> <seed> <from> <to> <tag> [--vs <tag>|bar|<dir>|none] [--trace SPEC]... [--rows [N]]
+                                  [--no-state | --state <dir>] [--warm N]
     python tools/aiport/window.py <worktree> --status
     python tools/aiport/window.py <worktree> --unlock
 
 Runs, with the worktree's own launcher and AISCORE_MISSES=1:
 
-    node <wt>/cpu/harness/bundled.mjs <wt>/cpu/harness/run.ts -- <dump> --aiscore <out> --memory aimem --from <from> --to <to>
+    node <wt>/cpu/harness/bundled.mjs <wt>/cpu/harness/run.ts -- <dump> --aiscore <out> --memory aimem --from <from> --to <to> --load-state <dir>
 
 (`--from` left out for a window from turn 1), the dump the seed's recording
-in the main checkout. It scores the turns <from> .. <to>-1. Output, the
-layout of a bar directory, so every aiport tool reads it:
+in the main checkout. It scores the turns <from> .. <to>-1.
+
+THE WINDOW RESUMES FROM THE BAR'S SAVED STATE: the newest aimem bar's saves
+of the seed (`.claude/scratchpad/aiscore/p<N>m/state/`, one as every tenth
+turn closes; `--state <dir>` names another directory, `--no-state` none).
+The harness takes the newest save closing a turn at or before <from>-1
+(`--warm N`: <from>-1-N), runs the turns between unscored and scores from
+<from> on what a whole-game run carries there. The tool prints the save it
+resumed from, or why it resumed from none (the window then opens on the
+record and the game's memory alone, as `--no-state`), and how the tree
+differs from the tree that wrote the save.
+
+Output, the layout of a bar directory, so every aiport tool reads it:
 
     <wt>/.claude/scratchpad/win/<tag>/ai<seed>.log    the run's output: the SCORE rows and the TRACE lines
     <wt>/.claude/scratchpad/win/<tag>/ai<seed>.json   the harness's report
@@ -28,11 +40,9 @@ a task that names one).
 
 Then the compare (`rows.py --cmp`): against `--vs <tag>` (that tag's window
 of the seed), or by default against the newest bar holding the seed, cut to
-the window's turns. Against a bar, the rows the window's FIRST TWO turns
-newly miss are counted apart: a mid-game window opens on the record and the
-game's memory alone, without what our own turns before it carried (the
-README's "what a window lacks"), so compare a change with a window of the
-base tree, not with the bar, wherever those rows matter.
+the window's turns. A window that resumed from no save opens without what
+our own turns before it carried: against a bar, the rows its FIRST TWO turns
+newly miss are counted apart (the README's "A window without a save").
 """
 from __future__ import annotations
 
@@ -41,6 +51,7 @@ import ctypes
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -108,6 +119,26 @@ def git(wt: pathlib.Path, *args: str) -> str:
         return ""
 
 
+def tree_against_save(wt: pathlib.Path, save: str, turn: int) -> str:
+    """how the worktree's cpu/ stands against the tree that wrote the save:
+    the turns to the save's ran under that tree's code, the turns after it
+    run under the worktree's"""
+    head = common.save_head(save) or {}
+    sha = str(head.get("sha", "unknown"))
+    was = f"the save's tree {sha[:8]}" + (f" (+{head['dirty']} files changed under cpu/)" if head.get("dirty") else "")
+    if not git(wt, "cat-file", "-t", sha):
+        return f"STATE: {was} is not a commit this worktree knows: what its code carried to t{turn} cannot be told from yours"
+    files = [f for f in git(wt, "diff", "--name-only", sha, "--", "cpu").splitlines() if f]
+    files += [f for f in git(wt, "ls-files", "--others", "--exclude-standard", "--", "cpu").splitlines() if f]
+    if not files and not head.get("dirty"):
+        return f"STATE: this tree's cpu/ is {was}'s: the window scores what a whole-game run of this tree scores on these turns"
+    base = git(wt, "merge-base", sha, "HEAD")
+    names = ", ".join(pathlib.PurePosixPath(f).name for f in files[:8]) + (f" and {len(files) - 8} more" if len(files) > 8 else "")
+    return (f"STATE: this tree's cpu/ differs from {was} in {len(files)} files ({names}; merge-base {base[:8] or 'none'}). The turns to t{turn} "
+            f"ran under the save's code, the turns from t{turn + 1} under yours: a change to what the engine CARRIES across turns shows "
+            f"only as far as it builds up after t{turn} (the README's \"A save from another tree\"; --warm N resumes N turns earlier)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("worktree")
@@ -119,6 +150,9 @@ def main() -> int:
     ap.add_argument("--trace", action="append", default=[], metavar="KIND:TURN[:TEXT]")
     ap.add_argument("--rows", nargs="?", type=int, const=0, default=None, metavar="N")
     ap.add_argument("--span", action="store_true", help="allow a window longer than 120 turns")
+    ap.add_argument("--no-state", action="store_true", help="open on the record and the game's memory alone")
+    ap.add_argument("--state", metavar="DIR", help="the saves to resume from (default: the newest bar's of the seed)")
+    ap.add_argument("--warm", type=int, default=0, metavar="N", help="resume from a save closing a turn at or before <from>-1-N")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--unlock", action="store_true")
     a = ap.parse_args()
@@ -155,6 +189,11 @@ def main() -> int:
     if a.turn_from > 1:
         cmd += ["--from", str(a.turn_from)]
     cmd += ["--to", str(a.turn_to)]
+    saves = None
+    if a.turn_from > 1 and not a.no_state:
+        saves = pathlib.Path(a.state).resolve() if a.state else common.state_dir(a.seed)
+        if saves:
+            cmd += ["--load-state", str(saves)] + (["--warm", str(a.warm)] if a.warm else [])
     for t in a.trace:
         cmd += ["--trace", t]
     started = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -180,8 +219,11 @@ def main() -> int:
     diff = git(wt, "diff", "--shortstat", "HEAD")
     meta = {"seed": a.seed, "from": a.turn_from, "to": a.turn_to, "tag": a.tag, "stem": files["stem"], "head": git(wt, "rev-parse", "--short", "HEAD"),
             "diff": diff or "clean", "trace": a.trace, "started": started, "seconds": secs, "rc": rc, "cmd": " ".join(cmd)}
-    stem.with_name(stem.name + ".meta.json").write_text(json.dumps(meta, indent=1) + "\n", encoding="utf-8")
     log_path = stem.with_name(stem.name + ".log")
+    said = [l.rstrip("\n") for l in open(log_path, encoding="utf-8", errors="replace") if l.startswith("STATE: ")]
+    m = re.match(r"STATE: RESUMED from (.+?) \(seed \d+, turn (\d+) closed", said[-1]) if said else None
+    meta["state"] = {"dir": str(saves) if saves else None, "save": m.group(1) if m else None, "turn": int(m.group(2)) if m else None}
+    stem.with_name(stem.name + ".meta.json").write_text(json.dumps(meta, indent=1) + "\n", encoding="utf-8")
     rows = common.read_rows(str(log_path))
     done = stem.with_name(stem.name + ".json").exists()
     print(f"window {a.seed} t{a.turn_from}-{a.turn_to} tag {a.tag}: rc={rc} {secs}s, {len(rows)} missed rows, head {meta['head']} ({meta['diff']}) -> {out}")
@@ -192,6 +234,16 @@ def main() -> int:
     stopped = json.loads(stem.with_name(stem.name + ".json").read_text(encoding="utf-8")).get("stopped")
     if stopped:
         print(f"the harness stopped: {stopped}")
+    resumed = m is not None
+    if a.turn_from > 1:
+        for l in said:
+            print(l[:700])
+        if a.no_state:
+            print("STATE: --no-state: the window opens on the record and the game's memory alone")
+        elif not saves:
+            print(f"STATE: NO RESUME (no bar holds a save of seed {a.seed}): the window opens on the record and the game's memory alone")
+        if resumed:
+            print(tree_against_save(wt, m.group(1), int(m.group(2))))
     traces = [l.rstrip("\n") for l in open(log_path, encoding="utf-8", errors="replace") if l.startswith("TRACE ")]
     if a.trace:
         print(f"-- trace ({len(traces)} lines; all in {log_path.name})")
@@ -222,7 +274,7 @@ def main() -> int:
         base = {r.line for r in common.read_rows(other) if r.seed == a.seed}
         early = [r for r in rows if r.turn < a.turn_from + 2 and r.line not in base]
         late = [r for r in rows if r.turn >= a.turn_from + 2 and r.line not in base]
-        if a.turn_from > 1:
+        if a.turn_from > 1 and not resumed:
             print(f"new against the bar: {len(early)} in the window's first two turns (t{a.turn_from}-{a.turn_from + 1}: the start state's, see the README), "
                   f"{len(late)} later")
     return 0

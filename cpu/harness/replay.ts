@@ -135,6 +135,7 @@ import { GameUnits, readPass, readPassAi, readUnitTable, type StateRead } from '
 import { RecordStore, type RecordLight } from './recordStore';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
+import { Resume, StateSaver, type CarryLists } from './stateSave';
 
 /** what became of one decision */
 type Outcome = 'applied' | 'fallback' | 'refused';
@@ -156,8 +157,9 @@ const HUMAN_CAMP_GOLD = scaleByGameSpeed(50 + 5) - CAMP_DISPERSAL_GOLD;
  *  (AI_Victories.csv "Forbidden", the AI seat's as the human's) */
 const LAB_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 
-/** the engine-side bookkeeping the replay carries across turns */
-interface Ctx {
+/** the engine-side bookkeeping the replay carries across turns; each field
+ *  is classed in `stateSave.ts`'s `CTX_FIELDS` */
+export interface Ctx {
   state: GameState;
   /** the pair's Fortify orders: unit -> the order's place in the log and the
    *  fortification record t+1 shows, null for a unit record t+1 no longer
@@ -6595,6 +6597,9 @@ const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
 const SEAT_STORES = ['barbKills', 'netIncome'] as const;
 const CITY_STORES = ['formerSeat'] as const;
 const MINOR_STORES = ['prodOverflow', 'repairWait', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
+/** the lists above by the object their fields sit on, as a save names them */
+const CARRY_LISTS: CarryLists = { seat: [...SEAT_MEMORY, ...SEAT_STORES], research: RESEARCH_MEMORY, minor: [...MINOR_MEMORY, ...MINOR_STORES],
+  city: [...CITY_MEMORY, ...CITY_STORES], unit: UNIT_MEMORY, game: [...GAME_MEMORY, ...GAME_STORES] };
 
 /** the progress a city-state's projects and repairs it switched from keep,
  *  the engine's own, beside the record's kept on its buildings, units and
@@ -6991,17 +6996,31 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   /** with `aiScore`, the game's own knowledge bases (army records, camps) and contracts
    *  taken each pair from `<stem>.aimem.jsonl` instead of carried */
   memoryFromAimem?: boolean;
+  /** with `aiScore`, a save of the run's carried state as every `every`th
+   *  turn closes, into `dir` (`StateSaver`) */
+  saveState?: { dir: string; every: number };
+  /** with `aiScore` and `from`, the window resumed from the newest save in
+   *  `dir` closing a turn at or before `from - 1 - warm` (`Resume`) */
+  loadState?: { dir: string; warm?: number };
   /** called after each pair is compared, with the engine state and record t+1 */
   onPair?: (state: GameState, b: TurnRecord, decisions: Decision[]) => void } = {}): ReplayReport {
   // the records, each parsed when the replay reaches it (`RecordStore`)
   const cat = loadCatalog(dumpPath);
-  const store = new RecordStore(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
+  // a resumed window opens on the record after the turn its save closes
+  const memoryMode = opts.memoryFromAimem ? 'aimem' : opts.memoryFromLog ? 'log' : 'carried';
+  const resume = opts.aiScore && opts.loadState ? Resume.open(dumpPath, opts.loadState, opts.from, memoryMode, CARRY_LISTS) : null;
+  const saver = opts.aiScore && opts.saveState ? new StateSaver(dumpPath, opts.saveState.dir, opts.saveState.every, memoryMode, CARRY_LISTS) : null;
+  const opensAt = resume ? resume.turn + 1 : opts.from ?? -Infinity;
+  // every record is read whatever `to`: the event replay places a turn's
+  // events by the records after it too (runs/h1_duels1121: plot 386's
+  // fertility from t20 on, which a run cut at t45 lacks)
+  const store = new RecordStore(dumpPath, opensAt, Infinity);
   const record = (t: number) => store.get(t)!;
   // the window: the records from `from` on; those before it are folded into
   // the history alone (`skipped`)
   const all = store.light;
-  const start = all.findIndex((r) => r.turn >= (opts.from ?? -Infinity));
-  const recs = start < 0 ? [] : all.slice(start);
+  const start = all.findIndex((r) => r.turn >= opensAt);
+  const recs = start < 0 ? [] : all.slice(start).filter((r) => r.turn <= (opts.to ?? Infinity));
   const skipped = start < 0 ? all : all.slice(0, start);
   const source = opts.source ?? (store.logged ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
@@ -7047,6 +7066,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (r.turn >= from) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
     };
     for (const r of store.live()) store.decorate(r);
+    // a window's history holds each unit's last blow of the turns before it
+    // too, as a run from the first record folds them from every record's
+    // combat log (`History.struck`; the window's first record adds its own
+    // turn's and drops the units no longer standing)
+    for (const c of combat) {
+      if (c.atkObj !== 1 || c.turn >= from - 1) continue;
+      const key = `${c.atkCiv}:${c.atkId}`;
+      history.struck.set(key, Math.max(c.turn, history.struck.get(key) ?? -1));
+    }
   }
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
     researchAi: { minor: newResearchTally(), free: newResearchTally() },
@@ -7210,11 +7238,25 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (tribeFold?.logged) tribeFold.seed(state, (key) => ctx.units.get(key)?.id);
   // a window started past the first turn opens on the game's memory of the
   // turn before, as every later pair does (`perTurnWorld`)
-  if (opts.aiScore && rec0.turn > 1) takeGameMemory(ctx, state, first, rec0.turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
+  if (opts.aiScore && rec0.turn > 1 && !resume) takeGameMemory(ctx, state, first, rec0.turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
   for (const [pid, cs] of first.minorOfPlayer) {
     if (cs.centerIndex >= 0) continue;
     ctx.pendingMinors.set(pid, cs);
   }
+  // ...a resumed one on its save's state and bookkeeping, its first pair's
+  // world built from the record imported anew, as every later pair's
+  resume?.restore(ctx, importTurn(rec0, cat, history), [report.researchAi, report.researchScores, report.civicAi, report.civicScores, report.barbTactics,
+    report.minorTactics, report.minorDraws, report.minorBuilds, report.minorResearch, report.scores, report.memory, ctx.stateScores, ctx.stateLeftOut,
+    ctx.cityBuild, operations.tally], () => {
+    report.perTurn.length = 0;
+    ctx.tally.clear();
+    ctx.reasons.clear();
+    ctx.cityBuildPer.clear();
+    if (source instanceof RecordedActions) {
+      source.unread.clear();
+      source.settled.clear();
+    }
+  });
   // per subsystem, the index of the first pair it diverged on: the pairs
   // before it held, those it had nothing to compare on included
   const brokeAt = new Map<string, number>();
@@ -7228,7 +7270,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       report.stopped = `no record of turn ${a.turn + 1}`;
       break;
     }
-    if (opts.aiScore && i > 0) perTurnWorld(ctx, a, ctx.next, history, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
+    resume?.pairOpens(a.turn);
+    if (opts.aiScore && (i > 0 || resume)) perTurnWorld(ctx, a, ctx.next, history, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
     if (state.turn !== a.turn) {
       report.stopped = `engine at turn ${state.turn}, record at ${a.turn}`;
       break;
@@ -8415,7 +8458,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         ...(ctx.fellBack.get(pid)?.length ? { fallbacks: ctx.fellBack.get(pid) } : {}) };
     }
     prev = a;
+    saver?.pairClosed(ctx, a.turn);
   }
+  if (saver) console.error(`STATE: ${saver.written.saves} saves, ${saver.written.bytes} bytes, ${saver.written.seconds.toFixed(1)}s -> ${opts.saveState!.dir}`);
   for (const [sub, s] of Object.entries(report.subsystems)) {
     s.held = brokeAt.get(sub) ?? report.perTurn.length;
     const at = report.perTurn.findIndex((p) => Object.keys(p.imposed).some((k) => imposesOn(k, sub)));

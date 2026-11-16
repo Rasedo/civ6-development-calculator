@@ -92,8 +92,16 @@ export function traceScoredRows(fn: typeof rowTrace): void {
   rowTrace = fn;
 }
 
+/** whether scored rows are dropped: the turns a resumed window runs before
+ *  its first scored one (`stateSave.ts`) */
+let muted = false;
+export function muteScores(on: boolean): void {
+  muted = on;
+}
+
 export function scoreDecision(s: DecisionScores, kind: string, turn: number, subject: string, equal: boolean,
   ours: unknown, game: unknown, clean?: boolean): void {
+  if (muted) return;
   const k = (s[kind] ??= { compared: 0, equal: 0 });
   // AISCORE_ROWS=<kind>,<kind>: every row of those kinds, one line each;
   // AISCORE_MISSES=1: every missed row of every kind (`c` marks a clean memory)

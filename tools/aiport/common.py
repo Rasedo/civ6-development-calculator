@@ -73,6 +73,28 @@ def newest_bar(seed: str | None = None) -> pathlib.Path | None:
     return None
 
 
+def state_dir(seed: str) -> pathlib.Path | None:
+    """the saves of the engine's carried state a window of the seed resumes
+    from (`p<N>m/state/s<seed>_t<turn>.state`, `cpu/harness/stateSave.ts`):
+    the newest aimem bar's whose run of the seed has ended (its report is
+    written) and left saves"""
+    bars = sorted((d for d in BARS.glob("p[0-9]*m") if d.is_dir()), key=lambda d: int(re.sub(r"\D", "", d.name) or 0), reverse=True)
+    for d in bars:
+        if (d / f"ai{seed}.json").exists() and any((d / "state").glob(f"s{seed}_t*.state")):
+            return d / "state"
+    return None
+
+
+def save_head(path: str) -> dict | None:
+    """a save's header (its first line): format, stem, seed, turn, memory,
+    sha, dirty, ..."""
+    try:
+        with open(path, "rb") as f:
+            return json.loads(f.readline().decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 class Row:
     """one scored row"""
     __slots__ = ("seed", "kind", "turn", "subject", "equal", "clean", "ours", "game", "line")

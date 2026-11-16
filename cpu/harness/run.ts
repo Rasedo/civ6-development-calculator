@@ -6,6 +6,7 @@
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> [--out <report.json>] [--from T] [--to T]
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --replay <replay.json> [--from T] [--to T]
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log|aimem] [--from T] [--to T] [--trace <kind>:<turn>[:<text>]]...
+ *       [--save-state <dir> [--every N]] [--load-state <dir> [--warm N]]
  *
  * Writes `<dump>.report.json` (or `--out`) and its Markdown digest
  * (`.report.md`): per check the counts (pass, fail, skip by reason, and how
@@ -28,7 +29,13 @@
  * the game's unit stream beside it (`<stem>.aiunits.jsonl`) has the game's
  * intermediate state compared too, in a table of its own (`aiUnits.ts`).
  * `--trace` (any number) prints the named rows' terms beside them
- * (`aiTrace.ts`).
+ * (`aiTrace.ts`). `--save-state` writes the run's carried state as every
+ * Nth turn closes (10 by default); `--from T --load-state` resumes the
+ * window from the newest of those saves closing a turn at or before T-1
+ * (`--warm N`: T-1-N), the turns between run unscored (`stateSave.ts`), and
+ * says on stderr which save it took (`STATE: RESUMED`) or why it took none
+ * (`STATE: NO RESUME`, `STATE: FELL BACK`: the window then starts as
+ * `--from T` alone).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
@@ -42,6 +49,7 @@ import { replayMarkdown, runReplay } from './replay';
 import { EventPicks } from './eventPick';
 import { aiScoreMarkdown, memoryTable, scoreTable, stateTable } from './aiScore';
 import { traceSpecs } from './aiTrace';
+import { resumeFailed } from './stateSave';
 
 interface Tally {
   pass: number;
@@ -219,8 +227,24 @@ function main() {
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
   if (opt.aiscore) {
     if (opt.trace) traceSpecs(opt.trace.split('\n'));
-    const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined, aiScore: true,
-      memoryFromLog: opt.memory === 'log', memoryFromAimem: opt.memory === 'aimem' });
+    const run = (load: boolean) => runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined, aiScore: true,
+      memoryFromLog: opt.memory === 'log', memoryFromAimem: opt.memory === 'aimem',
+      saveState: opt['save-state'] ? { dir: opt['save-state'], every: opt.every ? Number(opt.every) : 10 } : undefined,
+      loadState: load && opt['load-state'] ? { dir: opt['load-state'], warm: opt.warm ? Number(opt.warm) : 0 } : undefined });
+    // a resumed window that throws or ends before its first scored turn has
+    // scored nothing: it runs again as `--from T` alone
+    const fellBack = (why: string) => {
+      console.error(`STATE: FELL BACK (the resumed run stopped before its first scored turn: ${why}): the window starts as --from ${opt.from} alone`);
+      return run(false);
+    };
+    let r: ReturnType<typeof runReplay>;
+    try {
+      r = run(true);
+    } catch (e) {
+      if (!resumeFailed()) throw e;
+      r = fellBack((e as Error).message);
+    }
+    if (resumeFailed()) r = fellBack(r.stopped ?? 'the records ended');
     const stem = opt.aiscore.replace(/\.(json|md)$/, '');
     const { perTurn, ...rest } = r;
     writeFileSync(`${stem}.json`, JSON.stringify({ ...rest, pairs: perTurn.length }, null, 1) + '\n');

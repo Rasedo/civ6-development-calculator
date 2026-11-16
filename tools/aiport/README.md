@@ -8,7 +8,7 @@ Every tool prints its full usage with `-h`.
 | step | tool | answers |
 |---|---|---|
 | 1 | `rows.py` | which rows are missed, grouped, over which turns; what changed between two runs |
-| 2 | `window.py` | one seed's turn window scored under your tree, compared with your base's window or the bar |
+| 2 | `window.py` | one seed's turn window scored under your tree, resumed from the bar's saved state, compared with your base's window or the bar |
 | 3 | `show.py` | what the game itself held that turn (memory, units, planning, logs, record) |
 | 2-3 | `firstdiff.py` | the first turn a kind differs on a seed, and what the game did then |
 | 4 | `--trace` (harness) | our value's terms for a scored row |
@@ -52,7 +52,15 @@ REFUSES to start while another window of the worktree runs (`win/.lock`),
 takes one seed, and refuses more than 120 turns without `--span`.
 `--trace` (below) passes through; its lines land in `ai<seed>.log`.
 
-    window 1171 t36-42 tag a1: rc=0 7s, 114 missed rows, head e04ce61d (2 files changed ...) -> ...\win\a1
+The window RESUMES from the newest bar's saved state of the seed (below):
+it prints the save it took, or why it took none, and how your tree's cpu/
+differs from the tree that wrote the save. `--no-state` opens on the record
+alone, `--state <dir>` names other saves, `--warm N` resumes at least N
+turns before `<from>`.
+
+    window 1124 t124-130 tag a1: rc=0 15s, 6 missed rows, head e04ce61d (2 files changed ...) -> ...\win\a1
+    STATE: RESUMED from ...\aiscore\p92m\state\s1124_t0120.state (seed 1124, turn 120 closed, saved by 0ea12241); turns 121-123 run unscored
+    STATE: this tree's cpu/ differs from the save's tree 0ea12241 in 2 files (tactical.ts, aiView.ts; merge-base 0ea12241). The turns to t120 ran under the save's code ...
     gone 0 (A holds, B does not), new 0 (B holds, A does not)
     kind                          A      B   gone    new
 
@@ -111,18 +119,91 @@ blow's promotion, ability, flanking and support terms one by one (they are
 in "the rest": the composers are single sums); a policy's gates (a card
 with no score shows its modifiers alone).
 
-## What a window lacks
+## The saved state a window resumes from
 
-A `--from T` window folds the records before T into the import's history
-(eras, boosts, prices, levies, the city-states' savings, the barbarians'
-tribes), opens on record T, and takes from the game's memory of T-1 the
-knowledge bases, camps, operations, city trees and contracts. What our own
-turns carry and no record or memory read holds starts empty: the research
-and civics AIs' last analyses, government values and best cards (the score
-kinds miss for two turns: seed 1171 t36-37 holds 61 rows the whole-game run
-does not, t38 on the same counts), a city-state's unit and building value
+The aimem bar writes, per seed, the engine's carried state as every tenth
+turn closes: `.claude/scratchpad/aiscore/p<N>m/state/s<seed>_t<turn>.state`
+(`run.ts --save-state <dir> [--every N]`, `cpu/harness/stateSave.ts`; about
+45 KB a save, 1.1 MB a game, 0.2 s of a whole-game run). A save holds the
+engine's state whole, the record keys of its units and every field of the
+replay's bookkeeping that outlives a pair, with the saving tree's head sha
+in its header.
+
+`run.ts --from T --load-state <dir>` (what `window.py` runs) takes the
+newest save closing a turn at or before T-1, runs the turns from the save's
+to T unscored and scores from T on: the rows are a whole-game run's rows of
+those turns, row for row and in order, and the state it carries on is that
+run's (seeds 1124 and 1121, windows at t36, t124, t218 and t33, t137, t201;
+a run resumed at t31 of 1121 and taken to the end holds the whole game's
+160 rows and its 21 later saves). One line on stderr says what happened:
+
+- `STATE: RESUMED from <save> (..., saved by <sha>); turns A-B run unscored`,
+  with `NOT IN THE SAVE: <fields>` where your tree carries a field the
+  save's tree did not (a field you added to `SEAT_MEMORY`, `MINOR_STORES`
+  ...): it starts from the record's import, as a window without a save
+  starts it.
+- `STATE: NO RESUME (<why>)`: no save of the seed at or before T-1, a save
+  of another format, recording or memory mode, or one that does not read.
+- `STATE: FELL BACK (<why>)`: the resumed run threw or stopped before its
+  first scored turn (a state your tree's turn cannot run); the window ran
+  again from the record alone.
+
+After the last two the window is a window without a save (below).
+`node tools/aiport/statecmp.mjs <a.state|dir> <b.state|dir>` names the
+paths at which two saves differ (`run.ts ... --save-state <your dir>` on a
+window writes yours).
+
+### A save from another tree
+
+The bar's saves are written by the bar's tree; your window runs your tree,
+at a later head and with your patch. The turns up to the save's ran under
+the bar's code, the turns after it under yours, and the window says how the
+two trees' cpu/ differ. What that does to the rows:
+
+- Nothing, where your change is to a decision, a value or a memory the
+  engine builds anew each turn (a move, a build, a score, an analysis, the
+  danger map, a plan), or to what `--memory aimem` takes from the game each
+  turn (knowledge bases, camps, operations, city trees, contracts): the
+  window's rows are the rows your tree's own whole-game run holds (checked
+  with every research score moved: 763 rows of 1121 t137-149 the same, row
+  for row, from a save of the unpatched tree, with no turn run unscored).
+- A difference, where your change moves what the engine CARRIES and builds
+  up over many turns: a city-state's savings, strategic stockpile and
+  reservations, production overflow and kept progress, Great Person points,
+  the trade graph, the tribes' clocks and raids, the pool slots, explored
+  and revealed plots, the research AI's seen flags. The window holds the
+  bar's values at the save and your rule's from there, so a row that reads
+  such a store may differ from your whole-game run's (the same patch with a
+  lower savings cap: the window's carried state differs from the patched
+  whole game's at the two savings slots alone, `statecmp.mjs`). `--warm N`
+  lets your rule run N more turns before the scored ones; a store that never
+  forgets needs the window from turn 1 (`window.py <wt> <seed> 1 <to>`), or
+  the next bar.
+- A before / after pair of windows (`base`, then `a1 --vs base`) resumes
+  both from the same save: what differs between them is your change's from
+  the save's turn on.
+
+## A window without a save
+
+`--no-state`, or a window that said `NO RESUME` or `FELL BACK`, folds the
+records before T into the import's history (eras, boosts, prices, levies,
+the city-states' savings, the barbarians' tribes), opens on record T, and
+takes from the game's memory of T-1 the knowledge bases, camps, operations,
+city trees and contracts. What our own turns carry and no record or memory
+read holds starts empty: the research and civics AIs' last analyses,
+government values and best cards, a city-state's unit and building value
 tables, trade lists, standing-army list, upgrade trees, a unit's pool slot
 and DEFENDER type, the strategic stockpile and reservations, production
-overflow. So: compare a change against a window of your BASE tree with the
-same turns, start the window five turns before the case, and do not count
-the window's first two turns.
+overflow, the majors' agendas (drawn anew). Such a window holds rows the
+whole game does not, most in its first two turns (seed 1124 t36-47: 208
+rows for the whole game's 1; t124-135: 184 for 27, 13 of the 27 missing):
+compare it with a window of your BASE tree over the same turns, start it
+five turns before the case, and do not count its first two turns.
+
+## What a resumed window still lacks
+
+Nothing the two proof seeds show. Known and not carried: the generator
+hold's marks of the log's draws already taken (`streamHold`'s own, kept
+inside it: a run resumed 219 turns before its end drew as the whole game
+did), and the combat log on the two records before the window, which
+nothing reads.
