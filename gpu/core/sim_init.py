@@ -378,6 +378,9 @@ class SimInit:
         # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT
         # weight; the Free Cities' on the row `FR`
         self.citystate_combat_desire = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # its military AI's PSEUDOYIELD_NUCLEAR_WEAPON weight (raw 24.8), written
+        # beside the Combat Desire; the Free Cities' on the row `FR`
+        self.citystate_nuclear_desire = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # the count its city's standing army lacks (CityBuildAI +0x2d8), set in its city's update
         self.citystate_standing_short = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.citystate_savings = torch.zeros(B, s_pad, len(rules.ai_city_build["savings"]), dtype=torch.long, device=device)

@@ -990,6 +990,7 @@ class SimMinorAi:
         _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, 100 + s, queued,
                                               zero, threatened, standing)
         self.citystate_combat_desire[:, s] = torch.where(alive, w, self.citystate_combat_desire[:, s])
+        self.citystate_nuclear_desire[:, s] = torch.where(alive, self._nuclear_desire(row), self.citystate_nuclear_desire[:, s])
 
     def _free_combat_desire(self, act: torch.Tensor) -> None:
         """`freeCombatDesire` — THE FREE CITIES' COMBAT DESIRE at their
@@ -1044,6 +1045,18 @@ class SimMinorAi:
         _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, FREE_SEAT, queued,
                                               none, threatened, torch.zeros(B, dtype=torch.long, device=dev))
         self.citystate_combat_desire[:, self.FR] = torch.where(act, w, self.citystate_combat_desire[:, self.FR])
+        self.citystate_nuclear_desire[:, self.FR] = torch.where(act, self._nuclear_desire(row), self.citystate_nuclear_desire[:, self.FR])
+
+    def _nuclear_desire(self, row: int) -> torch.Tensor:
+        """`nuclearDesire` of `majorWars` [B], raw 24.8 — the
+        PSEUDOYIELD_NUCLEAR_WEAPON weight the military AI's turn writes: 0.5
+        a living major the war plane's row `row` is at war with, the Free
+        Cities with every one"""
+        if row == self.FREE_ROW:
+            wars = self.civ_alive.long().sum(dim=1)
+        else:
+            wars = (self.war[:, row, : self.n_majors] & self.civ_alive).long().sum(dim=1)
+        return wars * (_FX // 2)
 
     def _free_knowledge(self, act: torch.Tensor, age: bool) -> None:
         """`freeKnowledge` — the Free Cities' knowledge base's look (row

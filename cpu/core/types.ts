@@ -1055,6 +1055,9 @@ export interface Seat {
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;
+  /** the PSEUDOYIELD_NUCLEAR_WEAPON weight the same turn of the military AI
+   *  wrote (`nuclearDesire`), raw 24.8. Absent = 0. */
+  nuclearDesire?: number;
   /** THE FREE CITIES' REVEALED PLOTS: per plot 1 where their knowledge
    *  base's looks have seen it (the player's revealed plots, visibility
    *  +0x2f0, `freeKnowledge`). Absent = none. */

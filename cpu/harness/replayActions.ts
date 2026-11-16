@@ -892,9 +892,13 @@ export class RecordedActions implements ActionSource {
     // changes, the same chassis, at the minor's turn (runs/h1_duelw1117 t43:
     // China's levied Warriors home to Antananarivo; 1121 t57; h1_duely1117
     // t120: China's Crossbowman 3080200 home to city-state 3 as 1376257 past
-    // its ResearchChanged)
+    // its ResearchChanged); a unit its major upgraded in the pair is in
+    // neither record under the upgrade's id, its chassis the upgrade order's
+    // (runs/h1_duels1148 t122: player 1's levied Galley 2883590 upgraded to
+    // the Caravel 3866629, home as city-state 2's 1441799)
     const homes = new Map<number, Extract<Decision, { kind: 'levyEnd' }>>();
-    const typeOf = (key: string) => (units1.get(key) ?? a.units.find((x) => unitKey(x) === key))?.type;
+    const typeOf = (key: string) => (units1.get(key) ?? a.units.find((x) => unitKey(x) === key))?.type
+      ?? out0.find((d): d is Extract<Decision, { kind: 'upgrade' }> => d.kind === 'upgrade' && d.into === key)?.type;
     ev.forEach((r, i) => {
       let j = i + 1;
       while (ev[j] && (ev[j][2] === 'ResearchChanged' || ev[j][2] === 'CivicChanged')) j += 1;

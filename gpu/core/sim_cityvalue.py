@@ -2077,6 +2077,10 @@ class _MinorFacts:
     def pseudo_w(self, p):
         if p == "PSEUDOYIELD_DISTRICT":
             return (self.era() + 1) * (_FX // 2)
+        # the military AI's weight as its last turn wrote it
+        # (`citystate_nuclear_desire`)
+        if p == "PSEUDOYIELD_NUCLEAR_WEAPON" and self.s < self.sim.S:
+            return self.sim.citystate_nuclear_desire[:, self.s]
         # a city-state's military AI adds its Combat Desire to
         # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the
         # city-states'), over STRATEGY_NAVAL's weight where it follows the
@@ -3188,6 +3192,8 @@ class _FreeFacts(_MinorFacts):
     def pseudo_w(self, p):
         if p == "PSEUDOYIELD_UNIT_COMBAT":
             return self.sim.citystate_combat_desire[:, self.sim.FR]
+        if p == "PSEUDOYIELD_NUCLEAR_WEAPON":
+            return self.sim.citystate_nuclear_desire[:, self.sim.FR]
         if p in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT"):
             return -_FX
         return super().pseudo_w(p)

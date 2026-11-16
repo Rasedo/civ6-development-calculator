@@ -445,7 +445,13 @@ export function atWarWith(state: GameState, a: number, b: number): boolean {
  *  list +0xb50, alive +0x728, 0x2a92d0) — a war with a city-state, the Free
  *  Cities or the barbarians is none; the Free Cities fight every major */
 export function atWarWithMajor(state: GameState, seat: number): boolean {
-  return majorsAlive(state).some((p) => p !== seat && (isFreeSeat(seat) || civsAtWar(state, seat, p)));
+  return majorWars(state, seat) > 0;
+}
+
+/** 0x3dfae0: the living majors of the game the seat is at war with, counted
+ *  over the same list */
+export function majorWars(state: GameState, seat: number): number {
+  return majorsAlive(state).filter((p) => p !== seat && (isFreeSeat(seat) || civsAtWar(state, seat, p))).length;
 }
 
 export function atWarWithAny(state: GameState, seat: number): boolean {

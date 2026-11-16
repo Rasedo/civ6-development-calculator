@@ -614,6 +614,17 @@
           ]
         },
         {
+          "name": "freeNuclearDesire",
+          "compare": "exact",
+          "note": "the Free Cities' military AI's PSEUDOYIELD_NUCLEAR_WEAPON weight (`nuclearDesire` on `freeSeat.nuclearDesire`; the row `FR`), raw 24.8; 0 until the seat is made.",
+          "covers": [
+            "Seat.nuclearDesire"
+          ],
+          "planes": [
+            "citystate_nuclear_desire"
+          ]
+        },
+        {
           "name": "freeTradeValue",
           "compare": "exact",
           "note": "the Free Cities' trade AI's route value K (`freeTradeValue` on `freeSeat.tradeValue`), raw 24.8, over the cities of the player their knowledge base last met; 0 until the seat is made.",
@@ -3165,6 +3176,17 @@
             "citystate_combat_desire"
           ],
           "note": "the minor's military AI's Combat Desire, its PSEUDOYIELD_UNIT_COMBAT weight, raw 24.8"
+        },
+        {
+          "name": "minorNuclearDesire",
+          "compare": "exact",
+          "covers": [
+            "Seat.nuclearDesire"
+          ],
+          "planes": [
+            "citystate_nuclear_desire"
+          ],
+          "note": "the minor's military AI's PSEUDOYIELD_NUCLEAR_WEAPON weight, 0.5 a living major it is at war with as its last turn counted them, raw 24.8"
         },
         {
           "name": "minorStandingArmyShort",

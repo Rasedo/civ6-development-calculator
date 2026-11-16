@@ -687,7 +687,8 @@ class SimResearch:
         row of an era before the game's counts once per era between, plus
         one), a share per building, a district's and a wonder's at their
         pseudo-yields (the district's at the minor's weight), a project's
-        share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0, a space
+        share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0 at the
+        minor's weight (`citystate_nuclear_desire`), a space
         race project the space race share of PSEUDOYIELD_SPACE_RACE of its
         chain's length squared (a minor's weight none), each from landing to
         the horizon; past the horizon -9999. `mods` adds the
@@ -710,7 +711,9 @@ class SimResearch:
                + u[:, :, 1] * self._rai_from_landing(self._ai_district_share(s).unsqueeze(1).expand(B, NT), nn)
                + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn)
                + u[:, :, 3] * self._rai_from_landing(torch.full_like(own, T["project"]), nn)
-               + u[:, :, 4] * self._rai_from_landing(torch.full_like(own, _imul(_FX, T["py_nuclear"])), nn))
+               + u[:, :, 4] * self._rai_from_landing(
+                   _fmul(torch.full_like(own, _FX), _fmul(_FX + self.citystate_nuclear_desire[:, s].unsqueeze(1).expand(B, NT),
+                                                         torch.full_like(own, T["py_nuclear"]))), nn))
         for k in range(T["space"].shape[1]):
             n = T["space"][:, k].unsqueeze(0)
             if not bool((n > 0).any()):

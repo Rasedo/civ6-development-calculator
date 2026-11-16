@@ -714,6 +714,7 @@ const GAME: Record<string, Extractor> = {
   freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
   freeEnemyCounts: (s) => [enemyCountsRecord(s.freeSeat?.enemyCounts)],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
+  freeNuclearDesire: (s) => [s.freeSeat?.nuclearDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
   freePrimaryRegions: (s) => [[...(s.freeSeat?.primaryRegions ?? [])]],
   // the Free Cities' revealed plots and their knowledge base's cities, as a
@@ -1216,6 +1217,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
     return g ? [g.surplus, g.housing, g.population, g.stored, g.multiplier, 1] : [0, 0, 0, 0, 0, 0];
   }),
   minorCombatDesire: overCityStates((cityState) => cityState.combatDesire ?? 0),
+  minorNuclearDesire: overCityStates((cityState) => cityState.nuclearDesire ?? 0),
   minorStandingArmyShort: overCityStates((cityState) => cityState.standingArmyShort ?? 0),
   minorUnitValues: overCityStates((cityState) => [...(cityState.unitValues ?? [])]),
   minorBuildingValues: overCityStates((cityState) => [...(cityState.buildingValues ?? [])]),

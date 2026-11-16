@@ -475,6 +475,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
+    - "C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins"
   context:
     - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
     - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."
@@ -532,8 +533,12 @@
     - recording: h1_duelv1128
       turn: 197
       value: "Qin at war with Rome: the friendship's +20 and the cost's -5"
-  impl: [cpu/core/aiPlotValue.ts:n, cpu/core/aiValue.ts:AiValueView]
+    - recording: h1_duels1169
+      turn: 224
+      value: "city-states 3 and 4 at war with player 0 alone: the military AI's nuclear weight 0.5, Nuclear Fission 1146.4 at 1 turn (894.996 at weight 0)"
+  impl: [cpu/core/aiPlotValue.ts:n, cpu/core/aiValue.ts:AiValueView, cpu/core/seats.ts:majorWars]
   readings:
+    - "C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"

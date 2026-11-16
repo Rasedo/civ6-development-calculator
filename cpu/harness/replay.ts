@@ -2187,14 +2187,17 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // ...and a unit home from a levy at its minor's start stands where the
     // first record holds the major's (runs/h1_duely1121 t215: China's
     // Ironclad 6553622 on 38:22, city-state 3's 1376259 from then)
-    const home = key && !was.has(key) ? ctx.levyFrom.get(key) : undefined;
+    // (one the major upgraded in the pair under the id before its upgrade)
+    const sent = key && !was.has(key) ? ctx.levyFrom.get(key) : undefined;
+    const home = sent && !was.has(sent) ? ctx.upgradedFrom.get(sent) ?? sent : sent;
     const first = home ?? (old !== undefined && !was.has(key!) ? old : key);
     const at = first ? (teleportedTo.get(first) ?? was.get(first)) : undefined;
     // ...and one home from a levy that the pair's upgrade order renamed as
     // well stands in record t+1's chassis with no Movement left (runs/
     // h1_duely1121 t154: city-state 2's Musketman 2424833, home from China's
     // levy, upgraded at once to the Line Infantry 2490368, no tactical row)
-    const renamed = home ? [...ctx.units].find(([k, x]) => x === u && ctx.upgradedFrom.has(k))?.[0] : undefined;
+    // — its minor's order, not its major's before it came home
+    const renamed = home ? [...ctx.units].find(([k, x]) => x === u && k !== sent && ctx.upgradedFrom.has(k))?.[0] : undefined;
     if ((first !== key && !home) || renamed) {
       upgraded.add(c);
       const r = b.units.find((x) => `${x.owner}:${x.id}` === (renamed ?? key));
@@ -2210,7 +2213,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       gone.add(c);
       continue;
     }
-    if (home && minorAiSeat(c.seat)) levied.push({ c, minor: c.seat, major: seatOfP(ctx, Number(home.split(':')[0])), plot: lastStep.get(home) ?? at ?? c.tileIndex });
+    if (home && minorAiSeat(c.seat)) levied.push({ c, minor: c.seat, major: seatOfP(ctx, Number(home.split(':')[0])), plot: lastStep.get(sent!) ?? lastStep.get(home) ?? at ?? c.tileIndex });
     if (at !== undefined) c.tileIndex = at;
     // a barbarian its own turn of the pair undug is dug in through the
     // minors' turns before it (`undug`)
@@ -4619,10 +4622,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the old ones still through the pair: a battle a unit fought before
         // it came home is the log's under its levied id (runs/h1_duelw1117
         // t42: China's levied Warrior killed a barbarian, then went home with
-        // its 23 damage)
+        // its 23 damage); a unit its major upgraded in the same pair goes
+        // home under the upgrade's id, still keyed here by the id before it
+        // (runs/h1_duels1148 t122: player 1's levied Galley 2883590, its
+        // Caravel 3866629 from the upgrade, city-state 2's 1441799 at home)
         const seat = seatOfP(ctx, d.player);
         for (const [from, to] of d.units) {
-          const u = unitOf(ctx, from);
+          const before = ctx.upgradedFrom.get(from);
+          const u = unitOf(ctx, from) ?? (before ? unitOf(ctx, before) : undefined);
           if (!u) continue;
           ctx.units.set(to, u);
           count(ctx, 'levyEnd', u.seat === seat ? 'applied' : 'refused', d.player,
@@ -6568,7 +6575,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'primaryRegions', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'nuclearDesire', 'primaryRegions', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
   'favTech', 'civicQueue', 'researchTurns'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'citiesKnown', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',

@@ -509,6 +509,7 @@ GAME = {
     "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
     "freeEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.FK)],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
+    "freeNuclearDesire": lambda sim, b, rows: [int(sim.citystate_nuclear_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
     "freePrimaryRegions": lambda sim, b, rows: [sorted(set(sim.tile_region[b][sim.free_region_plots[b]].tolist()))],
     "freeRevealed": lambda sim, b, rows: [sim.free_revealed[b].nonzero(as_tuple=True)[0].tolist()],
@@ -1134,6 +1135,7 @@ CITY_STATE = {
     "minorAiGrowth": lambda sim, b, rows: [[int(x) for x in sim.citystate_ai_growth[b, s].tolist()] for s in rows],
     "minorAiGrowthSeen": lambda sim, b, rows: [[int(x) for x in sim.citystate_ai_seen[b, s].tolist()] for s in rows],
     "minorCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, s]) for s in rows],
+    "minorNuclearDesire": lambda sim, b, rows: [int(sim.citystate_nuclear_desire[b, s]) for s in rows],
     "minorStandingArmyShort": lambda sim, b, rows: [int(sim.citystate_standing_short[b, s]) for s in rows],
     "minorUnitValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_unit_values[b, s].tolist()]
                                              if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],

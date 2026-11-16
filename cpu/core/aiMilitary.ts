@@ -28,6 +28,10 @@
  *    least M; at peace with no threatened city at most 2.0; plus the cities'
  *    standing-army counts (CityBuildAI +0x2d8) as PSEUDOYIELD_STANDING_ARMY_
  *    VALUE.
+ *
+ * The same turn then writes the vector's PSEUDOYIELD_NUCLEAR_WEAPON weight
+ * (0x721a4e..0x721b02): 0.5 (@0xd20458) x the living majors the player is
+ * at war with (0x3dfae0), `nuclearDesire`.
  */
 import type { ArmyRecord } from './types';
 import { FX, fxConst } from './aiValue';
@@ -75,6 +79,18 @@ function fxFloat(x: number): number {
   const f = Math.fround(x);
   const fl = Math.floor(f);
   return fl * FX + Math.trunc(Math.fround(Math.fround(f - fl) * 256));
+}
+
+/** 0x71fb80 at 0x721a4e..0x721b02: the PSEUDOYIELD_NUCLEAR_WEAPON weight the
+ *  military AI's turn writes, 0.5 a living major the player is at war with
+ *  (`wars`, `majorWars`), raw 24.8 — read by every value until its next
+ *  turn (runs/h1_duels1164 city-state 4 at war with player 0 from t185:
+ *  Nuclear Fission 1045.8 at 1 turn t210, its Build Nuclear Device at
+ *  25 x 1.5; Nuclear Fusion 1156.2 at t220, player 0 gone before the
+ *  city-state's turn and the weight its t219 turn wrote still read, 915.0
+ *  from t221) */
+export function nuclearDesire(wars: number): number {
+  return fxFloat(wars * Math.fround(0.5));
 }
 
 const F005 = Math.fround(0.05);

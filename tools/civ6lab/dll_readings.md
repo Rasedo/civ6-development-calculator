@@ -19939,3 +19939,44 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   over the water a hostile land unit's zone lies on (t225 / t226: 38:22 and
   37:22 flagged in player 0's Scout's zone, six water plots past them at
   turn 2 in the game's planning, none in ours) (C-133).
+
+## C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins
+
+- THE WEIGHT: the military AI's turn (0x71fb80), right after it adds the
+  standing-army term to its vector's PSEUDOYIELD_UNIT_COMBAT entry
+  (0x7219e8..0x7219ee), writes the same vector's PSEUDOYIELD_NUCLEAR_WEAPON
+  entry (index @0xf2e2a0, the vector 0x9034b0 hands out): the count 0x3dfae0
+  returns on the player's diplomacy (+0x1300) as a float x 0.5 (xmm9,
+  @0xd20458), turned to 24.8 (the floor's integer part, the fraction's
+  256ths). 0x3dfae0 walks the game's players list +0xb50 (the majors), each
+  other player alive (+0x728) the player's team is at war with (0x2a92d0),
+  counted. The write is a store, not a sum: the weight is 0.5 a living major
+  at war as that turn counted them, and stands until the player's next
+  military turn.
+- ITS READERS: the pseudo-yield weight 0x700810 sums the military AI's
+  vector ([player +0x12a0] +0x7e8) into every PSEUDOYIELD_NUCLEAR_WEAPON
+  value (0x7a60d0): the research value's weapon project (0x7b3e50 at
+  0x7b5486..0x7b54f3), the project value's device terms (0x7b28c0) and a
+  WMDCapable unit's (0x7b62c0 at 0x7b709f). The research analysis runs before
+  the military turn, so it reads the weight of the turn before; the city
+  AI's update runs after it and reads the turn's own.
+- Ported: `nuclearDesire` (aiMilitary.ts) of `majorWars` (seats.ts) stored
+  on `Seat.nuclearDesire` beside the Combat Desire (`minorPhase`,
+  `freeDesire`), read by `pseudoYieldWeights`; GPU `_nuclear_desire` into
+  `citystate_nuclear_desire` (the Free Cities' on the row `FR`), read by
+  `pseudo_w` and `_rai_value`.
+- CONFIRMED: runs/h1_duels1164 city-state 4, at war with player 0 from t185
+  (AI_Knowledge.csv's WAR 0 rows t184-t227): Nuclear Fission (the Build
+  Nuclear Device project its one weapon) 82.7 at 41 turns t205, 63.3 at 42
+  t206, 1045.8 at 1 turn t210, each 1.3164 x the value at weight 0 (39.5 a
+  turn -> 52.0: 25 x 1.5 for the device); Nuclear Fusion 1256.8 at 2 turns
+  t218-t219. Stored, not live: player 0 is gone as city-state 4's t220 turn
+  opens, Lasers' Fav Tech x1.5 (0x3dcf50, live) is dropped that turn (1256.8
+  -> 1156.2, Lasers' third) and the device's half goes only at t221 (915.0,
+  241.2 less). City-state 3 (Cardiff) of the same game, at war with player 0
+  alike, picks the Manhattan Project at t211 where the weight-0 value gave a
+  Machine Gun. runs/h1_duels1169 city-states 3 and 4, at war with player 0
+  in record t224: Nuclear Fission 1146.4 at 1 turn that turn (894.996 at
+  weight 0).
+- Open: none in the weight. The Free Cities fight every living major, so
+  theirs is 0.5 a living major; no recording has them value a weapon.

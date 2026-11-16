@@ -35,6 +35,7 @@ import { freeResearchTerms } from './freeCityBuild';
 import { researchUnitTurns } from './aiResearch';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
+import { nuclearDesire } from './aiMilitary';
 import { freeTradeValue, majorTradeLists } from './aiTrade';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { placementPlot, plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
@@ -119,7 +120,7 @@ const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, FREE_CITY_BUILDER, FREE_CITY_BUILDER_THREAT, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
-import { hiddenResourcesFor } from './seats';
+import { hiddenResourcesFor, majorWars } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure } from './eras';
 import { improvementMoment } from './moments';
@@ -1228,7 +1229,9 @@ export function freeCitiesPhase(state: GameState): void {
  *  them (`freeCombatDesire`), between their civics AI's policy jobs and its
  *  government values (`minorResearchTurn`) */
 function freeDesire(state: GameState): void {
-  freeSeatOf(state).combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+  const free = freeSeatOf(state);
+  free.combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+  free.nuclearDesire = nuclearDesire(majorWars(state, FREE_SEAT));
 }
 
 /** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the

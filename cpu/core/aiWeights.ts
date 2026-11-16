@@ -26,7 +26,9 @@
  * strategies' PseudoYields lists — a city-state's STRATEGY_NAVAL's from
  * the turn after it starts (`minorNavalWeighted`), from the turn it starts
  * in the civics AI's government values (`minorNavalApplied`), the Free
- * Cities' none — held at -1.0 at least;
+ * Cities' none — held at -1.0 at least; a city-state's and the Free Cities'
+ * PSEUDOYIELD_NUCLEAR_WEAPON carries their military AI's weight
+ * (`nuclearDesire`);
  * PSEUDOYIELD_DISTRICT adds 0.5 x the ChronologyIndex of the player's era
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
@@ -289,5 +291,8 @@ export function pseudoYieldWeights(state: GameState, seat: number, applied = fal
     // 52.43 at T 23, every other class's points counting)
     out.set('PSEUDOYIELD_GPP_GENERAL', -FX);
   }
+  // the military AI's PSEUDOYIELD_NUCLEAR_WEAPON weight as its last turn
+  // wrote it (`nuclearDesire`), a city-state's and the Free Cities'
+  if (s.nuclearDesire) out.set('PSEUDOYIELD_NUCLEAR_WEAPON', s.nuclearDesire);
   return out;
 }

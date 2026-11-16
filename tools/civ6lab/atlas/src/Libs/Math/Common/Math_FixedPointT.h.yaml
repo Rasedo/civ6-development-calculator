@@ -532,6 +532,7 @@
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
     - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+    - "C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb4/NOTES.md: ...f2e270 SPY,   f2e274 DISTRICT, f2e2a0 NUCLEAR, f2e2b4 STANDING_ARMY, f2e2bc TOURISM. (pyglob.py) - 0x700810 pseudo weight: max(-1, mil[+0x7e8]+ai[+0x620]+list768+list748); GP pseudos +GA pts 0x2c4230. - Mili..."

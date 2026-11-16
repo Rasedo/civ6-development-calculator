@@ -53,7 +53,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { districtAirBase } from './air';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
-import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorWars, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, formationBanned, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
@@ -82,7 +82,7 @@ import { aiCityStats, cityGrowth, aiView, freeCitiesLook, storeUnitStrength } fr
 import { congressBannedLuxury, congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight, revealAround, unitSeesThrough, unitSight } from './fog';
-import { combatDesire, type CombatDesire } from './aiMilitary';
+import { combatDesire, nuclearDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
 import { militaryFavTech } from './operations/unitRows';
 import { minorStrategyTurn } from './minorStrategy';
@@ -185,6 +185,7 @@ export function minorPhase(state: GameState): void {
     detectBoosts(state, cityState.seat);
     const government = minorResearchAi(state, cityState);
     cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
+    cityState.nuclearDesire = nuclearDesire(majorWars(state, cityState.seat));
     const wars = seatOf(state, cityState.seat)?.wars ?? [];
     cityState.research.favTech = militaryFavTech(state, cityState.seat, cityState.armyKnown ?? [],
       (p) => p === BARB_SEAT || wars.includes(p));

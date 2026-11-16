@@ -630,6 +630,9 @@
     - recording: h1_duely1128
       turn: 32
       value: Nazca's t32 Horseman is not the war footing's
+    - recording: h1_duels1164
+      turn: 210
+      value: "the PSEUDOYIELD_NUCLEAR_WEAPON weight (0x721a4e..0x721b02: 0.5 x 0x3dfae0, stored): city-state 4 at war with player 0, Nuclear Fission 1045.8 at 1 turn (794.4 at weight 0); t220 with player 0 gone 1156.2, t221 915.0"
     - recording: h1_duely1127
       value: 466 of 513 city-state and Free Cities turns' Fav Tech as logged (t1-t130)
     - recording: h1_duelv1124
@@ -657,7 +660,10 @@
     - cpu/core/minorBuild.ts:freeCombatDesire
     - gpu/core/sim_minorai.py:_free_combat_desire
     - cpu/core/operations/unitRows.ts:militaryFavTech
+    - cpu/core/aiMilitary.ts:nuclearDesire
+    - gpu/core/sim_minorai.py:_nuclear_desire
   readings:
+    - "C-98 / C-96: the military AI's nuclear weapon weight — READ (0x71fb80 at 0x721a4e..0x721b02, 0x3dfae0), both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
