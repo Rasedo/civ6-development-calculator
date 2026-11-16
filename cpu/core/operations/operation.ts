@@ -91,6 +91,13 @@ export interface Operation {
    *  one — the city's defence event writes the city's threat as it starts
    *  its operation —, else its definition's */
   recruitPriority?: number;
+  /** its tree's present value (tree +0x608, 24.8): the candidate's value it
+   *  started on (0x73a120), the city's worth for City Defense (the defence
+   *  event 0x5cced0 at 0x5cd0c1..0x5cd0fd), and for Naval Superiority the
+   *  player's era's ChronologyIndex x 100 at each teams' update (0x73f7d0 at
+   *  0x73f810..0x73f88f). A recruit of its priority answered by a marked
+   *  tree of a lower value takes that tree's units (0x7d1e40) */
+  value: number;
   /** its units may be built for it (op +0x5d8, AllowUnitConstruction: set
    *  by an Operation Diplomacy that desires war) */
   allowUnitConstruction: boolean;

@@ -273,7 +273,7 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
     status: run.status, mem: run.mem, bb: run.bb, done: false, started: base?.started ?? turn,
     enemyStrength: g.targetStrength, strength: g.opStrength, triggerUnits, triggerValue, locked,
     allowUnitConstruction: base?.allowUnitConstruction ?? false,
-    contracts: (tree.contracts ?? []).filter((c) => c >= 0),
+    contracts: (tree.contracts ?? []).filter((c) => c >= 0), value: tree.presentValue ?? base?.value ?? 0,
     ...((tree.recruitPriority ?? -1) >= 0 ? { recruitPriority: tree.recruitPriority } : {}),
     ...(base?.killed !== undefined ? { killed: base.killed } : {}),
     ...(released.length ? { released } : {}),

@@ -1260,7 +1260,7 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     `opsRecord` reads them: the pool's
     size, its free slots, the pick, per slot its definition (-1 free), id,
     target, rally, backup, strengths, recruit priority, enemy, backup enemy,
-    locked, unit construction allowed, per team its team, its members' pool
+    locked, unit construction allowed, present value, per team its team, its members' pool
     slots (-1 unslotted, -2 gone), each one released (1) or not, each one's
     slot as the last keep saw it, the units listed again (their count, their
     pool slots ascending, -2 gone), its requirements' counts, goals, flags,
@@ -1272,7 +1272,7 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     out = [size, nf] + [int(x) for x in sim.mops_free[b, s, :nf].tolist()]
     pk = int(sim.mops_pick[b, s])
     out += [pk, int(sim.mops_pick_target[b, s]) if pk >= 0 else -1, int(sim.mops_pick_rally[b, s]) if pk >= 0 else -1,
-            int(sim.mops_pick_enemy[b, s]) if pk >= 0 else -1]
+            int(sim.mops_pick_enemy[b, s]) if pk >= 0 else -1, int(sim.mops_pick_val[b, s]) if pk >= 0 else 0]
     lo = sim.POOL_LO[sim._mops_pre(s)]
     seat = sim._mops_seat(s)
     for k in range(size):
@@ -1283,7 +1283,8 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
         out += [d, int(sim.mops_id[b, s, k]), int(sim.mops_target[b, s, k]), int(sim.mops_rally[b, s, k]),
                 int(sim.mops_bk_target[b, s, k]), int(sim.mops_bk_rally[b, s, k]), int(sim.mops_estr[b, s, k]),
                 int(sim.mops_str[b, s, k]), int(sim.mops_recpri[b, s, k]), int(sim.mops_enemy[b, s, k]),
-                int(sim.mops_bk_enemy[b, s, k]), int(sim.mops_locked[b, s, k]), int(sim.mops_auc[b, s, k])]
+                int(sim.mops_bk_enemy[b, s, k]), int(sim.mops_locked[b, s, k]), int(sim.mops_auc[b, s, k]),
+                int(sim.mops_val[b, s, k])]
         for ti in range(2):
             tm = int(sim.mops_tm[b, s, k, ti])
             if tm < 0:

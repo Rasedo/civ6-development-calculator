@@ -253,6 +253,8 @@ export interface GameTree {
   contracts?: number[];
   /** the tree's recruit priority (-1 none) */
   recruitPriority?: number;
+  /** the tree's present value (+0x608, 24.8) */
+  presentValue?: number;
   /** at the end look: per node [status, shape, handler, its data as hex,
    *  its TreeData values by DefnId: [DataTypes id, slot, value], its graph
    *  entry: parent, end, first child, last child, current child] */

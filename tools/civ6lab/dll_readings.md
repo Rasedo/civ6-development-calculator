@@ -19065,3 +19065,52 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   `accumulatedPerTurn` pays it both; the copy at 0x44eff0 unread);
   runs/h1_duels1150 t184 player 1's Tank fights at full strength with no
   Oil income from t150 on (C-125).
+
+## C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins
+
+- THE RECRUIT'S ANSWER AT AN EQUAL PRIORITY (0x7d1e40 at 0x7d2044..0x7d2059):
+  a marked tree (m_allowRecruiting +0x3c8) whose priority (+0x548) equals
+  the request's answers where the request's value (r9, the requester's
+  present value +0x608 >> 8) passes its own present value >> 8. An Upgrade
+  Units tree's present value is 0 at every aimem read, so every recruit of
+  priority 3 holding a value above 0 takes its units: Attack Barb Camp, the
+  city assaults (priority 3) and a City Defense whose recruit priority (the
+  city's threat) is 3. Ported in `recruitUnits` (the lower operations and
+  the seat's trees; `Operation.value`) and `_u_recruit` (`mops_val`).
+- THE TREE'S PRESENT VALUE (tree +0x5b0, value +0x608, 24.8): the city's
+  defence event writes the city's worth on its knowledge base's record
+  (0x7a0ac0, 0 with none) after the start (`minorOpsStart`,
+  `start_operation`); the teams' update of an operation of target type
+  TARGET_NAVAL_SUPERIORITY writes its player's era's ChronologyIndex x 100
+  (0x73f810..0x73f88f: GetEra 0x467eb0, Eras +0x1c x 0x6400) at the start
+  and at each refresh (`teamsUpdate`, `_mops_naval_value`). The military
+  AI's pick starts at the candidate's value (`OpsAi.pick.value`,
+  `mops_pick_val`): the trees of runs/h1_duels1160 t114 (Attack Barb Camp,
+  12800 = 50.0, its AI_Operation_Eval line 50.0), runs/h1_duels1159 t48,
+  runs/h1_duels1149 t78 (Attack Barb Camp at 50.0) and runs/h1_duels1133
+  t170 (Wartime Attack Walled City, 240640 = 940.0, its line 940.0) hold it;
+  the write itself is not found among 0x1e60f0's callers on +0x5b0 (the
+  four are 0x5cced0, 0x73f7d0, 0x7f2970's Decode Trigger and 0x725e90's
+  recruit priority), open. The aimem import takes the tree's
+  `presentValue`.
+- Confirmed: runs/h1_duels1160 t114 city-state 4's Attack Barb Camp,
+  started that turn, logs "Recruiting strength ... UNIT_CATAPULT" and takes
+  the Catapult 1048577 its Upgrade Units tree 4456455 held (assigned at the
+  log look, the operation's at the end look): the family and plot rows and
+  ops.members gone; runs/h1_duels1149 t78 the Warrior 786436 and
+  runs/h1_duels1159 t48 the Warrior 131073 alike. Naval Superiority's value:
+  runs/h1_duels1160 city-state 4 at 300 (era 2) t114, 500 (era 4) t180;
+  runs/h1_duels1133 city-state 4 at 600 (era 5) t170.
+- AN UPGRADE NO RECORD HOLDS: the replay's upgrade takes the new unit's
+  chassis from the log's UnitUpgraded where no record holds the new unit,
+  so a unit the engine's turn made and the game upgraded and absorbed into
+  a formation in the same turn is upgraded in the copy, and Make Military
+  Formation takes it (runs/h1_duels1147 t213: city-state 3's Scout 3932162
+  trained on 5:14, upgraded to the Ranger 3997696, then UnitFormCorps on the
+  Ranger 3866629 and UnitRemovedFromMap: its row Heal, 534 // 620 gone;
+  t180 and t216, and the Rangers, Spec Ops and Skirmishers of
+  runs/h1_duels1137 t193, 1150 t172, 1153 t180, 1175 t232 alike).
+- Open: a unit trained or bought and absorbed in its turn without an
+  upgrade (runs/h1_duels1155 t219 the Pike and Shot 2818056 swapped off the
+  centre by City Defense's Skirmisher Army 2293760; runs/h1_duels1170 t241
+  the Nihang 1966086 bought, which ours does not buy).

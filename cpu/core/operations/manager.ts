@@ -58,8 +58,9 @@ export interface OpsAi {
   /** the diplomatic requests its operations made (Operation Diplomacy),
    *  their ids their places; none of them is taken up here */
   diplomacy: DiplomacyRequest[];
-  /** the new candidate the military AI's turn chose, started at the run */
-  pick: { def: string; enemy: number; target: number; rally: number } | null;
+  /** the new candidate the military AI's turn chose, started at the run,
+   *  with its value (24.8) */
+  pick: { def: string; enemy: number; target: number; rally: number; value: number } | null;
 }
 
 /** a triggered tree of the seat with no operation: its priority, its tree
@@ -204,12 +205,12 @@ const stagingPlots = (view: AiView, seat: number): readonly number[] => view.cit
  *  target (0x73eb60) and the teams' update (0x73f7d0), as the refresh takes
  *  them (runs/h1_duely1117 t9: the barbarians' Barbarian Attack on 12:19
  *  holds Target Str 43 in its start turn, its tree unticked) */
-function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, target: number, rally: number): Operation {
+function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, target: number, rally: number, value: number): Operation {
   const nodes = treeOf(def.tree ?? '');
   const op: Operation = {
     id: env.newOpId(), def: def.name, enemy, target, rally, backup: null, teams: newTeams(def, env.view(), target),
     status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {}, done: false, started: env.turn, enemyStrength: 0, strength: 0,
-    triggerUnits: [], triggerValue: 0, locked: false, allowUnitConstruction: false, contracts: [],
+    triggerUnits: [], triggerValue: 0, locked: false, allowUnitConstruction: false, contracts: [], value,
   };
   for (const t of op.teams) {
     t.goals[0] = rally;
@@ -227,8 +228,8 @@ function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, tar
  *  tree's recruit priority, written after the start (the city's defence
  *  event 0x5cced0 at 0x5cd102..0x5cd11e: the city's threat); the
  *  operation's id */
-export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: number, recruitPriority = -1): number {
-  const op = startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot);
+export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: number, recruitPriority: number, value: number): number {
+  const op = startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot, value);
   if (recruitPriority >= 0) op.recruitPriority = recruitPriority;
   return op.id;
 }
@@ -237,7 +238,7 @@ export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: 
  *  the target, the rally, each team's goals) and the player it is against
  *  (op +0x2a0, -1 none); the operation */
 export function startOperationAt(ai: OpsAi, env: OpsEnv, name: string, enemy: number, target: number, rally: number): Operation {
-  return startOperation(ai, env, AI_OP_DEFS[name], enemy, target, rally);
+  return startOperation(ai, env, AI_OP_DEFS[name], enemy, target, rally, 0);
 }
 
 /** one tick of a running operation's tree outside the operations' run (a
@@ -335,7 +336,7 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv, slotOf: ReadonlyMap<n
   const settleType = settleDef.operationType ?? '';
   if (env.settle && settleCand && count(ai, settleType) < (base.get(settleType) ?? 0)) {
     const site = view.cityPlots(ai.seat).length > 0 ? env.settle?.best(-1) ?? null : null;
-    const op = startOperation(ai, env, settleDef, -1, site ? site.plot : settleCand.target, settleCand.rally);
+    const op = startOperation(ai, env, settleDef, -1, site ? site.plot : settleCand.target, settleCand.rally, settleCand.value);
     if (op.target === NO_PLOT) {
       const again: Candidate = { ...blank(settleDef, -1), presetRally: op.target, presetStrength: op.strength, op };
       evaluate(view, ai.seat, again, staging, inputs);
@@ -362,7 +363,7 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv, slotOf: ReadonlyMap<n
     if (type && count(ai, type) >= (perWar.get(type) ?? 0) * wars + (base.get(type) ?? 0)) continue;
     best = c;
   }
-  ai.pick = best ? { def: best.def.name, enemy: best.enemy, target: best.target, rally: best.rally } : null;
+  ai.pick = best ? { def: best.def.name, enemy: best.enemy, target: best.target, rally: best.rally, value: best.value } : null;
 }
 
 /** the Control Manager's pass a city's AI acts in (CityBuildAI +0x470, 2
@@ -414,7 +415,7 @@ export function operationsRefresh(ai: OpsAi, env: OpsEnv): void {
   }
   const pick = ai.pick;
   ai.pick = null;
-  if (pick) startOperation(ai, env, AI_OP_DEFS[pick.def], pick.enemy, pick.target, pick.rally);
+  if (pick) startOperation(ai, env, AI_OP_DEFS[pick.def], pick.enemy, pick.target, pick.rally, pick.value);
 }
 
 /** what the shared contract nodes read of an operation's tree: the seat's

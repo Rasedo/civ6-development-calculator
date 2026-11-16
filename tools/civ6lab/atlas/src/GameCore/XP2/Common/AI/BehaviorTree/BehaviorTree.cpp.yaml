@@ -150,6 +150,9 @@
   semantics: "a tree's recruit listener: a tree not the requester's job, marked (+0x3c8) or asked with Allow Stealing, of a priority below the request's (or marked, equal priority and a lower value), answers with its units (0x6092c0 by its job +0x488) alive and alone (+0x1fb8 +0x738 1)."
   status: READ
   cases:
+    - recording: h1_duels1160
+      turn: 114
+      value: "city-state 4's Attack Barb Camp (priority 3, present value 12800) takes the Catapult 1048577 its Upgrade Units tree 4456455 (priority 3, present value 0, marked) held: the equal priority's value clause"
     - recording: h1_duels1133
       turn: 52
       value: "city-state 3's City Defense (recruit priority 1) leaves Naval Superiority's Galley 524292 (tree priority 2) t52-61: one recruit round logged; runs/h1_duels1135 t67 city-state 2's City Defense at 1 recruits none beside Attack Barb Camp's Archer and completes"
@@ -170,7 +173,10 @@
     - gpu/core/sim_minorops.py:_u_recruit
     - cpu/core/operations/nodes.ts:asked
     - cpu/core/operations/manager.ts:SeatTree
+    - cpu/core/operations/nodes.ts:worth
+    - cpu/core/operations/operation.ts:Operation
   readings:
+    - "C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"

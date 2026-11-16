@@ -2658,8 +2658,12 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, copy: GameStat
   for (const [u, m] of all) {
     const key = keyOf.get(u);
     if (!key) continue;
-    // a unit with no tactical row: its job in the game's AI memory
-    const game = rows ? tacticalCategory(rows.get(key)
+    // a unit with no tactical row: its job in the game's AI memory; one
+    // whose move is that of a row of its player naming the first of several
+    // available units, one of the others, unnamed: its move unscored
+    const row = rows?.get(key);
+    const unnamed = !row && !!ctx.tactical?.othersShared.get(`${turn}:${ownerOf(key)}`)?.has(tacticalCategory(m.move));
+    const game = rows && !unnamed ? tacticalCategory(row
       ?? gameJob(ctx, turn, ownerOf(key), Number(key.split(':')[1]), upgradeType(copy, u.seat, u.type) !== undefined)) : undefined;
     // the Free Cities' moves apart
     const label = `${u.seat === FREE_SEAT ? 'Free Cities: ' : ''}${game ?? m.move}`;
@@ -4904,8 +4908,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a unit the engine's turn made and the player upgraded within it,
         // which no record holds before: the engine's own, of the chassis that
         // upgrades to the record's (runs/h1_dueld1128 t41: Hong Kong's Warrior
-        // 851968, trained and upgraded to the Swordsman 917509 in its turn)
-        const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
+        // 851968, trained and upgraded to the Swordsman 917509 in its turn);
+        // the upgrade's chassis is the log's where no record holds the new
+        // unit, absorbed in the turn (runs/h1_duels1147 t213: city-state 3's
+        // Scout 3932162, trained and upgraded to the Ranger 3997696, which
+        // the Ranger 3866629's Corps takes)
+        const into = engineRowOf(ctx.cat, 'unit', r ? r.type : d.type);
         const mapped = new Set(ctx.units.values());
         // an upgrade climbs its line as far as its player's research reaches
         // (`upgradeType`: a Warrior to a Man-at-Arms)
@@ -4954,7 +4962,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
         if (!res.ok) {
-          const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
+          const t = engineRowOf(ctx.cat, 'unit', r ? r.type : d.type);
           const s = seatOf(state, u.seat);
           const to = t ?? upgradeType(state, u.seat, u.type);
           if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : to ? upgradeGoldCost(state, u.seat, u.type, to, u.leviedFrom !== undefined, u.formation ?? 0) : 0;
@@ -6352,6 +6360,11 @@ interface Tactical {
    *  first unit, 0x774380 moves them all: runs/h1_duelp1124 t186-196 the
    *  Ironclad 6225934 beside the named 5701639 on 19:8) */
   shared: Map<number, Set<string>>;
+  /** the same of the other players' rows, per `turn:player` (runs/h1_duels1155
+   *  t68: city-state 2's Attack Civilian on player 1's Builder names the
+   *  Warrior 196610 of "Available Units: 3", its Warriors 327683 and 393220
+   *  moving with no row) */
+  othersShared: Map<string, Set<string>>;
   wanders: Map<number, number[]>;
   others: Map<number, Map<string, string>>;
   drawRows: Map<number, string[]>;
@@ -6366,6 +6379,7 @@ function loadTactical(dumpPath: string): Tactical | undefined {
   const others = new Map<number, Map<string, string>>();
   const drawRows = new Map<number, string[]>();
   const shared = new Map<number, Set<string>>();
+  const othersShared = new Map<string, Set<string>>();
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const f = line.split(', ');
     if (f.length < 6) continue;
@@ -6375,14 +6389,15 @@ function loadTactical(dumpPath: string): Tactical | undefined {
     const id = Number(m[1]);
     const key = `${f[1]}:${id}`;
     if (f[2] === 'Wander' || f[2] === 'Garrison') drawRows.set(turn, [...(drawRows.get(turn) ?? []), key]);
+    const avail = /Available Units: (\d+)/.exec(line);
     if (f[1] !== '63') {
+      if (avail && Number(avail[1]) > 1) othersShared.set(`${turn}:${f[1]}`, (othersShared.get(`${turn}:${f[1]}`) ?? new Set()).add(f[2]));
       let o = others.get(turn);
       if (!o) others.set(turn, (o = new Map()));
       if (!o.has(key)) o.set(key, f[2]);
       continue;
     }
     if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
-    const avail = /Available Units: (\d+)/.exec(line);
     if (avail && Number(avail[1]) > 1) shared.set(turn, (shared.get(turn) ?? new Set()).add(f[2]));
     let t = out.get(turn);
     if (!t) out.set(turn, (t = new Map()));
@@ -6394,7 +6409,7 @@ function loadTactical(dumpPath: string): Tactical | undefined {
       t.set(id, { move: f[2], extra: f.slice(6).join(", ") });
     }
   }
-  return { first: out, shared, wanders, others, drawRows };
+  return { first: out, shared, othersShared, wanders, others, drawRows };
 }
 
 /** the per-turn step check that reads each state subsystem */

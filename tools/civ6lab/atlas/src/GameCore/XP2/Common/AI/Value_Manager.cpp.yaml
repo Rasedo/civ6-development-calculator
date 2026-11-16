@@ -13,7 +13,11 @@
     - recording: h1_duelv1117
       turn: 18
       value: Caguana 450 + 200 + Production / Science / Culture x 7 + 10 a lead point
-  impl: [cpu/core/operations/cityValue.ts:cityWorth, gpu/core/sim_minorops.py:_mops_city_value]
+  impl:
+    - cpu/core/operations/cityValue.ts:cityWorth
+    - gpu/core/sim_minorops.py:_mops_city_value
+    - cpu/core/minorOps.ts:minorOpsStart
+    - gpu/core/sim_minorops.py:_mops_city_worth
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
@@ -21,6 +25,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins"
   context:
     - "...akes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the po..."
   review: reviewed

@@ -2738,10 +2738,18 @@ class _MinorWorld:
         return self.sim._mops_live(self.s, ids)
 
     def start_operation(self, name, plot, mask):
-        # the city's defence event's start: the tree's recruit priority the
-        # city's threat (0x5cced0 at 0x5cd102..0x5cd11e)
+        # the city's defence event's start: the tree's present value the
+        # city's worth on its knowledge base's record, 0 with none (0x5cced0
+        # at 0x5cd0c1..0x5cd0fd), its recruit priority the city's threat
+        # (0x5cd102..0x5cd11e)
         T = self.sim._mops_tables()
-        return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask, recruit=self._threat.reshape(-1))
+        sim = self.sim
+        val = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+        for k in sim._mops_known_cities(self.s):
+            at = mask & k["m"] & (k["plot"] == plot)
+            if bool(at.any()):
+                val = torch.where(at, sim._mops_city_worth(self.s, k), val)
+        return sim._mops_start(self.s, T.names.index(name), plot, plot, mask, recruit=self._threat.reshape(-1), value=val)
 
     def builder_type(self, imp):
         """`builderType`: [B] an improvement's (AI_IMPROVEMENTS' row) first

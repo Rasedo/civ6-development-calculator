@@ -367,9 +367,16 @@ const recruitUnits: BtHandler<OpsContext> = {
     // passes (runs/h1_duels1135 city-state 3 t141: City Defense, started at
     // its city's threat, takes the three Swordsmen and the Trebuchet its
     // Upgrade Units tree holds); the second offer keeps the units whose turn
-    // is not done (0x60ac91..0x60aca1)
-    const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < asked);
-    const trees = ctx.seatTrees().filter((t) => t.units && t.priority < asked);
+    // is not done (0x60ac91..0x60aca1); a marked tree of the request's own
+    // priority answers where the request's present value, whole, passes its
+    // own (0x7d2044..0x7d2059: runs/h1_duels1160 t114 city-state 4's Attack
+    // Barb Camp, 3 at 50, takes the Catapult 1048577 its Upgrade Units tree,
+    // 3 at 0, holds). An Upgrade Units tree's present value is 0 at every
+    // aimem read.
+    const worth = op.value >> 8;
+    const lower = ctx.others().filter((o) => o !== op && !o.locked
+      && (opDef(o).priority < asked || (opDef(o).priority === asked && worth > o.value >> 8)));
+    const trees = ctx.seatTrees().filter((t) => t.units && (t.priority < asked || (t.priority === asked && worth > 0)));
     const done = ctx.turnDone();
     const freed = [...lower.flatMap(opUnits), ...trees.flatMap((t) => t.units!())]
       .filter((id) => !done.has(id)).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
@@ -480,6 +487,11 @@ function teamsUpdate(ctx: OpsContext): void {
   const view = ctx.view();
   let total = 0;
   const targets = view.attackTargets(ctx.seat);
+  // a Naval Superiority's tree takes the player's era's ChronologyIndex x
+  // 100 as its present value (0x73f810..0x73f88f: runs/h1_duels1160 city-
+  // state 4's at 300 in its Medieval era at t114, 500 in its Industrial at
+  // t180)
+  if (opDef(op).targetType === 'TARGET_NAVAL_SUPERIORITY') op.value = (view.playerEra(ctx.seat) + 1) * 100 * FX;
   // the team update's members (0x73fba0 -> 0x732cd0): those whose assignment
   // (unit +0x7d0) is no longer the operation's leave (runs/h1_duely1127 t67:
   // city-state 3's Galley 393216, released at t66, "Not Ready" with no

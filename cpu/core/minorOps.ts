@@ -35,6 +35,7 @@ import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContr
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
 import { NO_PLOT, opDef, opJobUnits, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
+import { cityWorth } from './operations/cityValue';
 import { newCityAi } from './aiCityTrees';
 import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
 import { installType, minorCanUpgrade, minorKnownUnits, minorOrdersHeld, minorSetItem, minorUnitProduction, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
@@ -237,10 +238,14 @@ export function minorOpsRefresh(state: GameState, cs: CityState): void {
   if (cs.ops) operationsRefresh(cs.ops, minorEnv(state, cs, null));
 }
 
-/** A: the defence event's start (0x7265b0), its tree's recruit priority the
- *  city's threat (0x5cced0 at 0x5cd102..0x5cd11e): the operation's id */
+/** A: the defence event's start (0x7265b0), its tree's present value the
+ *  city's worth on its knowledge base's record, 0 with none (0x5cced0 at
+ *  0x5cd0c1..0x5cd0fd: 0x7a0ac0), its recruit priority the city's threat
+ *  (0x5cd102..0x5cd11e): the operation's id */
 export function minorOpsStart(state: GameState, cs: CityState, name: string, plot: number): number {
-  return startOperationNamed(opsOfMinor(cs), minorEnv(state, cs, null), name, plot, cs.threat ?? -1);
+  const view = aiView(state);
+  const k = view.knownCities(cs.seat).find((c) => c.plot === plot);
+  return startOperationNamed(opsOfMinor(cs), minorEnv(state, cs, null), name, plot, cs.threat ?? -1, k ? cityWorth(view, cs.seat, k) : 0);
 }
 
 /** the operation of the id still runs */

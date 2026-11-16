@@ -1361,7 +1361,7 @@ _MUTABLE = [
     "mops_tene", "mops_tatk",
     "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_rel", "mops_mslot", "mops_twice", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "barb_camps_known", "mops_revealed",
-    "mops_enemy", "mops_recpri",
+    "mops_enemy", "mops_recpri", "mops_val", "mops_pick_val",
     "mops_upg_id", "mops_upg_of",  # its "Upgrade Units" trees: their ids, the tree holding each unit
     "citystate_kb_seq", "citystate_kb_next", "citystate_kb_aged", "citystate_kb_enemy",  # the records' order, the last ageing, its enemy counts
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on

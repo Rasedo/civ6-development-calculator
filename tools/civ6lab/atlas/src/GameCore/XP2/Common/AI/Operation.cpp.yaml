@@ -60,6 +60,7 @@
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - gpu/core/sim_minorops.py:_mops_teams_update
     - cpu/core/minorBuild.ts:old
+    - cpu/core/operations/nodes.ts:teamsUpdate
   readings:
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
@@ -314,6 +315,7 @@
     - cpu/core/operations/manager.ts:startOperation
     - gpu/core/sim_minorops.py:_mops_start
     - gpu/core/sim_barbops.py:_barb_captures
+    - cpu/core/operations/operation.ts:Operation
   readings:
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -748,13 +750,17 @@
 - addr: 0x73f7d0
   final: 0x4e2670
   kind: function
-  semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field. Its dl goes to the team update as its fifth argument (the start 0x73a120 passes 1, the refreshes 0x727510 / 0x728010 0), its r8b as the sixth (1 at all three)."
+  semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field; an operation of target type TARGET_NAVAL_SUPERIORITY first has its tree's present value (tree +0x5b0, value +0x608) set to its player's era's ChronologyIndex x 100 (0x73f810..0x73f88f: GetEra 0x467eb0, Eras +0x1c x 0x6400). Its dl goes to the team update as its fifth argument (the start 0x73a120 passes 1, the refreshes 0x727510 / 0x728010 0), its r8b as the sixth (1 at all three)."
   status: PARTLY
   cases:
+    - recording: h1_duels1160
+      turn: 114
+      value: city-state 4's Naval Superiority tree at present value 76800 (300) in its era 2, 128000 (500) at t180 in its era 4; runs/h1_duels1133 t170 153600 (600) in era 5
     - recording: h1_duelq1128
       turn: 161
       value: Barbarian Attack (AllowTargetUpdate false, op +0x128 0) holds goal 0 on its rally at every end look of the five duelq recordings; Attack Barb Camp, Builder Capture, Settle New City and Naval Superiority teams with members move it
   impl:
+    - gpu/core/sim_minorops.py:_mops_naval_value
     - cpu/core/operations/assault.ts:WEIGHED
     - cpu/core/operations/nodes.ts:refreshStrengths
     - cpu/core/operations/manager.ts:startOperation
@@ -763,7 +769,9 @@
     - cpu/core/operations/nodes.ts:teamsUpdate
     - gpu/core/sim_minorops.py:_mops_teams_update
     - cpu/core/operations/assault.ts:advanceRally
+    - cpu/core/operations/operation.ts:Operation
   readings:
+    - "C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -803,6 +811,7 @@
     - cpu/core/operations/operation.ts:keepMembers
     - gpu/core/sim_minorops.py:_mops_teams_update
     - cpu/core/minorBuild.ts:old
+    - cpu/core/operations/nodes.ts:teamsUpdate
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"

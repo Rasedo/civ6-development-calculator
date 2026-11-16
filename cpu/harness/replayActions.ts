@@ -142,7 +142,7 @@ export type Decision = Base & (
   | { kind: 'promote'; player: number; unit: string; promotion: number; xp: number; formed?: true }
   /** a unit upgraded (`UnitUpgraded`): the game removes the unit and adds its
    *  upgrade under a new id */
-  | { kind: 'upgrade'; player: number; unit: string; into: string }
+  | { kind: 'upgrade'; player: number; unit: string; into: string; type: number }
   | { kind: 'camp'; player: number; plot: number; unit: string }
   | { kind: 'village'; player: number; plot: number; gold: number; faith: number; techBoosts: number[]; civicBoosts: number[];
       /** the city a citizen the village gave joined, -1 none */
@@ -785,7 +785,7 @@ export class RecordedActions implements ActionSource {
             const d = out0[i];
             if (d.kind === 'promote' && d.unit === into) out0.splice(i, 1);
           }
-          out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into });
+          out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into, type: n(r, 2) });
         }
       } else if (name === 'UnitPromoted') {
         // a unit new in the pair (a levied unit home under its new id) holds

@@ -713,6 +713,16 @@
   context:
     - ...nDenouncePlayer (0x681c10) sends the denouncement, the military AI's PrepareForWarWith (0x724f30), returns true. OnOfferAlliance (0x681e80) picks an alliance type and performs it (0x67...
   review: reviewed
+- addr: 0x725e90
+  final: 0x4d1390
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-134 / C-128: a tree's present value and the recruit's answer at an equal priority; an upgrade the record never holds — READ (0x7d1e40 at 0x7d2044..0x7d2059, 0x73f7d0 at 0x73f810..0x73f88f, 0x5cced0 at 0x5cd0c1..0x5cd0fd), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0f0's callers on +0x5b0 (the four are 0x5cced0, 0x73f7d0, 0x7f2970's Decode Trigger and 0x725e90's recruit priority), open. The aimem import takes the tree's `presentValue`."
+  review: imported
 - addr: 0x7271d0
   final: 0x4d2400
   kind: function
