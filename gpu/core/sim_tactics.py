@@ -2881,7 +2881,10 @@ class SimTactics:
                 back_d[n_i[j_i], e_i[j_i], s_i] = bt
         # a city centre's blow kills where it tops its hit points left
         # (`planUnit`: 0x791470's district branch)
-        djob = (sn > 0) & has & ~other
+        # (a unit that may not shoot after moving and holds no Movement, one
+        # the camps raised in the turn, predicts none)
+        mute = ~self._moves_and_shoots(pre)[rows, slots] & (getattr(self, f"{pre}_unit_mp")[rows, slots] <= 0)
+        djob = (sn > 0) & has & ~other & ~mute.unsqueeze(1)
         if bool(djob.count_nonzero()):
             dn_i, de_i = djob.nonzero(as_tuple=True)
             dplot = tpc[dn_i, de_i]
@@ -5870,7 +5873,8 @@ class SimTactics:
         with `min_mv` [B] whole Movement left at least (none: 0), none in
         `taken`, none with a unit that keeps it out (`keptOut`: its own
         stacking with it, itself counted, or another player's at peace but a
-        Trader), one at war with it that fights or fallout, the first best — a fort (its
+        Trader), one at war with it that fights or fallout, none a civilian
+        attacks into, the first best — a fort (its
         own territory under any district or wonder) over any plot
         but a fort, of two forts the lower danger; a plot of no danger over
         one of danger, a fort aside; of two of no danger its own territory,
@@ -5894,6 +5898,11 @@ class SimTactics:
                 & ~(self._tac_fighters(seat) & ~rel_m.unsqueeze(1)) & (self.tile_fallout <= 0))
         if min_mv is not None:
             cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
+        # a civilian (the civilian domain: no combat, no support chassis)
+        # stands on no district its planning attacks into
+        ut0 = getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)
+        civ = self._type_noncombat.take(ut0) & ~self._type_support.take(ut0)
+        cand = cand & ~(res["attack"][rr] & civ.unsqueeze(1))
         # a fort's district: any (DistrictInfo +0x58 set on every row)
         held = self._centre_plane() | (self.district >= 0) | (self.built_wonder >= 0)
         n = cand.sum(dim=1)

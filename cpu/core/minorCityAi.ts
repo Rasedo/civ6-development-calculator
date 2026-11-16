@@ -389,9 +389,16 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     // district tree at 13:13)
     const foreign = !owned && tileSeat(tile) >= 0;
     const nearOwned = !owned && !foreign && neighbors(map, tile).some((n) => tileSeat(n) === cs.seat);
-    // the plot of the city's own pillaged district: its repair is valued
+    // the plot of the city's own pillaged district: its repair is valued;
+    // the plot of its own district not complete values that district too
+    // (runs/h1_duels1164 Fez's Campus on 29:15 valued t33-t37, none from its
+    // completion at t38; runs/h1_duels1165 Vatican City's Neighborhood on
+    // 42:10, its contract FAILED at t184, its plot's row at 1715.6 the
+    // choice's at t185)
     const repair = minorRepairsDistrictAt(state, cs, plot);
-    if (plot === cs.centerIndex || foreign || (tile.district && !repair)) {
+    const own = repair || (!!tile.district && !tile.districtComplete && owned
+      && (cs.districts ?? []).some((d) => d.tileIndex === plot && d.type === tile.district));
+    if (plot === cs.centerIndex || foreign || (tile.district && !own)) {
       out.push({ plot, owned, improvable: false, districtOk: false, nearOwned,
         improvements: AI_IMPROVEMENTS.map(() => 0), districts: AI_DISTRICTS.map(() => 0) });
       continue;
@@ -434,7 +441,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     // Kong: the Farm at 9:6 72.45 to t4, 0.00 through the drought of t5-t9,
     // 71.45 at t10; the drought of t16-t17 makes 8:5's, 7:6's and 7:7's
     // Farms and 8:6's Camp 0.00, 7:5's Mine 71.45)
-    const ground = !repair ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }, !owned) : new Set<string>();
+    const ground = !own ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }, !owned) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
       if (!id || !ground.has(id)) return FX_MIN;
@@ -470,7 +477,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       lake: tile.terrain === 'LAKE',
       // a city-state's city holds no EFFECT_ADJUST_VALID_FEATURES_DISTRICTS pair
       keepsFeature: () => false,
-      district: repair ? districtType(tile.district!) : null,
+      district: own ? districtType(tile.district!) : null,
       districtPillaged: repair,
       isCity: false,
       districtAdjacency: districtAdj,
@@ -502,12 +509,12 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     const districts = AI_DISTRICTS.map((row, i) => {
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
       const id = DISTRICT_ENGINE.get(row.type) ?? null;
-      // the pillaged district's plot values its own row alone; elsewhere a
-      // district the city holds is valued only where it is not OnePerCity
-      // (runs/h1_duels1136 Buenos Aires t191: its Neighborhood completed at
-      // t190, the Neighborhood rows of t191 at 611.9-700.1, its next Build
-      // City District tree on 28:15 that turn)
-      if (repair) {
+      // the pillaged or unfinished district's plot values its own row alone;
+      // elsewhere a district the city holds is valued only where it is not
+      // OnePerCity (runs/h1_duels1136 Buenos Aires t191: its Neighborhood
+      // completed at t190, the Neighborhood rows of t191 at 611.9-700.1, its
+      // next Build City District tree on 28:15 that turn)
+      if (own) {
         if (!id || id !== tile.district) return FX_MIN;
       } else if (!id || (!DISTRICTS[id].allowMultiple && (cs.districts ?? []).some((c) => c.type === id)) || !placeable(id)) return FX_MIN;
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;

@@ -2314,6 +2314,12 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // 7077911, more than half their health lost, beside player 0's 42:20 at
     // 52 hit points, their blows 59 / 55, hold and wander, as logged)
     if (E.target.type === 'COMBAT_DISTRICT') {
+      // a unit that may not shoot after moving and holds no Movement (one
+      // their camps raised in the turn) predicts no blow on a district
+      // (runs/h1_duels1148 t87: the barbarians' Bombard 3342347 raised on
+      // 16:11, its spots on player 1's centre 13:10 at 0 / 0 / 0 / 0;
+      // h1_duels1161 t117 the Trebuchet 4587539 alike)
+      if (!shoots && unit.movesLeft <= 0) continue;
       const d = districtHealth(state, E.target.tile);
       const x = predictDistrictExchange(state, unit, E.target.tile);
       // the dealt word is the larger of the simulation's two damage words,
@@ -3928,7 +3934,8 @@ function cityCentre(state: GameState, t: Tile): boolean {
  * (0x5861f0's out-flag at 0x716d9c, `fighterOnLayer`: a civilian at war
  * keeps no plot out — runs/h1_duelq1121 t234: the barbarians' captive
  * Settler 4587543 on 3:10 takes player 1's Great Writer's 5:13, its order
- * with no path there, and stands), none in fallout (0x2d2100). A FORT is a plot of the player's
+ * with no path there, and stands), none in fallout (0x2d2100), none a
+ * civilian attacks into. A FORT is a plot of the player's
  * own territory holding any district or wonder (`districtPlot`: runs/
  * h1_duelq1124 t151 city-state 3's Cuirassier 1835008 takes Granada's
  * Harbor 40:13 over 41:13; t181 a Harbor fort 4 plots off lets the farther
@@ -3953,6 +3960,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
   const noCombat = (UNITS[u.type]?.combat ?? 0) <= 0;
   // its combat strength as the AI reads it (0x56dc90 with 0)
   const fights = aiStrengths(state, u).melee > 0;
+  const civilian = unitDomain(u.type) === 'civilian';
   let best = -1;
   let bGoal = -1;
   let bFort = false;
@@ -3964,6 +3972,12 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
   let bDist = 0;
   for (const r of plan.reach) {
     if (r.turns > 1 || taken.has(r.tile) || r.moves < minMoves * FIX) continue;
+    // a civilian stands on no district its planning attacks into
+    // (runs/h1_duels1185 t171: the barbarians' captive Builder 2883597 on
+    // 29:19, its planning's 33:18/1 and 30:14/1 into player 0's districts,
+    // takes 32:18; h1_duels1166 t242-246 their Battering Ram 5701645 takes
+    // such a plot, 275)
+    if (r.attack && civilian) continue;
     const t = state.map.tiles[r.tile];
     if (irradiated(t)) continue;
     if (keptOut(state, u, r.tile) || fighterOnLayer(state, u, r.tile)) continue;

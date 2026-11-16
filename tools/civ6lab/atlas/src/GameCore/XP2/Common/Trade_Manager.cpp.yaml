@@ -450,7 +450,7 @@
   kind: function
   semantics: "a trade route's road (from 0x512610): each path plot takes the route's player's best route where it differs or is pillaged."
   status: PARTLY
-  impl: [cpu/core/eras.ts:layRoad]
+  impl: [cpu/core/eras.ts:layRoad, cpu/harness/replay.ts:majorRoads]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]

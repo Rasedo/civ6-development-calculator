@@ -71,7 +71,7 @@ import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunderTrader, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
-import { commitDedications, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
+import { commitDedications, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent, bestRoadTier } from '../core/eras';
 import { cityStateSight, initFog, revealAround, takeLook, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
@@ -1313,6 +1313,49 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameSta
   }
 }
 
+/** the roads the majors laid in their turns before row `open` stand for the
+ *  minors' planning on `copy`, over the first record's: a district a major
+ *  completed carries its road (`landMajorDistricts`), a major's Trader lays
+ *  its player's road on each land plot its route walk steps onto
+ *  (`tradeRouteStep`, 0x554340), and a major's new era re-lays the roads of
+ *  its plots (`upgradeRoads`) as it begins, at its turn's start (runs/
+ *  h1_duels1117 t135: player 1's Trader 1310732 steps onto city-state 3's
+ *  Medieval 41:13, its Industrial road there in record 136, city-state 3's
+ *  Trader 458756 on 41:13 plans 40:13 at (1/320); t153: player 1's Aqueduct
+ *  on 39:11 completed in its turn, the Trader on 40:11 plans it at
+ *  (1/320); t121: player 1's Industrial era at its turn's start, the Trader
+ *  on its Medieval 40:11 plans 40:10, 41:10 and 41:12 at (1/320)) */
+function majorRoads(ctx: Ctx, acts: readonly unknown[][], open: number | undefined, b: TurnRecord, turn: number, copy: GameState): void {
+  if (open === undefined) return;
+  const tiles = copy.map.tiles;
+  for (const x of acts) {
+    if ((x[0] as number) >= open) break;
+    if (x[1] !== turn) continue;
+    const seat = ctx.seatOfPlayer.get(x[3] as number);
+    if (seat === undefined || !isCiv(seat)) continue;
+    if (x[2] === 'PlayerEraChanged') {
+      // only an era some Routes.PrereqEra names brings a road (runs/
+      // h1_duels1166 t223: player 1's era 8, its Medieval 11:12 kept in
+      // record 224)
+      const tier = bestRoadTier(x[4] as number);
+      if (tier <= bestRoadTier((x[4] as number) - 1)) continue;
+      for (const t of tiles) {
+        if (!t.road || t.railroad || tileSeat(t) !== seat || (t.roadTier ?? 0) >= tier) continue;
+        t.roadTier = tier;
+      }
+    } else if (x[2] === 'UnitMoved') {
+      const key = `${x[3]}:${x[4]}`;
+      const u = ctx.units.get(key) ?? ctx.gone.get(key);
+      const t = tiles[(x[6] as number) * ctx.W + (x[5] as number)];
+      if (u && UNITS[u.type]?.trader && t && !isWater(t)) layRoad(copy, seat, t);
+    } else if (x[2] === 'CityProductionCompleted' && x[5] === 2) {
+      const d = b.cities.find((c) => c.owner === x[3] && c.id === x[4])?.districts.find((y) => y[0] === x[6]);
+      const t = d ? tiles[(d[2] as number) * ctx.W + (d[1] as number)] : undefined;
+      if (t?.district && t.ownerSeat === seat && !isWater(t)) layRoad(copy, seat, t);
+    }
+  }
+}
+
 /** the improvements a Builder repaired in its player's turn stand repaired
  *  for the players after it (`takes`): the log's ImprovementChanged (x, y, type,
  *  owner, resource, pillaged) clearing the pillage between the player's
@@ -1893,6 +1936,8 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // safety on 41:13, 1835008's UnitFormCorps, the Frigate's moves, then
   // 1769478's removal)
   const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  // (the minors' turns open after the majors': the first minor's)
+  const minorsOpen = acts.find((x) => x[2] === 'PlayerTurnActivated' && x[1] === turn && minorAiSeat(seatOfP(ctx, x[3] as number)))?.[0] as number | undefined;
   const pending = new Map<number, number>();
   const killed = new Set(acts.flatMap((x) => (x[2] === 'UnitKilledInCombat' ? [`${x[3]}:${x[4]}`] : [])));
   for (let j = 0; j < acts.length; j++) {
@@ -2153,11 +2198,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       t.districtComplete = r.districtComplete;
       t.districtPillaged = r.districtPillaged;
     }
-    // ...on the first record's road types: a road a major's era brings lands
-    // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
-    // minors' planning on Medieval roads, Industrial ones from record 146),
-    // a city-state's at its research step (the engine's turn re-laid them:
-    // `minorPhase`) where its research raised its road this pair — a road
+    // ...on the first record's road types, the roads the majors' turns laid
+    // over them after (`majorRoads`), a city-state's at its research step
+    // (the engine's turn re-laid them: `minorPhase`) where its research raised its road this pair — a road
     // of its ground a Trader's step re-laid in the turn is the first
     // record's (runs/h1_duelq1124 t126: city-state 3's Knight 1310720 on
     // 39:9 plans its own 40:10 on the Classical road of record 126,
@@ -2169,6 +2212,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     if (tier > 0) t.roadTier = tier;
     else delete t.roadTier;
   });
+  majorRoads(ctx, acts, minorsOpen, b, turn, copy);
   for (const s of [...copy.cityStates, ...(copy.freeSeat ? [copy.freeSeat] : [])]) {
     const slots = copy.units.filter((c) => c.seat === s.seat).map((c) => c.slot ?? -1);
     s.unitPool = { size: Math.max(s === copy.freeSeat ? 0 : 1, ...slots.map((x) => x + 1)), free: [], dying: [] };

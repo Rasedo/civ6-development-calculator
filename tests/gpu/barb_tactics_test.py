@@ -326,11 +326,15 @@ def scalar_safe_plot(sim, s, res, danger, b=0):
     foe = sim._tac_hostile(BARB_SEAT)[b].tolist()
     here = int(sim.barb_unit_tile[b, s])
     no_combat = int(sim._type_combat[int(sim.barb_unit_type[b, s])]) <= 0
+    ut = int(sim.barb_unit_type[b, s])
+    civilian = bool(sim._type_noncombat[ut]) and not bool(sim._type_support[ut])
+    atk = res["attack"][0].tolist()
     pd = sim.pair_dist.tolist()
     best = -1
     bs = bo = bw = False
     bd = bm = bdist = 0
-    for p in sorted((p for p in range(T) if rt[p] == 1 and not own_mil[p] and not foe[p]), key=lambda p: rk[p]):
+    for p in sorted((p for p in range(T) if rt[p] == 1 and not own_mil[p] and not foe[p] and not (atk[p] and civilian)),
+                    key=lambda p: rk[p]):
         d = danger[p]
         safe, own, water = d <= 0, int(sim.tile_seat[b, p]) == BARB_SEAT, bool(sim.water[b, p])
         dist = pd[here][p]

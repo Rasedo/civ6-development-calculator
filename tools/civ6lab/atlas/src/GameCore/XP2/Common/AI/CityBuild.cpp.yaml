@@ -611,6 +611,9 @@
     - recording: h1_duely1128
       turn: 49
       value: "0x5cee82: +0x55 set by a district row past its gates whatever its value; Nazca's pillaged Holy Site's repair at 0.0, contract 125 VALUE 0.0"
+    - recording: h1_duels1165
+      turn: 185
+      value: "0x5cee3f: the plot's own district unfinished values its row alone: Vatican City's Neighborhood on 42:10 at 1715.61 (its contract FAILED at t184), the district tree of t185 on it; h1_duels1164 Fez's Campus on 29:15 t33-t37, -9999 from its completion"
   impl:
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:buildingTurns
@@ -639,6 +642,7 @@
     - cpu/harness/plotValueLab.ts:gp
     - cpu/core/minorBuild.ts:built
   readings:
+    - "C-100 / C-127: the plot analysis values the city's own unfinished district on its plot"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
@@ -660,6 +664,7 @@
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+    - "C-100 / C-127: the plot analysis values the city's own unfinished district on its plot — READ (0x5ce970 at 0x5cede6..0x5cee82 as \"C-96: the plot analysis's owner test\" reads it), LAB (the cases), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
@@ -727,6 +732,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
+    - "C-100 / C-127: the plot analysis values the city's own unfinished district on its plot — READ (0x5ce970 at 0x5cede6..0x5cee82 as \"C-96: the plot analysis's owner test\" reads it), LAB (the cases), both twins"
   context:
     - "...ity Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the b..."
   review: reviewed

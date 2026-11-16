@@ -276,9 +276,9 @@ export function upgradeRoads(state: GameState, seat: number, r: ResearchState): 
 
 /** THE ROADS' UPGRADE at the turn's change: each player whose era brought a
  *  new road this turn re-lays its plots' roads (`upgradeRoads`) — a major,
- *  a city-state, the Free Cities (runs/h1_duely1128: China's Industrial era
- *  at its t145 start, the minors' planning on Medieval roads that turn,
- *  China's Industrial ones from record 146) */
+ *  a city-state, the Free Cities (runs/h1_duels1117 t121: player 1's
+ *  Industrial era at its turn's start, city-state 3's Trader on its 40:11
+ *  planning 40:10 at (1/320) on the Industrial road that turn) */
 export function upgradeAllRoads(state: GameState): void {
   for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     upgradeRoads(state, s.seat, s.research);

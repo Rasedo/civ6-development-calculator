@@ -1263,9 +1263,12 @@ class SimMinorAi:
         # holding one among them, its own valued 0
         improvable = owned & ev & g.any(-1)
         # the plot of the city's own pillaged district values that district
-        # alone, its repair (`minorRepairsDistrictAt`): per district row its
-        # plots, each other value FX(-9999)
+        # alone, its repair (`minorRepairsDistrictAt`), and the plot of its
+        # own district not complete that district alone: per district row
+        # its plots (the pillaged flag with each), each other value FX(-9999)
         held = self.city_dist_tile[:, row, 0]
+        d_at = self.district.gather(1, p0)
+        unfinished = valid & owned & ~self.district_complete.gather(1, p0)
         repairs = []
         rep_any = torch.zeros_like(valid)
         for i, r in enumerate(dist_rows):
@@ -1276,12 +1279,13 @@ class SimMinorAi:
             t0 = tt.clamp(min=0)
             rep = (alive & (tt >= 0) & self.district_pillaged[self._bidx, t0] & (self.district[self._bidx, t0] == dv)
                    & (self.tile_seat[self._bidx, t0] == seat))
-            hit = valid & (plots == tt.unsqueeze(1)) & rep.unsqueeze(1)
+            pil = valid & (plots == tt.unsqueeze(1)) & rep.unsqueeze(1)
+            hit = pil | (unfinished & (d_at == dv) & alive.unsqueeze(1))
             if bool(hit.count_nonzero()):
                 imps[hit] = _FX_MIN
                 dists[hit] = _FX_MIN
                 rep_any = rep_any | hit
-                repairs.append((i, r["type"], hit))
+                repairs.append((i, r["type"], hit, pil))
         out = {"plot": plots, "valid": valid, "owned": owned, "improvable": improvable, "near_owned": near,
                "imps": imps, "dists": dists}
         if not bool(ev.count_nonzero()) and not repairs:
@@ -1369,11 +1373,12 @@ class SimMinorAi:
                     continue
                 v = self._cv_district(pf, name, ti, torch.full_like(bb, hz))
                 dists[bb, pp, i] = torch.where(ci, v, torch.full_like(v, _FX_MIN))
-        # the repairs' values
-        for (i, dname, hit) in repairs:
+        # the repairs' and the unfinished districts' values
+        for (i, dname, hit, pil) in repairs:
             ok_t = T["minor_dverdict"].to(dev)[self.citystate_type[:, s].clamp(min=0), i] >= 0
-            hk = torch.where(hit, ((imp + 1) * NR + (rid + 1)) * NF + (fid + 1), torch.full_like(plots, -1))
+            hk = torch.where(hit, (((imp + 1) * NR + (rid + 1)) * NF + (fid + 1)) * 2 + pil.long(), torch.full_like(plots, -1))
             for k in torch.unique(hk[hit]).tolist():
+                is_rep = bool(k % 2)
                 bb, pp = (hk == k).nonzero(as_tuple=True)
                 ii = int(imp[bb[0], pp[0]])
                 ri = int(rid[bb[0], pp[0]])
@@ -1384,11 +1389,13 @@ class SimMinorAi:
                                 PN["feature"][fi] if fi >= 0 else None,
                                 [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok, _other) in cand_rows])
                 pf.repair_of = dname
+                pf.repair_pillaged = is_rep
                 passed[bb, pp] = passed[bb, pp] | ok_t[bb]
                 # a repair lands at the repair's turns, the rest of its price
-                # past the resumed share (`minorPlotEvals`)
+                # past the resumed share (`minorPlotEvals`), an unfinished
+                # district at its build turns
                 r = dist_rows[i]
-                ti = (_t(f.build_turns(dname, repair=True), f.like()) + torch.maximum(_t(f.tech_turns(r["tech"]), f.like()),
+                ti = (_t(f.build_turns(dname, repair=is_rep), f.like()) + torch.maximum(_t(f.tech_turns(r["tech"]), f.like()),
                                                                                      _t(f.civic_turns(r["civic"]), f.like())))[bb]
                 if bool((ti > hz).all()):
                     continue
@@ -2156,8 +2163,10 @@ class _PlotFacts:
         self._cand = cand
         # a district's rows value, once per plot group (`_cv_rows_value`)
         self.rows_memo = {}
-        # the plots' own pillaged district whose repair is valued, None none
+        # the district the plots hold, their own pillaged one (its repair) or
+        # unfinished one, valued alone; None none
         self.repair_of = None
+        self.repair_pillaged = False
 
     def _at(self, x):
         """a [B] fact at the elements' games, or a number as is"""
@@ -2364,7 +2373,7 @@ class _PlotFacts:
         return self.repair_of
 
     def plot_district_pillaged(self):
-        return 1 if self.repair_of is not None else 0
+        return 1 if self.repair_of is not None and self.repair_pillaged else 0
 
     def is_city(self):
         return 0

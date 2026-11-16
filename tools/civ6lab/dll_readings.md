@@ -18267,3 +18267,25 @@ GPU `_walls_tier_at`, `_walls_tier_all`, `city_urban_kept`, `_transfer_city`.
   standing, no camp and none of its units (barb.unit, knowledge.camps).
 - Open: the game logs both Recruit Units nodes in the tick a recruit takes
   its unit back (runs/h1_duels1132 t170 / t173), the engines the first.
+
+## C-100 / C-127: the plot analysis values the city's own unfinished district on its plot — READ (0x5ce970 at 0x5cede6..0x5cee82 as "C-96: the plot analysis's owner test" reads it), LAB (the cases), both twins
+
+- THE RULE: 0x5ce970's district rows pass a row on "the plot's own district
+  of the row" (0x5cee3f) as on its repair: the plot holding the city's own
+  district not yet complete values that district's row alone (its build
+  turns from the progress the type keeps, the "plot holds it" chronology),
+  each other row and every improvement FX(-9999); a completed district's
+  plot stands unanalysed. The district choice (0x5d0c20) takes it like any
+  other plot. Ported: minorPlotEvals' `own` (a pillaged repair or an
+  unfinished district), `_minor_plot_evals`' unfinished plots with the
+  repairs (`repair_pillaged` False).
+- Confirmed: duels1164 Fez's Campus on 29:15, placed t32: its row alone at
+  530.27-647.17 t33-t37, the plot -9999 from its completion at t38.
+  duels1165 Vatican City's Neighborhood on 42:10 (contract 747 FAILED at
+  t184): t185 its row 1715.61, the Build City District tree of that turn on
+  it with no contract (presentValue 439040), ours no Purchase Plot on 0:10;
+  duels1173 Ayutthaya's on 0:17 (contract 692 FAILED t184): 3669.35 in ours
+  as logged, t185 no contract, t187 contract 853 on 0:17 at 3669.0.
+- OPEN: the tree on its own unfinished plot submits its contract a turn
+  before the game's (duels1173 t186, duels1165 t186 / t190: ours
+  DISTRICT_NEIGHBORHOOD, the game's none).
