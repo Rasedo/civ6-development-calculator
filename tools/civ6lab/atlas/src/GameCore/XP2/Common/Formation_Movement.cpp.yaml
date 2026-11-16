@@ -758,7 +758,7 @@
   final: 0x1a94b0
   kind: function
   name: pathfinder pool init
-  semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the least of the formation's units' 0x56d9f0(unit, domain) (0x2717f4..0x27181b: a member's value replaces a pool at or above it), 0 for a domain a member holds no Movement in; +0x194 the least GetMaxMoves. Only the start node reads GetMaxMoves (the planning's 0x26eea0); a later turn starts on the pool of its plot's domain, and the shore crossing's carry reads the same pool. Ported: domainPool (cpu/core/tactical.ts), _tac_pool (gpu/core/sim_tactics.py). +0x1f8 (r14 +0x78, 0x2717cd) the OR over the members of 0x1385c0 (a strength above 0 and unit +0x18ba clear); +0x1a0 (r14 +0x20, 0x271870..0x2718d7) the domain: 0 sea or embarked, 2 land, 1 air, 4 else. GeneratePath's start callback (+0xa0 / +0xa8, 0x77d8b..0x77db0) for every pool search: +0x1bc (r14 +0x3c, 0x271909..0x271910), the Movement the start node takes (0x26e920 at 0x26e98a), set to the formation's Movement +0x218 (the least its members hold, the refresh 0x267650), and the step cost's pair cache +0x1c0 / +0x1c8 (r14 +0x40 / +0x48, 0x2718f1 / 0x2718f5) cleared: a search sets out on its own formation's Movement left; the full-Movement searches' 0x26eea0 calls it, then sets +0x1bc to GetMaxMoves."
+  semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the least of the formation's units' 0x56d9f0(unit, domain) (0x2717f4..0x27181b: a member's value replaces a pool at or above it), 0 for a domain a member holds no Movement in; +0x194 the least GetMaxMoves. Only the start node reads GetMaxMoves (the planning's 0x26eea0); a later turn starts on the pool of its plot's domain, and the shore crossing's carry reads the same pool. Ported: domainPool and formationPool (cpu/core/tactical.ts), _tac_pool and _tac_search (gpu/core/sim_tactics.py). +0x1f8 (r14 +0x78, 0x2717cd) the OR over the members of 0x1385c0 (a strength above 0 and unit +0x18ba clear); +0x1a0 (r14 +0x20, 0x271870..0x2718d7) the domain: 0 sea or embarked, 2 land, 1 air, 4 else. GeneratePath's start callback (+0xa0 / +0xa8, 0x77d8b..0x77db0) for every pool search: +0x1bc (r14 +0x3c, 0x271909..0x271910), the Movement the start node takes (0x26e920 at 0x26e98a), set to the formation's Movement +0x218 (the least its members hold, the refresh 0x267650), and the step cost's pair cache +0x1c0 / +0x1c8 (r14 +0x40 / +0x48, 0x2718f1 / 0x2718f5) cleared: a search sets out on its own formation's Movement left; the full-Movement searches' 0x26eea0 calls it, then sets +0x1bc to GetMaxMoves."
   status: READ
   cases:
     - recording: h1_duels1166
@@ -776,10 +776,17 @@
     - recording: h1_duely1124
       turn: 29-55
       value: city-state 4's Heavy Chariot 83 plans its second turn on its base 2, not GetMaxMoves' 3 on a clear start plot (AI_Planning.csv)
+    - recording: h1_duels1154
+      turn: 19
+      value: "the barbarian Horseman 851979 (base 3) formed with the Settler 1179664 (base 2) plans 8:10 at turn 2 with 1 Movement left off 7:11 and no plot three steps out: the second turn on the formation's least pool, 2"
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
-  impl: [cpu/core/tactical.ts:domainPool, gpu/core/sim_tactics.py:_tac_pool]
+  impl:
+    - cpu/core/tactical.ts:domainPool
+    - cpu/core/tactical.ts:formationPool
+    - gpu/core/sim_tactics.py:_tac_pool
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"

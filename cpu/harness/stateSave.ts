@@ -102,6 +102,7 @@ export const CTX_FIELDS: Record<keyof Ctx, 'carried' | 'pair' | 'run' | 'tally'>
   barbBlows: 'pair',
   startBests: 'pair',
   barbSeized: 'pair',
+  minorSeized: 'pair',
   minorBlows: 'pair',
   minorShots: 'pair',
   minorPromoted: 'pair',

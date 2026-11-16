@@ -225,6 +225,10 @@ export interface Ctx {
    *  before (its owner, id and plot): their tactical turn's look sees it
    *  so, the seizure coming after (`barbarianAi`) */
   barbSeized: { u: Unit; was: Unit }[];
+  /** the civilians a city-state or the Free Cities seized in this pair, each
+   *  as it stood before (its owner, id and plot) with its taker's player:
+   *  the minors' passes up to the taker's hold it so (`minorAi`) */
+  minorSeized: { u: Unit; was: Unit; taker: number }[];
   /** the units a city-state's, a Free City's or a barbarian's battle of this
    *  pair struck or fought with, as they stood before its first blow: the
    *  minors' AI takes its turn from there (`minorAi`), its own operations
@@ -2430,6 +2434,33 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     else delete t.roadTier;
   });
   majorRoads(ctx, acts, minorsOpen, b, turn, copy);
+  // a civilian a minor seized in its own turn of the pair is its owner's
+  // still, on the plot of its seizure, through the passes of the minors up
+  // to its taker's; the captive its taker's from the pass after, with no
+  // Movement, and in no pool before (runs/h1_duels1166 t83: the barbarians'
+  // Builder 3342341 on 6:17, CIVILIAN_UNIT last in city-state 4's target
+  // list from its record of age 1 at 8:16, its Heavy Chariot 851970 taking
+  // it in its Operation move as city-state 4's 1310725)
+  // — a minor's own, taken by another, stands as its own turn left it
+  // (`minorUnits`)
+  const seizedStands = ctx.minorSeized.filter((g) => !minorAiSeat(g.was.seat))
+    .map((g) => ({ taker: g.taker, stand: structuredClone(g.was), captive: back.get(g.u) }));
+  const standSeized = (player: number): void => {
+    for (const g of seizedStands) {
+      const before = player <= g.taker;
+      const i = copy.units.indexOf(g.stand);
+      if (before && i < 0) copy.units.push(g.stand);
+      else if (!before && i >= 0) copy.units.splice(i, 1);
+      if (!g.captive) continue;
+      const j = copy.units.indexOf(g.captive);
+      if (before && j >= 0) copy.units.splice(j, 1);
+      else if (!before && j < 0) {
+        g.captive.movesLeft = 0;
+        copy.units.push(g.captive);
+      }
+    }
+  };
+  standSeized(-1);
   for (const s of [...copy.cityStates, ...(copy.freeSeat ? [copy.freeSeat] : [])]) {
     const slots = copy.units.filter((c) => c.seat === s.seat).map((c) => c.slot ?? -1);
     s.unitPool = { size: Math.max(s === copy.freeSeat ? 0 : 1, ...slots.map((x) => x + 1)), free: [], dying: [] };
@@ -2579,7 +2610,27 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       if (here && i < 0) copy.units.push(g.c);
       else if (!here && i >= 0) copy.units.splice(i, 1);
     }
+    // ...and a major's unit the log takes off by no battle after the
+    // minor's turn opened, where the log's steps had left it (runs/
+    // h1_duels1124 t113: player 1's Missionary 3211267 on 39:19,
+    // RELIGIOUS_CIVILIAN in city-state 3's target list, the barbarian
+    // Man-At-Arms 4980762 stepping onto its plot in their turn)
+    for (const g of lost) {
+      const here = (opened.get(player) ?? Infinity) < g.ord;
+      const i = copy.units.indexOf(g.c);
+      if (here && i < 0) copy.units.push(g.c);
+      else if (!here && i >= 0) copy.units.splice(i, 1);
+    }
   };
+  const lost: { c: Unit; ord: number }[] = [];
+  acts.forEach((x, j) => {
+    if (x[2] !== 'UnitRemovedFromMap' || acts[j + 1]?.[2] === 'UnitAddedToMap' || minorsOpen === undefined || (x[0] as number) < minorsOpen) return;
+    const key = `${x[3]}:${x[4]}`;
+    const u = ctx.gone.get(key);
+    const at = lastStep.get(key) ?? was.get(key);
+    if (!u || !isCiv(u.seat) || standing.has(u) || ctx.minorBlows.has(u) || killed.has(key) || at === undefined) return;
+    lost.push({ c: Object.assign(structuredClone(u), { tileIndex: at, hp: u.hp > 0 ? u.hp : hpWas.get(key) ?? UNIT_HP }), ord: x[0] as number });
+  });
   // ...and a barbarian camp a minor's unit took in its own turn of the pair
   // (`campsTaken` has it gone) stands through the passes of the minors up to
   // its taker's: each one's target list and operations read it as their turn
@@ -2625,6 +2676,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standLevied(playerOf(cs.seat));
       standLeaving(playerOf(cs.seat));
+      standSeized(playerOf(cs.seat));
       standCamps(playerOf(cs.seat));
       standGame(playerOf(cs.seat));
       popAtTurn(ctx, b, copy, turn, playerOf(cs.seat));
@@ -2634,6 +2686,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     }
     standLevied(playerOf(FREE_SEAT));
     standLeaving(playerOf(FREE_SEAT));
+    standSeized(playerOf(FREE_SEAT));
     standCamps(playerOf(FREE_SEAT));
     standGame(playerOf(FREE_SEAT));
     popAtTurn(ctx, b, copy, turn, playerOf(FREE_SEAT));
@@ -2642,6 +2695,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   } finally {
     standLevied(Infinity);
     standLeaving(Infinity);
+    standSeized(Infinity);
     standCamps(Infinity);
     for (const [c, p] of ownEnd) c.tileIndex = p;
     copy.turn = clock;
@@ -3298,6 +3352,17 @@ function settleEnvoys(ctx: Ctx, b: TurnRecord, close: boolean): void {
   const { state } = ctx;
   const due = ctx.lateEnvoys;
   ctx.lateEnvoys = [];
+  // the envoys the log gives once the turn's last player is done are the
+  // active player's start's of the next turn: they land at the close, after
+  // the city-states' and the barbarians' turns (runs/h1_duels1171 t43:
+  // player 0's envoy to city-state 2 given in its t44 start, the centre
+  // 7:21 at 24 in city-state 2's and the barbarians' t43 known cities, 25
+  // from t44)
+  const rows = (b as { actions?: unknown[][] }).actions ?? [];
+  let done = rows.length - 1;
+  while (done >= 0 && rows[done][2] !== 'PlayerTurnDeactivated') done -= 1;
+  const nextStart = (d: EnvoyDecision) => (close || done < 0 || d.phase !== 'before' ? 0
+    : rows.filter((r, j) => j > done && r[2] === 'InfluenceGiven' && r[3] === d.minor).length);
   for (const d of due) {
     const seat = seatOfP(ctx, d.player);
     const s = seatOf(state, seat) as Seat | undefined;
@@ -3305,7 +3370,10 @@ function settleEnvoys(ctx: Ctx, b: TurnRecord, close: boolean): void {
     const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
     if (!s || !cs || seat >= state.seats.length) { count(ctx, 'envoy', 'refused', d.player); continue; }
     if (!close && !cs.met.includes(seat)) { ctx.lateEnvoys.push(d); continue; }
-    const want = (b.players.find((p) => p.id === d.minor)?.envoysReceived ?? []).find(([g]) => g === d.player)?.[1] ?? 0;
+    const later = Math.min(d.n, nextStart(d));
+    if (later > 0) ctx.lateEnvoys.push({ ...d, n: later });
+    if (later >= d.n) continue;
+    const want = ((b.players.find((p) => p.id === d.minor)?.envoysReceived ?? []).find(([g]) => g === d.player)?.[1] ?? 0) - later;
     const short = want - (cs.envoys[seat] ?? 0);
     if (short <= 0) { count(ctx, 'envoy', 'applied'); continue; }
     const was = cs.envoys[seat] ?? 0;
@@ -3864,7 +3932,11 @@ function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): v
   // city at 14:8, seen at age 0 by its knowledge base's look before)
   const snap = () => Object.assign(structuredClone(atk), { tileIndex: d.from });
   if (isBarbSeat(atk.seat) && !ctx.barbBlows.has(atk)) ctx.barbBlows.set(atk, Object.assign(snap(), { tileIndex: barbStart(ctx, d.attacker, d.from) }));
-  if (minorAiSeat(atk.seat) && !ctx.minorBlows.has(atk)) ctx.minorBlows.set(atk, { snap: snap(), key: d.attacker });
+  // (the minors' copy holds the barbarian too, their turn coming after:
+  // runs/h1_duels1137 t13, the barbarian Scout 393221 on 37:6 that falls on
+  // city-state 2's centre 37:5 in their turn, HIGH_PRIORITY_UNIT in
+  // city-state 2's target list)
+  if ((minorAiSeat(atk.seat) || isBarbSeat(atk.seat)) && !ctx.minorBlows.has(atk)) ctx.minorBlows.set(atk, { snap: snap(), key: d.attacker });
   const s0 = battleDraw(ctx, wit, b, d);
   if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); return; }
   if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
@@ -3921,7 +3993,7 @@ const CITY_TURN_ROWS = new Set(['CityPopulationChanged', 'CityProductionComplete
 /** does the giver send its envoys in its start: its start draws more border
  *  picks than its cities (one each) — the minors' annexes — by the game's
  *  log; with no log, the start (the DLL's reading) */
-function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, player: number): boolean {
+function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, player: number, minor: number, cat: Catalog): boolean {
   // an InfluenceGiven row between the player before's deactivation and its
   // own activation is its start's (runs/h1_duelw1121 t41: China's envoy to
   // Hunza, its Mysticism token, the minor annexing no plot for it)
@@ -3936,8 +4008,15 @@ function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, p
     let k = on - 1;
     while (k >= 0 && rows[k][2] !== 'PlayerTurnDeactivated') k--;
     const block = rows.slice(k + 1, on);
-    const given = block.findIndex((r) => r[2] === 'InfluenceGiven');
+    const given = block.findIndex((r) => r[2] === 'InfluenceGiven' && r[3] === minor);
     if (given >= 0) {
+      // a row the Ambassador's own clock row follows is her posting's,
+      // granted as she is established and paid by no token: the engine's
+      // clock grants it (`governorClocks`; runs/h1_duels1164 t68: player 1's
+      // two to city-state 2 before its GovernorChanged 1, 4 -> 6;
+      // h1_duels1135 t132: 7 -> 9 after the other governors' rows)
+      const next = block[given + 1];
+      if (next?.[2] === 'GovernorChanged' && next[3] === player && cat.governors[next[4] as number] === 'GOVERNOR_THE_AMBASSADOR') return false;
       const city = block.findIndex((r) => CITY_TURN_ROWS.has(r[2] as string) && r[3] === player);
       // the governors' clocks (0x432980, a GovernorChanged row for each
       // governor) run after the Influence turn and before the cities
@@ -3997,7 +4076,7 @@ function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log
   // the civics each start completes (`turnStartCompletions`)
   const starts = turnStartCompletions(ctx, b, a.turn);
   for (const d of ds) {
-    if (d.kind !== 'envoy' || d.phase !== 'after' || !envoysInStart(log, a, b, d.player)) continue;
+    if (d.kind !== 'envoy' || d.phase !== 'after' || !envoysInStart(log, a, b, d.player, d.minor, ctx.cat)) continue;
     const seat = seatOfP(ctx, d.player);
     const s = seatOf(state, seat) as Seat | undefined;
     const ms = seatOfP(ctx, d.minor);
@@ -5270,6 +5349,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         if (!vic) { count(ctx, 'seize', 'refused', d.player, 'a civilian the replay does not hold'); break; }
         if (isBarbSeat(seatOfP(ctx, d.player))) ctx.barbSeized.push({ u: vic, was: { ...vic, tileIndex: d.plot } });
+        else if (minorAiSeat(seatOfP(ctx, d.player))) ctx.minorSeized.push({ u: vic, was: { ...vic, tileIndex: d.plot }, taker: d.player });
         const by = unitOf(ctx, d.unit);
         if (!by) {
           // the record's seizure, on the engine's own rule for the civilian,
@@ -5398,9 +5478,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const late = minorAiSeat(def.seat) && ctx.playerOfSeat.get(atk.seat)! > ctx.playerOfSeat.get(def.seat)!;
         const holder = late ? seatOf(state, def.seat) : undefined;
         const known = holder?.armyKnown?.map((x) => ({ ...x }));
+        // the civilians under the defender, which a minor's advance takes
+        const under = minorAiSeat(atk.seat) && !d.ranged
+          ? state.units.filter((u) => u !== def && u.tileIndex === d.at && unitDomain(u.type) !== 'military' && unitsHostile(state, atk, u)).map((u) => [u, { ...u }] as const)
+          : [];
         let r: ReturnType<typeof rangedAttack>;
         try {
           r = isAirUnit(atk.type) ? airStrike(state, atk.id, d.at, atk.seat) : d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
+          for (const [u, was] of under) {
+            if (u.seat === atk.seat && state.units.includes(u)) ctx.minorSeized.push({ u, was, taker: ctx.playerOfSeat.get(atk.seat)! });
+          }
         } finally {
           barbBattlesFromRecord(false);
           if (holder) {
@@ -7185,7 +7272,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: rec0.head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), barbEncampments: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), barbEncampments: new Map(), gone: new Map(), barbSeized: [], minorSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -7334,6 +7421,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     delete ctx.startBests;
     ctx.gone = new Map();
     ctx.barbSeized = [];
+    ctx.minorSeized = [];
     ctx.minorBlows = new Map();
     ctx.minorShots = [];
     ctx.minorPromoted = new Map();

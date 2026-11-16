@@ -633,11 +633,19 @@ def main() -> int:
     ap.add_argument("--what")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--wide", type=int, default=400, help="the widest a log row prints")
+    ap.add_argument("--ords", help="A-B: every record event row of sequence A..B, any player, whole, and nothing else")
     a = ap.parse_args()
     common.utf8()
     g = Game(a.seed, a.turn)
     if not g.rec:
         print(f"no unmoved record of turn {a.turn} in {g.f['dump'].name}")
+    if a.ords:
+        lo, hi = (int(v) for v in a.ords.split("-"))
+        rows = {json.dumps(e): e for rec in (g.rec, g.next) for key in ("actions", "extra") for e in (rec or {}).get(key) or []
+                if isinstance(e, list) and len(e) > 2 and isinstance(e[0], int) and lo <= e[0] <= hi}
+        for e in sorted(rows.values(), key=lambda e: e[0]):
+            print(f"  record #{e[0]} t{e[1]}: {e[2]} {' '.join(str(x) for x in e[3:])}")
+        return 0
     a.plot = tuple(int(v) for v in a.plot.split(":")) if a.plot else None
     if a.unit is not None and a.player is None:
         a.player = find_unit(g, a.unit)

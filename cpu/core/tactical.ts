@@ -716,6 +716,16 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
   return canEmbark(state, unit) ? EMBARK_MOVES + embarkTechMoves(state, unit.seat) + rosterEmbarkMoves(state, unit) : 0;
 }
 
+/** a formation's pool of a domain (the pool's init 0x2715a0 at 0x2717f4..
+ *  0x27181b: a member's value replaces a pool at or above it): the least
+ *  `domainPool` of its members, the unit and its `mates` (runs/h1_duels1154
+ *  t19: the barbarian Horseman 851979, 3 Movement, formed with the Settler
+ *  1179664, plans 8:10 at turn 2 with 1 Movement left off 7:11 and no plot
+ *  three steps out) */
+function formationPool(state: GameState, unit: Unit, mates: readonly Unit[], sea: boolean): number {
+  return Math.min(domainPool(state, unit, sea), ...mates.map((m) => domainPool(state, m, sea)));
+}
+
 /**
  * THE PATHFINDER (Pathfinder_Instance 0x77d10, its step 0x793f0): Dijkstra
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
@@ -808,8 +818,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   // a later turn starts on the pathfinder's pool of the domain its plot holds
   // the unit in (`domainPool`): embarked on water, a land unit's own ashore
   const naval = !!UNITS[unit.type]?.naval;
-  const fullLand = domainPool(state, unit, false) * FIX;
-  const fullSea = domainPool(state, unit, true) * FIX;
+  const fullLand = formationPool(state, unit, mates, false) * FIX;
+  const fullSea = formationPool(state, unit, mates, true) * FIX;
   // the planning's search carries the unmoved flag 0x100 by its own flags
   // (UnitPlanning 0x791e00 at 0x791eb6..0x791ec4: 0x115), whatever Movement
   // the unit holds; the reach searches 0x26df90 add it where the formation

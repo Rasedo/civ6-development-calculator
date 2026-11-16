@@ -876,6 +876,10 @@ class SimTactics:
         f_land, f_sea = self._tac_pool(pre)
         full_l = torch.div(f_land[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         full_s = torch.div(f_sea[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
+        # ...the formation's: the least of its members' (`formationPool`)
+        pm = mate.clamp(min=0)
+        full_l = torch.where(mate >= 0, torch.minimum(full_l, torch.div(f_land[rows, pm] * _FIX, self._mp_scale, rounding_mode="floor")), full_l)
+        full_s = torch.where(mate >= 0, torch.minimum(full_s, torch.div(f_sea[rows, pm] * _FIX, self._mp_scale, rounding_mode="floor")), full_s)
         unmoved = mp >= granted
         if from_full:
             # the planning sets out on the unit's full Movement (0x791e00 ->
