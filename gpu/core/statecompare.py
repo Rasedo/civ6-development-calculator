@@ -510,6 +510,7 @@ GAME = {
     "freeEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.FK)],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
+    "freePrimaryRegions": lambda sim, b, rows: [sorted(set(sim.tile_region[b][sim.free_region_plots[b]].tolist()))],
     "freeTradeSeat": lambda sim, b, rows: [int(sim.free_trade_seat[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
     "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), *_tree_pool(sim, b, sim.FR)]],

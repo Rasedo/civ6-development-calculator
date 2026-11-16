@@ -18380,3 +18380,41 @@ order), `enemyCities` (cpu/core/operations/evaluate.ts, `EvalInputs.tradeListed`
   peace), its air strike, its Make Formation pairs, Attack Along March over a
   district, a walled target's blows and its pillage over the majors' pool —
   the GPU twin refuses each (NotImplementedError).
+
+## C-98: the Free Cities' unit production table, primary region list and grants
+
+- THE TABLE (0x7989e0) of the Free Cities counts their knowledge base's
+  records as their last turn left them, before the turn's ageing and look,
+  as a city-state's: runs/h1_duels1143 t209-t211, the end look's table on
+  the records of the turn before (t209 Archer 0.383, Catapult 0.512,
+  Slinger 0.211, Warrior 0.184; on that turn's own records it reads the
+  game's t210 0.488 / 0.656 / 0.262 / 0.230). Ported: `freeMilitaryTurn`
+  holds `Seat.armyCounted` from before `freeKnowledge(..., true)` to the
+  cities' updates' end, `freeCityBuildFacts` and the view's
+  `unitProductionValue` read `minorKnownUnits`; GPU `_cv_counted[FK]`,
+  `_FreeFacts._production_table`.
+- THE PRIMARY REGION LIST (+0x1290 +0x2f0) the Combat Desire (0x71fb80)
+  reads is the one the cities' analyses built (0x700630 from 0x5cdd70
+  through 0x6fa5e0), kept: a city taken this turn adds none before its
+  update, a city lost leaves its regions. 1143 t208 Taiyuan, taken in
+  China's turn: Regional and Enemy Strength 0, the desire 1.0 of one city's
+  target; t220-t224, no city: Enemy 205 .. 85, the desire 1.0 / 2.0; 0.5
+  from t225 as the records age out. No clear of the list in
+  GrandStrategic.cpp's code (0x6f0000..0x703000: its one other touch the
+  object's destructor). Ported: `Seat.primaryRegions`,
+  `freePrimaryRegions`, `freeCombatDesire`; GPU `free_region_plots`,
+  `_free_city_build`, `_free_combat_desire`.
+- THE GRANTS (0x273a40, the revolt's pair and the periodic grant) take no
+  birth record in the Free Cities' knowledge base: 1143 the revolt's
+  Mechanized Infantry 131073 (China's t208 turn), the grants 262146 (t212)
+  and 327681 (t217) absent at the aimem tactical site, at age 0 at its
+  log; the Slinger 196608 Taiyuan trained at t212 at the tactical site.
+  Ported: `grantFreeCityUnit`; GPU `_grant_free_unit` (`_spawn_barb`
+  birth False). The create's signal path is unread.
+- THE HANDICAP: the Free Cities' unit value takes its Maintenance off, as a
+  city-state's (below handicap 3, 0x7b62c0): 1143 t208 Taiyuan's first
+  update on a table of 1.0 and the desire 1.0: the Slinger (no
+  Maintenance) 54.9 as its pick logs, the Archer 26.6 and the Battering Ram
+  15.96, each twice the value at desire 0 less one Maintenance. Ported:
+  `freeCityBuildFacts` handicap 0; GPU `_FreeFacts` takes
+  `_MinorFacts.handicap`.

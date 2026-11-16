@@ -949,9 +949,10 @@ class SimMinorAi:
         military AI's turn, in the games of `act`, with or without a city
         (`citystate_combat_desire` on the row `FR`), on the records of their
         knowledge base (the row `FK`) as their last update aged them (the
-        turn before): the regions of their cities' 37 plots (`_city_regions`),
-        each city's unit in training, the majors at war with them, the city-states not, the
-        barbarians a tribe at war; a city threatened at its last update
+        turn before): their primary region list as their cities' last
+        updates left it (`free_region_plots`), each city's unit in training,
+        the majors at war with them, the city-states not, the barbarians a
+        tribe at war; a city threatened at its last update
         (`city_ai_threat`); no war footing, no standing-army term."""
         B, dev = self.B, self.device
         if not bool(act.count_nonzero()):
@@ -972,12 +973,8 @@ class SimMinorAi:
         seen = self.citystate_kb_seen[:, r].long()
         plot = self.citystate_kb_plot[:, r].long()
         alive_c = self.city_alive[:, row, : self.RC]
-        ctr = self.city_center[:, row, : self.RC]
-        # their primary region list: every region of each city's 37 plots
-        regs = torch.cat([self._city_regions(torch.where(alive_c[:, j], ctr[:, j], torch.full_like(ctr[:, j], -1)))
-                          for j in range(self.RC)], dim=1)
-        rec_area = self.tile_region.gather(1, plot.clamp(min=0))
-        in_area = ((rec_area.unsqueeze(2) == regs.unsqueeze(1)) & (regs >= 0).unsqueeze(1)).any(dim=2)
+        # their primary region list: a record's plot in one of its regions
+        in_area = (plot >= 0) & self.free_region_plots.gather(1, plot.clamp(min=0))
         turn = int(self.turn) - 1
         counted = (slot != -2) & (turn - seen <= 2) & in_area
         strength = strength_of(typ)
@@ -1877,6 +1874,11 @@ class SimMinorAi:
         threat, near = self._free_city_threat(j)
         self.city_ai_threat[:, row, j] = torch.where(act, threat, self.city_ai_threat[:, row, j])
         self.city_ai_near[:, row, j] = torch.where(act, near, self.city_ai_near[:, row, j])
+        # its analysis adds the city's regions to the Free Cities' primary
+        # region list (`freePrimaryRegions`)
+        regs = self._city_regions(torch.where(act, self.city_center[:, row, j], torch.full_like(self.city_center[:, row, j], -1)))
+        here = ((self.tile_region.unsqueeze(2) == regs.unsqueeze(1)) & (regs >= 0).unsqueeze(1)).any(dim=2)
+        self.free_region_plots |= act.unsqueeze(1) & here & (self.tile_region >= 0)
         # its UNITS table every update, which the Free Cities' research
         # values read (`free_unit_values`, `_free_unit_term`)
         f = _FreeFacts(self, j)

@@ -30,7 +30,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, seatYi
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture, cityStateAt } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
-import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
+import { freeCityBuild, freeCombatDesire, freeKnowledge, minorArmyCounts, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { freeResearchTerms } from './freeCityBuild';
 import { researchUnitTurns } from './aiResearch';
 import { storeUnitStrength } from './aiView';
@@ -940,7 +940,18 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
   }
   if (!spot) return;
   const u = spawnUnit(state, unitType, spot.index, FREE_SEAT);
-  if (u) u.freeCity = city.id;
+  if (!u) return;
+  u.freeCity = city.id;
+  // a granted unit (0x273a40's) takes no birth record: the Free Cities'
+  // knowledge base records it at its next look (runs/h1_duels1143: the
+  // revolt's Mechanized Infantry 131073, made in China's t208 turn, and the
+  // grants 262146 at t212 and 327681 at t217 absent at the aimem tactical
+  // site, at age 0 at its log; the Slinger 196608 Taiyuan trained at t212
+  // at the tactical site)
+  const free = freeSeatOf(state);
+  const kept = (free.armyKnown ?? []).filter((r) => r.id !== u.id);
+  if (kept.length) free.armyKnown = kept;
+  else delete free.armyKnown;
 }
 
 /**
@@ -1113,6 +1124,7 @@ export function freeCitiesPhase(state: GameState): void {
     freeDesire(state);
     government();
     freeMilitaryTurn(state);
+    delete free.armyCounted;
     freeKnowledge(state, false);
     researchUnitTurns(free.research);
     return;
@@ -1172,6 +1184,7 @@ export function freeCitiesPhase(state: GameState): void {
     // does (0x1fa1d0 at 0x1fa22d -> the full reassign 0x196320)
     replaceAllCitizens(state, city, cityFlags(city));
   });
+  delete free.armyCounted;
   // (a replay runs their units' turn on a copy beside the record's)
   if (!minorOrdersHeld()) freeCitiesMilitary(state);
   // its knowledge base's look and its research AI's turns per unit
@@ -1191,11 +1204,17 @@ function freeDesire(state: GameState): void {
 /** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the
  *  favoured technology on the records as their last update aged them
  *  (`militaryFavTech`), then their knowledge base ages and looks
- *  (`freeKnowledge`) and keeps its route value (`freeTradeValue`) */
+ *  (`freeKnowledge`) and keeps its route value (`freeTradeValue`). Their
+ *  unit production table, which their cities' updates read, counts the
+ *  records as they stood before the ageing and the look
+ *  (`Seat.armyCounted`, held to the cities' turn's end): runs/h1_duels1143
+ *  t209-t211, Taiyuan's table on the records of the turn before (t209
+ *  Archer 0.383, Catapult 0.512, Slinger 0.211 at the end look) */
 function freeMilitaryTurn(state: GameState): void {
   const free = freeSeatOf(state);
   // the majors and the barbarians are the players it fights
   free.research.favTech = militaryFavTech(state, FREE_SEAT, free.armyKnown ?? [], (p) => isCiv(p) || p === BARB_SEAT);
+  free.armyCounted = minorArmyCounts(free.armyKnown ?? []);
   freeKnowledge(state, true);
   // the route value K at the ageing's tail (`freeTradeValue`)
   freeTradeValue(state);

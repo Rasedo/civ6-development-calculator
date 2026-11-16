@@ -471,12 +471,17 @@
   kind: function
   semantics: "logs the city's yield advantages to AI_CityBuild.csv: Food Adv. / Prod. Adv. are adv[YIELD_FOOD] / adv[YIELD_PRODUCTION] from 0x5d83c0 over the YIELD_* list CityBuildAI +0x908."
   status: PARTLY
-  impl: [cpu/core/minorBuild.ts:minorKnowledge, cpu/core/aiTrade.ts:majorCityTradeList]
+  impl:
+    - cpu/core/minorBuild.ts:minorKnowledge
+    - cpu/core/aiTrade.ts:majorCityTradeList
+    - cpu/core/minorBuild.ts:freePrimaryRegions
+    - cpu/core/types.ts:Seat
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...d.csv lines: DS '%d, %d, %s, , , %s, %s, , , Value %3.1f' at 0x5d4d70 (DS chooser).  advantage line 0x5cdd70: Food Adv = adv[YIELD_FOOD], Prod Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed..."
   context:

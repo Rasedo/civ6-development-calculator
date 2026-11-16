@@ -1013,7 +1013,7 @@ export interface Seat {
    *  the units of the players at war with the seat, the barbarians and the
    *  seat itself left out. Absent = none. */
   enemyCounts?: Record<string, number>;
-  /** a city-state's records by install unit type as its last turn left
+  /** a city-state's or the Free Cities' records by type as its last turn left
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
@@ -1043,6 +1043,11 @@ export interface Seat {
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;
+  /** THE FREE CITIES' PRIMARY REGION LIST (the military AI's +0x1290
+   *  +0x2f0), which their Combat Desire reads: every region a Free City's
+   *  update added (`cityRegions`, 0x700630 from the city analysis
+   *  0x5cdd70), ascending; a city lost leaves its regions. Absent = none. */
+  primaryRegions?: number[];
   /** a major's agendas (`agendas.ts`): its historical ones, then the random
    *  ones as drawn; absent, none */
   agendas?: string[];

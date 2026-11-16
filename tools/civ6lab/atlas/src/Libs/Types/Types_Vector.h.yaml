@@ -51,11 +51,20 @@
   name: freeCityRaise
   semantics: "a unit of a class for a Free City's record: of its allowed units (+0x28) the highest Combat (+0x48), placed by the ring walk within 3. The first of equals; the ring walk 0x6aef0."
   status: PARTLY
-  impl: [cpu/core/phase.ts:freeCityChassis]
+  cases:
+    - recording: h1_duels1143
+      turn: 208
+      value: "the revolt's Mechanized Infantry 131073 (made in China's t208 turn) and the grants 262146 (t212) and 327681 (t217) absent from the Free Cities' records at the aimem tactical site, at age 0 at its log: no birth record; the Slinger 196608 Taiyuan trained at t212 at the tactical site"
+  impl:
+    - cpu/core/phase.ts:freeCityChassis
+    - cpu/core/phase.ts:grantFreeCityUnit
+    - gpu/core/sim_phase.py:_grant_free_unit
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-60: the Free City's grant"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
+  notes:
+    - the unit it makes raises no knowledge-base record at birth (observed; the create's signal path unread)
   context:
     - "...(0x152eb0) over CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each; the unit 0x273a40: of the record's allowed units (+0x28) of the class, the highest Combat (+0x48, the fir..."
   review: reviewed
@@ -462,12 +471,19 @@
     - recording: h1_duelv1128
       turn: 5
       value: "Bologna's two Warriors on region 0 beside its centre's region 4: Regional Strength 40, Combat Desire 0.0 (AI_Military.csv), its UNITS table as logged"
+    - recording: h1_duels1143
+      turn: 208
+      value: "the Free Cities' Taiyuan, taken that turn, before its first update: Regional and Enemy Strength 0, the desire 1.0 of one city's target; t220-t224, the city gone, its regions still read (Enemy 205 .. 85, the desire 1.0 / 2.0)"
   impl:
     - cpu/core/minorBuild.ts:cityRegions
     - gpu/core/sim_minorai.py:_city_regions
     - cpu/core/minorBuild.ts:minorKnowledge
+    - cpu/core/minorBuild.ts:freePrimaryRegions
+    - gpu/core/sim_minorai.py:_free_city_build
+    - cpu/core/types.ts:Seat
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
   context:
     - "...+0x378 -> +0x3d0). The primary: the region of a city's plot and of each plot round it (0x700630 from the city analysis 0x5cdd70, through 0x6fa5e0), the secondary the regions across th..."
   review: reviewed
@@ -643,6 +659,7 @@
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
     - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
   context:

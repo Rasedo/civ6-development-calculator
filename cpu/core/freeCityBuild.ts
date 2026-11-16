@@ -28,7 +28,7 @@ import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
 import { aiCityStats, cityGrowth, aiView } from './aiView';
-import { UNITS_OF_CIVIC, UNITS_OF_TECH, UNIT_CITY_VALUE_CAP, UPGRADE_SOURCE_FLOOR, analysedTurns, installType, promotionWeight, strongerFoe, type minorResearchTerms } from './minorBuild';
+import { UNITS_OF_CIVIC, UNITS_OF_TECH, UNIT_CITY_VALUE_CAP, UPGRADE_SOURCE_FLOOR, analysedTurns, installType, minorKnownUnits, promotionWeight, strongerFoe, type minorResearchTerms } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
@@ -410,14 +410,22 @@ export function freeResearchTerms(state: GameState): ReturnType<typeof minorRese
  *  over the Free Cities' seat, but no full civilization, its trait
  *  TRAIT_LEADER_FREE_CITIES' promotion lists, its research and civics turns
  *  its own research AI's analysis (`minorResearch`'s entries, as a
- *  city-state's), no strategic stockpile, no government */
+ *  city-state's), no strategic stockpile, no government; its unit
+ *  production table on its knowledge base's counts (`minorKnownUnits`: the
+ *  records before the turn's ageing and look, `Seat.armyCounted`); a
+ *  handicap below 3, as a city-state's, so a unit's value takes its
+ *  Maintenance off (runs/h1_duels1143 t208, Taiyuan's first update on a
+ *  table of 1.0 and the desire 1.0: the Slinger, no Maintenance, 54.9 as
+ *  its pick logs, the Archery row's Archer 26.6 and the Wheel's Battering
+ *  Ram 15.96, 1 Maintenance each) */
 export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts {
-  const f = majorBuildFacts(state, city, () => 0);
+  const f = majorBuildFacts(state, city, minorKnownUnits(freeSeatOf(state)));
   const centre = state.map.tiles[city.centerIndex];
   return {
     ...f,
     fullCiv: false,
     governmentTier: 0,
+    handicap: 0,
     promotionWeight: (cls) => promotionWeight(['TRAIT_LEADER_FREE_CITIES'], cls),
     resourceAccess: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);

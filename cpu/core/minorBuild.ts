@@ -16,7 +16,7 @@
  * researched unlock, a legal plot, an intact perimeter below a higher wall,
  * a free tile beside the centre for a unit — is the same rule a major pays.
  */
-import type { ArmyRecord, City, CityState, DistrictId, GameState, QueueItem, ResearchState, Tile, Unit, YieldKey } from './types';
+import type { ArmyRecord, City, CityState, DistrictId, GameState, QueueItem, ResearchState, Seat, Tile, Unit, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { ERAS, TECHS, type Era } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -1741,20 +1741,35 @@ export function freeKnowledge(state: GameState, age: boolean): void {
   knowledgeLook(state, freeSeatOf(state), FREE_SEAT, plotsSeenNow(state, new Set([FREE_SEAT])), age);
 }
 
+/** A FREE CITY'S ANALYSIS adds its regions (`cityRegions`, 0x700630 from
+ *  0x5cdd70 through 0x6fa5e0) to the Free Cities' primary region list
+ *  (`Seat.primaryRegions`) */
+function freePrimaryRegions(state: GameState, city: City): void {
+  const free = freeSeatOf(state);
+  const list = new Set(free.primaryRegions ?? []);
+  for (const r of cityRegions(state, city.centerIndex)) list.add(r);
+  if (list.size) free.primaryRegions = [...list].sort((a, b) => a - b);
+}
+
 /** THE COMBAT DESIRE of the Free Cities (`combatDesire`) at their military
  *  AI's turn, every turn with or without a city (AI_Military.csv's player
- *  62 rows), on the records as their last update aged them (`turn`): the
- *  primary regions of their cities (`cityRegions`), each city's unit in training, the players in
+ *  62 rows), on the records as their last update aged them (`turn`): their
+ *  primary region list as their cities' last updates left it
+ *  (`Seat.primaryRegions`), each city's unit in training, the players in
  *  the game's order — the majors at war with them, the city-states not
  *  (runs/h1_duelw1123 t200-t201 with no Free City 0.5, the floor of two
  *  majors at war), the barbarians a tribe at war —; their cities'
  *  threats as their last updates left them (`City.aiThreat`: t203-t212
  *  uncapped, 3.5 to 9.5, t213-t215 capped at 2.0 — no war footing); no
- *  standing-army term (t203 3.5 = (160 - 90) x 0.05). */
+ *  standing-army term (t203 3.5 = (160 - 90) x 0.05). A city taken this
+ *  turn has had no update: runs/h1_duels1143 t208, Taiyuan the Free
+ *  Cities' that turn, Regional and Enemy Strength 0 and the desire 1.0 of
+ *  one city's target; t220-t224, the city gone, its regions still read
+ *  (Enemy 205 .. 85, the desire 1.0 and 2.0), 0 from t225 as the records
+ *  age out. */
 export function freeCombatDesire(state: GameState, turn: number): CombatDesire {
   const free = freeSeatOf(state);
-  const regions = new Set<number>();
-  for (const c of free.cities) for (const r of cityRegions(state, c.centerIndex)) regions.add(r);
+  const regions = new Set(free.primaryRegions ?? []);
   const players = [
     ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: true, tribe: false, flagged: false })),
     ...state.cityStates.map((c) => ({ seat: c.seat, atWar: false, tribe: false, flagged: false })),
@@ -1953,13 +1968,13 @@ function minorResearchResources(state: GameState, cityState: CityState, counts: 
 
 /** A minor's knowledge base's unit counts (0x5eb650 over every player): its
  *  army records by type */
-export function minorKnownUnits(cityState: CityState): (unit: string) => number {
-  const n = cityState.armyCounted ?? minorArmyCounts(cityState.armyKnown ?? []);
+export function minorKnownUnits(holder: Seat): (unit: string) => number {
+  const n = holder.armyCounted ?? minorArmyCounts(holder.armyKnown ?? []);
   return (unit) => n[unit] ?? 0;
 }
 
 /** army records by install unit type */
-function minorArmyCounts(records: readonly ArmyRecord[]): Record<string, number> {
+export function minorArmyCounts(records: readonly ArmyRecord[]): Record<string, number> {
   const n: Record<string, number> = {};
   for (const r of records) {
     const t = installType('unit', r.type, 'UNIT_');
@@ -2596,10 +2611,12 @@ export function freeCityBuild(state: GameState, city: City, production: number):
   // (the Free Cities hold no contract: their one tree, Free Cities Assault,
   // names no Contract ID); on an empty queue the Default Specialization.
   // Its UNITS table every update, which the Free Cities' research values
-  // read (`City.aiUnitValues`)
+  // read (`City.aiUnitValues`). Its analysis adds the city's regions to the
+  // Free Cities' primary region list (`freePrimaryRegions`)
   const t = freeCityThreat(state, city);
   city.aiThreat = t.level;
   city.aiThreatNear = t.near;
+  freePrimaryRegions(state, city);
   const facts = freeCityBuildFacts(state, city);
   const units = unitTable(facts).map((v) => v ?? FX_MIN);
   city.aiUnitValues = units;

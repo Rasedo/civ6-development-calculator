@@ -1131,8 +1131,6 @@ export function buildRules() {
       // the plot facts' engine terms: the Lake terrain, the city centre's Housing
       lakeTerrain: TERRAIN_IDS.indexOf('LAKE'),
       centreHousing: DISTRICTS.CITY_CENTER.housing,
-      // the handicap a seat with no row of its own reads (the Free Cities)
-      defaultHandicap: DEFAULT_HANDICAP,
       // the city events (their slots in table order), each leader trait's
       // list of the tree an event starts, and the trees' nodes
       // (`aiCityTrees.ts`, `behaviorTree.ts`)

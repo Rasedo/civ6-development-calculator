@@ -625,6 +625,17 @@
           ]
         },
         {
+          "name": "freePrimaryRegions",
+          "compare": "exact",
+          "note": "the Free Cities' primary region list (`freePrimaryRegions` on `freeSeat.primaryRegions`), the region ids ascending; the GPU's plane holds the plots of those regions (`free_region_plots`), read back as their regions.",
+          "covers": [
+            "Seat.primaryRegions"
+          ],
+          "planes": [
+            "free_region_plots"
+          ]
+        },
+        {
           "name": "freeTradeSeat",
           "compare": "exact",
           "note": "the city-state the Free Cities' knowledge base last met (`meetFreeCities` on `freeSeat.tradeSeat`), the absolute seat; -1 before any (their walk over the last major's cities).",

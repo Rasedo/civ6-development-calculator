@@ -515,7 +515,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return borderCandidates(state, city).includes(plot) ? tilePurchaseCost(state, city, plot) : -1;
     },
     // a city-state's table on its knowledge base's counts; a major's or the
-    // Free Cities' on their own versions, the Free Cities knowing none
+    // Free Cities' on their own versions and their knowledge base's counts
     unitProductionValue: (i, type) => {
       let table = unitTables.get(i);
       if (!table) {
@@ -535,7 +535,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
             const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
             return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
           };
-          const known = i === FREE_SEAT ? () => 0 : minorKnownUnits(s as CityState);
+          const known = minorKnownUnits(s);
           table = unitProductionTable({
             isVersion: (u) => majorUnitVersion(traits, u) === u,
             obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),

@@ -157,6 +157,7 @@
       value: an unmet city-state's slot reads -1
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
   context:
     - "...r one not appointed now — the turn's appointment counts — or a slot its analysis lacks, 0x6eff30), weight and capacity 1, λ 0x6ed060 (the move: the slot's occupant replaced and retur..."
   review: reviewed

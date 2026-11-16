@@ -708,6 +708,7 @@ const GAME: Record<string, Extractor> = {
   freeEnemyCounts: (s) => [enemyCountsRecord(s.freeSeat?.enemyCounts)],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
+  freePrimaryRegions: (s) => [[...(s.freeSeat?.primaryRegions ?? [])]],
   freeTradeSeat: (s) => [s.freeSeat?.tradeSeat ?? -1],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
   // next contract takes and their tree pool (`newTreeId`)

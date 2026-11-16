@@ -25,6 +25,9 @@
     - recording: h1_duels1124
       turn: 69
       value: city-state 4's Warrior, Heavy Chariot and Catapult levied by player 1 in its turn held 1 each in the end look's table; t27 city-state 3's Builder its contract bought held 0
+    - recording: h1_duels1143
+      turn: 209
+      value: "the Free Cities' table at the end look on the records before the turn's ageing and look: Archer 0.383, Catapult 0.512, Slinger 0.211, Warrior 0.184 (t208 every entry 1.0, the knowledge base empty at the tactical site)"
   impl:
     - cpu/core/minorBuild.ts:minorOwnedUnits
     - gpu/core/sim_minors.py:_minor_listed_units
@@ -57,6 +60,7 @@
     - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "C-96: the unit production table's held counts walk the unit list at the table's build — READ (0x7989e0 at 0x79a138..0x79a19f, 0x4f2c90), both twins"
+    - "C-98: the Free Cities' unit production table, primary region list and grants"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:

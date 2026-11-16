@@ -142,7 +142,6 @@ class SimCityValue:
             "promo_minor": {k: int(v) for k, v in cb["minorPromotionWeights"].items()},
             "minor_dverdict": torch.tensor(cb["minorDistrictVerdict"], dtype=torch.long),
             "promo_free": {k: int(v) for k, v in cb["freePromotionWeights"].items()},
-            "default_handicap": int(cb["defaultHandicap"]),
             "plot_names": cb["plotNames"],
             # per engine district its install type (the row no civilization owns)
             "dist_name": dict(reversed([(e, r["type"]) for r, e in zip(cb["districts"], cb["engineIndex"]["district"])
@@ -2991,8 +2990,8 @@ class _FreeFacts(_MinorFacts):
     Free City in column `j` of the Free Cities' row, the Free Cities'
     research (its row `FR`), no government, no combat units counted against
     its trade, TRAIT_LEADER_FREE_CITIES' promotion lists, the majors' default
-    trait alone for its versions, the default handicap; its units in the
-    hostile pool; no knowledge base's units known; its queue the city's"""
+    trait alone for its versions, a city-state's handicap; its units in the
+    hostile pool; its knowledge base's units known; its queue the city's"""
 
     def trade_knowledge(self):
         # the Free Cities' trade AI's route value K (`_free_trade_value`)
@@ -3172,7 +3171,9 @@ class _FreeFacts(_MinorFacts):
             for k, ei in enumerate(eng):
                 if ei >= 0:
                     owned[:, k] = (mine & (sim.barb_unit_type == ei)).sum(dim=1)
-            known = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
+            # their knowledge base's counts: the records before the turn's
+            # ageing and look (`_cv_counted`) during their cities' updates
+            known = sim._cv_known(sim.FK)
             return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, sim._unit_listed(sim.FR), owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod", build)
 
@@ -3201,9 +3202,6 @@ class _FreeFacts(_MinorFacts):
 
     def promotion_weight(self, c):
         return self.T["promo_free"].get(c, _FX) if c else _FX
-
-    def handicap(self):
-        return self.T["default_handicap"]
 
     def growth(self):
         def build():

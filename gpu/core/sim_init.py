@@ -418,6 +418,10 @@ class SimInit:
         # absolute seat; -1 none: the last major)
         self.free_trade_value = torch.zeros(B, dtype=torch.long, device=device)
         self.free_trade_seat = torch.full((B,), -1, dtype=torch.long, device=device)
+        # the Free Cities' primary region list (`freeSeat.primaryRegions`) as
+        # the plots of its regions: every region a Free City's update added,
+        # none taken out
+        self.free_region_plots = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)

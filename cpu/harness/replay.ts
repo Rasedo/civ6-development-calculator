@@ -6309,7 +6309,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'primaryRegions', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
   'favTech', 'civicQueue', 'researchTurns'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'citiesKnown', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',

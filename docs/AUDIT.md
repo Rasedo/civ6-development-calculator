@@ -599,8 +599,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (ops.strength): the team's attack strength at the military AI's refresh (each member's planning of its last pass, the engines' planned anew): duelq1128 city-state 3's City Defense t178 0 for the game's 115, t179 0 for 55, t181 / t182 60 for 0, its Attack Barb Camp t197 0 for 70; duelq1127 t64 the barbarians' 0 for 25
 - **C-98. CITY-STATES' RESEARCH AND CIVIC VALUES.** Weight 3.
   - BUILD (free cities and majors): the Free Cities' resource value (resourceValueOf 0)
-  - LAB (free cities and majors): a Free City's City Analysis unit values under the research unit term: duels1143 t209 player 62's city on 8:8, Archery's term ours 159.6 for the game's 266.0 (Archer, Spearman, Heavy Chariot, Horseman, Swordsman, Man-at-Arms 26.6 each in the game, ours 15.96 to 29.6), the Battering Ram 10.64 for 15.96, the Catapult 10.34 for 13.77, the Pikeman 2.26 for 0
+  - LAB (free cities and majors): a Free City's City Analysis unit values under the research unit term: duels1143 t209-t211 Horseback Riding, Construction and Apprenticeship 162-181 over the game's (the Horseman's term), t210-t218 every row in reach 5 to 586 off (t211 Stirrups 3201.2 for 2615.2), untraced
   - BUILD (free cities and majors): a full civilization's religious unit value (0x7b62c0's heal, Evangelize, evict, inquisition terms)
+  - LAB (free cities and majors): a granted unit's missing birth record in the Free Cities' knowledge base is observed only (duels1143 t208 / t212 / t217 grants absent at the tactical site): the create's signal path from 0x273a40 is unread
   - LAB (research values): 1121 the trees' goal techs (Present Values)
   - LAB (research values): the Industrial Zone value low (1128 Hong Kong t84)
   - LAB (research values): the military AI's Fav Tech 466 of 513 (duely1127 t1-130: city-state 2's Masonry for the Wheel t21-26)

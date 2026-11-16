@@ -802,7 +802,10 @@ class SimPhase:
         best = key.min(dim=1).values
         spot = key.min(dim=1).indices
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
-        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home, civ=civ)
+        # a granted unit takes no birth record: the Free Cities' knowledge
+        # base records it at its next look
+        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home, civ=civ,
+                         birth=False)
 
     def _free_city_grant(self, act: torch.Tensor, j: int) -> None:
         """`freeCityGrant` for the Free City in column `j` in the games of
@@ -855,8 +858,12 @@ class SimPhase:
         then their knowledge base ages and looks (`_free_knowledge`) and
         keeps its route value (`_free_trade_value`); their Combat Desire
         (`_free_combat_desire`) is taken between their civics AI's policy
-        jobs and its government values (`_minor_research`)"""
+        jobs and its government values (`_minor_research`). Their unit
+        production table, which their cities' updates read, counts the
+        records before the ageing and the look (`_cv_counted` at `FK`, held
+        to the cities' turn's end)"""
         self._military_fav_tech(self.FR, act)
+        self._cv_counted[self.FK] = self._cv_known(self.FK)
         self._free_knowledge(act, True)
         self._free_trade_value(act)
 
@@ -903,6 +910,7 @@ class SimPhase:
             self._free_combat_desire(ones)
             government()
             self._free_military_turn(ones)
+            del self._cv_counted[self.FK]
             self._free_knowledge(ones, False)
             self._research_unit_turns(self.FR, ones)
             return
@@ -985,6 +993,7 @@ class SimPhase:
             # player's city does (0x1fa1d0 at 0x1fa22d -> the full reassign
             # 0x196320)
             self._place_citizens(row, jc, act, None, full=True, fav_food=self.city_fav_food[:, row, j])
+        del self._cv_counted[self.FK]
         self._free_tactics(acting)
         # its knowledge base's look and its research AI's turns per unit at
         # its turn's end, in every game

@@ -3113,7 +3113,7 @@ class SimMasks:
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor,
                     seat: int = BARB_SEAT, home: torch.Tensor | None = None, cart: torch.Tensor | None = None,
                     naval_rows: torch.Tensor | None = None, civ: torch.Tensor | None = None,
-                    stack: bool = False) -> torch.Tensor:
+                    stack: bool = False, birth: bool = True) -> torch.Tensor:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
         seat walks. `unit_type` is a roster index or [B] roster indices,
@@ -3122,7 +3122,8 @@ class SimMasks:
         the games whose unit is a hull where it varies per game, `cart` [B]
         the games whose owner may put one on OCEAN, `civ` [B] the games whose
         unit is a civilian (a Free City's Builder), standing in the civilian
-        plane; `stack` a unit a Free City makes (`_spawn_unit`'s). Returns the
+        plane; `stack` a unit a Free City makes (`_spawn_unit`'s); `birth` False
+        a unit its knowledge base takes no birth record of (a grant). Returns the
         games where the unit landed."""
         if not bool(mask.count_nonzero()):
             return mask & False
@@ -3160,8 +3161,10 @@ class SimMasks:
         self.tribe_defender[rows] = torch.where(_ds == slot.unsqueeze(1), torch.full_like(_ds, -1), _ds)
         self.barb_unit_slotno[rows, slot] = -1
         self.barb_unit_tile[rows, slot] = spot[rows]
-        # its player's knowledge base records the unit it made (`spawnUnit`)
-        self._kb_birth(self.BK if seat == BARB_SEAT else self.FK, seat, rows, slot + self.POOL_LO["barb"])
+        # its player's knowledge base records the unit it made (`spawnUnit`),
+        # a Free City's grant none (`birth` False, `grantFreeCityUnit`)
+        if birth:
+            self._kb_birth(self.BK if seat == BARB_SEAT else self.FK, seat, rows, slot + self.POOL_LO["barb"])
         self.barb_unit_hp[rows, slot] = self.rules.combat["unitHp"]
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         self.barb_unit_revealed_turn[rows, slot] = -1
