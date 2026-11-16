@@ -1233,6 +1233,7 @@ const CITY: Record<string, Extractor> = {
   // the pool as it stands (`outerPool`): an unset `outerHp` is a FULL
   // perimeter at the holder's tier, which is what the GPU stores
   outerHp: overCities((r, state) => outerPool(state, r.city)),
+  urbanKept: overCities((r) => (r.city.urbanKept ? 1 : 0)),
   lastHitTurn: overCities((r) => r.city.lastHitTurn ?? 0),
   reactorAge: overCities((r) => r.city.reactorAge ?? -1),
   projectBoostTurn: overCities((r) => r.city.projectBoostTurn ?? 0),

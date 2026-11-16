@@ -3482,6 +3482,16 @@
           ]
         },
         {
+          "name": "urbanKept",
+          "compare": "exact",
+          "covers": [
+            "City.urbanKept"
+          ],
+          "planes": [
+            "city_urban_kept"
+          ]
+        },
+        {
           "name": "lastHitTurn",
           "compare": "exact",
           "covers": [

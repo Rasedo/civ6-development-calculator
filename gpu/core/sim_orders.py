@@ -1711,6 +1711,7 @@ class SimOrders:
             _m_outer = self.city_outer_hp[b, self._CITY_MINOR0 + s, 0].clone()
             _m_full = bool(_m_outer >= self._walls_tier_hp[self._minor_walls_tier(s)][b])
             self.city_outer_hp[b, row, col] = _m_outer
+            self.city_urban_kept[b, row, col] = False
             self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
             self.city_kept[b, row, col] = 0

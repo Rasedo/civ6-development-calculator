@@ -1806,6 +1806,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: a city's Urban Defenses through a transfer by loyalty — FIT on the record (the install's modifier, its writer unread), both twins"
   context:
     - "- READ, Bastions' two analyzers: EFFECT_ADJUST_CITY_OUTER_DEFENSE 0x6c4650 (the registry's object @f03cf0, vtable 0xd63a18 slot 1): with arguments and the conte..."
   review: reviewed

@@ -97,6 +97,9 @@ class SimInit:
             ("pop", torch.long, 0, None),
             ("hp", torch.long, 0, None),
             ("outer_hp", torch.long, 0, None),
+            # the urban tier's perimeter a transfer by loyalty carried from a
+            # holder with Urban Defenses (`City.urbanKept`)
+            ("urban_kept", torch.bool, False, None),
             ("last_hit", torch.long, 0, None),
             ("boost_turn", torch.long, 0, None),
             ("is_cap", torch.bool, False, None),

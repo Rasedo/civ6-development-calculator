@@ -774,10 +774,14 @@ export function wallsLevel(city: { buildings: string[] }): number {
  * future cities" with no production at all, otherwise the highest tier among
  * the walls buildings it has finished.
  */
-export function wallsTier(state: GameState, city: { buildings: string[]; seat: number }): number {
+export function wallsTier(state: GameState, city: { buildings: string[]; seat: number; urbanKept?: boolean }): number {
   // every holder's own research: a major's, a city-state's (`seatOf` answers
-  // its CityState record) and the Free Cities', which researches nothing
-  if (seatOf(state, city.seat)?.research.techs.includes(URBAN_DEFENSES_TECH)) return WALLS_TIER_URBAN;
+  // its CityState record) and the Free Cities'; a city a transfer by
+  // loyalty took from a holder with Urban Defenses keeps them
+  // (runs/h1_duels1143 Taiyuan, China's to the Free Cities at t208: its
+  // centre's outer defence 0 of 400 t209-215, the Free Cities holding no
+  // Steel; their Bastions 6.0 t208-218)
+  if (city.urbanKept || seatOf(state, city.seat)?.research.techs.includes(URBAN_DEFENSES_TECH)) return WALLS_TIER_URBAN;
   return wallsLevel(city);
 }
 

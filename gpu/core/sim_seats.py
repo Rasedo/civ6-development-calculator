@@ -12017,6 +12017,7 @@ class SimSeats:
         self.city_loyalty[b, row, col] = 100.0
         self.city_hp[b, row, col] = int(self.rules.combat["cityMaxHp"])
         self.city_outer_hp[b, row, col] = 0
+        self.city_urban_kept[b, row, col] = False
         self.city_last_hit[b, row, col] = 0
         self._q_clear(b, row, col)
         self.city_prod_bank[b, row, col] = 0
@@ -12406,6 +12407,9 @@ class SimSeats:
         old_unconv = float(self.city_unconverted[b, src_row, src_col])
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
+        old_urban = int(self._walls_tier_at(
+            torch.full((self.B,), src_row, dtype=torch.long, device=self.device),
+            torch.full((self.B,), src_col, dtype=torch.long, device=self.device))[b]) == self._walls_tier_urban
         # a perimeter at its FULL pool is TS's unset `outerHp`, which a flip
         # carries as unset — full again at whatever tier the new holder reads
         old_full = old_outer >= int(self._walls_max_at(
@@ -12527,6 +12531,9 @@ class SimSeats:
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
         self.city_last_hit[b, dst_row, col] = 0
+        # a transfer by loyalty keeps the urban tier's perimeter its old holder's
+        # Urban Defenses gave it (`City.urbanKept`)
+        self.city_urban_kept[b, dst_row, col] = (not conquest) and old_urban
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
@@ -13094,6 +13101,7 @@ class SimSeats:
         self.city_acquired[rows, row, slot] = 0
         self.city_hp[rows, row, slot] = self.rules.combat["cityMaxHp"]
         self.city_outer_hp[rows, row, slot] = 0
+        self.city_urban_kept[rows, row, slot] = False
         self.city_last_hit[rows, row, slot] = 0
         self._q_clear(rows, row, slot)
         self.city_dist_tile[rows, row, slot, :] = -1

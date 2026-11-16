@@ -540,6 +540,9 @@ class SimMasks:
                 minor = (s0 >= 0) & (s0 < self.S)
                 urban = urban | (minor & self.citystate_techs[b, s0.clamp(min=0, max=self.S - 1),
                                                               self._urban_def_tech])
+            # a city a transfer by loyalty took from a holder with them
+            # keeps them (`City.urbanKept`)
+            urban = urban | self.city_urban_kept[b, r0, c0]
             tier = torch.where(urban, torch.full_like(tier, self._walls_tier_urban), tier)
         return torch.where((row >= 0) & (col >= 0), tier, torch.zeros_like(tier))
 
@@ -663,7 +666,7 @@ class SimMasks:
             tier = torch.maximum(tier, torch.where(bl[:, :, bi], torch.full_like(tier, t),
                                                    torch.zeros_like(tier)))
         if self._urban_def_tech >= 0:
-            tier = torch.where(self.civ_techs[:, row, self._urban_def_tech].unsqueeze(1),
+            tier = torch.where(self.civ_techs[:, row, self._urban_def_tech].unsqueeze(1) | self.city_urban_kept[:, row],
                                torch.full_like(tier, self._walls_tier_urban), tier)
         return tier
 

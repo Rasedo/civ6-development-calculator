@@ -211,6 +211,10 @@ export interface City {
    *  in this city, dense over seats. */
   spySources?: number[];
   outerHp?: number;
+  /** the urban tier's perimeter a transfer by loyalty carried from a holder
+   *  with Urban Defenses (`wallsTier`): the city keeps its modern
+   *  fortifications whatever its new holder has researched */
+  urbanKept?: boolean;
   /** the turn this city (or its Encampment) last took combat damage — what
    *  the repair project's three quiet turns are counted from. 0 = never. */
   lastHitTurn?: number;

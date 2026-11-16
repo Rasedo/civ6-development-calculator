@@ -59,7 +59,7 @@ import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { UNITS, CITY_MAX_HP, UNIT_HP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { MP_SCALE, emptyStockpile } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower, stockpileCap, strategicSlot, unitResourceCost } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
@@ -2687,6 +2687,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const lockedDistrictCost = new Map<number, number>();
     let hp = CITY_MAX_HP;
     let outerHp: number | undefined;
+    let urbanKept = false;
     for (const d of c.districts) {
       const [ti, dx, dy, complete, dpil] = d as [number, number, number, boolean, boolean];
       const name = cat.districts[ti];
@@ -2700,6 +2701,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         hp = CITY_MAX_HP - num(d[6] as number);
         const outerMax = num(d[9] as number);
         if (outerMax > 0) outerHp = outerMax - num(d[8] as number);
+        // the urban tier's perimeter on a holder without Urban Defenses: a
+        // transfer by loyalty carried it (`City.urbanKept`)
+        const urbanAt = cat.techs.indexOf(`TECH_${URBAN_DEFENSES_TECH}`);
+        const holderUrban = urbanAt >= 0 && (rec.players.find((q) => q.id === c.owner)?.techs ?? '')[urbanAt] === '1';
+        urbanKept = outerMax >= WALLS_TIER_HP[WALLS_TIER_URBAN] && !holderUrban;
       } else {
         t.district = id;
         t.districtComplete = complete === true;
@@ -2842,6 +2848,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       ...(c.favored?.includes(0) ? { favoredFood: true } : {}),
       ...(pillaged.length ? { pillagedBuildings: pillaged } : {}),
       ...(outerHp !== undefined ? { outerHp } : {}),
+      ...(urbanKept ? { urbanKept } : {}),
       ...(history?.lastHit.has(`${c.owner}:${c.id}`) ? { lastHitTurn: history.lastHit.get(`${c.owner}:${c.id}`) } : {}),
     };
     holder.cities.push(city);

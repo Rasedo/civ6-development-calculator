@@ -48,8 +48,8 @@ import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_TRAIN_BUILDING } from '../data/units';
-import { availableBuildings, buildingCompletable, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
+import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, WALLS_TIER_URBAN, FORMATION_CIVIC, FORMATION_TRAIN_BUILDING } from '../data/units';
+import { availableBuildings, buildingCompletable, purchasableBuildings, outerPool, wallsMax, wallsTier, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
@@ -1843,6 +1843,9 @@ export function transferCity(
   // breaches nothing and carries the pool it had.
   if (why === 'conquered') flipped.outerHp = 0;
   else flipped.outerHp = civCity.outerHp;
+  // ...and keeps the urban tier's perimeter its old holder's Urban Defenses
+  // gave it (`City.urbanKept`)
+  if (why !== 'conquered' && wallsTier(state, civCity) === WALLS_TIER_URBAN) flipped.urbanKept = true;
   // the city's placement takes every district type's price to the
   // completed count before its own districts join (0x1eae70 -> 0x409800;
   // the log adds them after CityInitialized)

@@ -18198,3 +18198,22 @@ GPU `_op_move_exec`'s `barred` and the ring's `ent`, the barbarians'
 - Open: runs/h1_duels1162 t62 / t64 the same team, every ring plot refused,
   goes for the camp with the attack flag (ours "10:9, 16:15, 11:9"), the
   game's stands ("10:9, 16:15, 10:9"); the camp's Spearman in our sight there.
+
+## C-130: a city's Urban Defenses through a transfer by loyalty — FIT on the record (the install's modifier, its writer unread), both twins
+
+`wallsTier`, `City.urbanKept`, `transferCity`, the importer's city centre;
+GPU `_walls_tier_at`, `_walls_tier_all`, `city_urban_kept`, `_transfer_city`.
+
+- THE RULE: Steel's STEEL_UNLOCK_URBAN_DEFENSES
+  (MODIFIER_PLAYER_GRANT_CITIES_URBAN_DEFENSES, EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES)
+  gives the holder's cities the urban perimeter; a city that leaves the
+  holder by loyalty (a revolt to the Free Cities, a join) keeps it, whatever
+  its new holder has researched. A conquest destroys the walls as before.
+- CONFIRMED: runs/h1_duels1143 Taiyuan (8:8), China's to the Free Cities at
+  t208: its centre's outer defence 0 / 400 in records 209-215, the Free
+  Cities holding Pottery and one other technology; their Bastions 6.0
+  t208-218 as logged (the outer defence standing, 0x6c4650), ours 0 before;
+  the major's danger map's sum on 8:8 44 / 48 at t209 / t213 as logged.
+- OPEN: the effect's writer (whether the flag sits on the city or its
+  centre district) and a conquest by a captor without Steel of a city that
+  had it.

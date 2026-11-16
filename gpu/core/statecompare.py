@@ -1412,6 +1412,7 @@ CITY = {
     "population": _cty("city_pop"),
     "hp": _cty("city_hp"),
     "outerHp": _cty("city_outer_hp"),
+    "urbanKept": lambda sim, b, rows: [int(sim.city_urban_kept[b, c, s]) for c, s in rows],
     "lastHitTurn": _cty("city_last_hit"),
     "reactorAge": _cty("city_reactor_age"),
     "projectBoostTurn": _cty("city_boost_turn"),
