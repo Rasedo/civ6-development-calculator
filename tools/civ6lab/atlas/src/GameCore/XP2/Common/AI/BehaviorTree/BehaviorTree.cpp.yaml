@@ -91,6 +91,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
     - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   context:
     - "...node's Allow Stealing (TreeData +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by..."
   review: reviewed
@@ -158,16 +159,23 @@
     - recording: h1_duely1128
       turn: 32
       value: "city-state 4's City Defense takes Attack Barb Camp's only Archer; Attack Barb Camp logs Operation complete alone, its contract 83 CANCELLED (the emptied operation's end: robbedOps, its site unread)"
+    - recording: h1_duels1135
+      turn: 141
+      value: "city-state 3's City Defense, started at its city's threat, logs its No recruits pair, then recruits the three Swordsmen and the Trebuchet its Upgrade Units tree (priority 3, allowRecruiting 1) holds: the tree with no operation answers the signal"
   impl:
     - cpu/core/operations/nodes.ts:recruitUnits
+    - cpu/core/minorOps.ts:cityStateMilitary
+    - gpu/core/sim_minorops.py:_u_recruit
     - cpu/core/operations/manager.ts:tickTree
     - gpu/core/sim_minorops.py:_u_recruit
     - cpu/core/operations/nodes.ts:asked
+    - cpu/core/operations/manager.ts:SeatTree
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   context:
     - "...a +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked w..."
   review: reviewed

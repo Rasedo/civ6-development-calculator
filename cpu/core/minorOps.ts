@@ -30,7 +30,7 @@ import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReac
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
-import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
+import { NO_PLOT, opDef, opJobUnits, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
@@ -360,8 +360,13 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass, tr
         const u = own(id);
         if (u && !pass.done.has(id) && minorUpgradeVisible(state, cs, u)) held.add(id);
       }
-      t.members = t.members.filter((id) => !held.has(id));
     }
+    // a unit the offer takes has its assignment set (0x60a8c0 -> 0x1e60f0):
+    // it stays in its team's list, in no job of the operation, until the
+    // team update (runs/h1_duels1132 t172: city-state 2's Caravel 1441798,
+    // taken from Naval Superiority, released after the tick and recruited
+    // back, its team's Naval share full of it)
+    for (const id of opUnits(op)) if (held.has(id) && !op.released?.includes(id)) (op.released ??= []).push(id);
   }
   // each joining unit is in the tree's job from its join (0x737e80)
   tree.units = order(held).map((u) => u.id);
@@ -571,7 +576,13 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
     // the units its "Upgrade Units" trees hold in their job as the walk opens
     for (const id of upgradeHeld(cs)) (pass.jobs ??= new Map()).set(id, UPGRADE_MOVE);
     // its "Upgrade Units" trees each a tree of the walk, by its pool slot
-    const trees = (cs.upgradeTrees ?? []).map((t) => ({ priority: UPGRADE_TREE_PRIORITY, slot: treeSlot(t.id), tick: () => upgradeTreesTick(state, cs, pass, t) }));
+    // (marked: a recruit's signal of a higher priority takes their units)
+    const trees = (cs.upgradeTrees ?? []).map((t) => ({ priority: UPGRADE_TREE_PRIORITY, slot: treeSlot(t.id), tick: () => upgradeTreesTick(state, cs, pass, t),
+      units: () => t.units.filter((id) => state.units.some((u) => u.id === id && u.seat === cs.seat)),
+      release: (ids: readonly number[]) => {
+        t.units = t.units.filter((id) => !ids.includes(id));
+        for (const id of ids) pass.jobs?.delete(id);
+      } }));
     operationsRun(ops, { ...env, trees,
       // a unit the hook buys has its turn done at its creation (0x60a440):
       // the trees of priority 2 after the hook offer it not (runs/h1_duely1121
@@ -586,7 +597,8 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       // +0x530): the units the trees hold and those whose turn is done — a
       // unit bought this turn among them (runs/h1_duely1124 t72 city-state
       // 3's City Defense recruits no Heavy Chariot bought that turn, t73 it)
-      held: () => [...upgradeHeld(cs), ...pass.done] });
+      held: () => [...upgradeHeld(cs), ...pass.done],
+      done: () => pass.done });
     // the destroy loop after the walk: the ended trees' slots free
     minorFreeTrees(cs);
     for (const id of opsOf(ops).flatMap(opJobUnits)) {

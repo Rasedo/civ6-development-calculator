@@ -62,19 +62,33 @@ export interface OpsAi {
   pick: { def: string; enemy: number; target: number; rally: number } | null;
 }
 
+/** a triggered tree of the seat with no operation: its priority, its tree
+ *  pool slot, its tick; its units and their release where a recruit's
+ *  signal may take them (the trees' listener 0x7d1e40: the tree marked,
+ *  m_allowRecruiting) */
+export interface SeatTree {
+  priority: number;
+  slot: number;
+  tick: () => void;
+  units?: () => readonly number[];
+  release?: (ids: readonly number[]) => void;
+}
+
 /** what the manager reads and does beside its own state */
 export interface OpsEnv {
   turn: number;
   /** the seat's triggered trees with no operation (a city-state's "Upgrade
    *  Units", `upgradeTreesTick`): each ticks in the run among the
    *  operations' trees by its priority, of equals by its tree pool slot */
-  trees?: readonly { priority: number; slot: number; tick: () => void }[];
+  trees?: readonly SeatTree[];
   /** the city's second hook (0x5c2610 -> 0x5ce5b0), run in the city AI's
    *  pass (`CITY_AI_PASS`): after the trees of a higher priority, before
    *  those of its own or lower */
   cityHook?: () => void;
   /** the units those trees hold, out of the operations' offers */
   held?: () => readonly number[];
+  /** the units whose turn is done in the pass (+0x530) */
+  done?: () => ReadonlySet<number>;
   /** the view as the actions so far left the game */
   view(): AiView;
   /** the definitions the seat runs (null: its leader's list, `allowedOps`) */
@@ -444,6 +458,8 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
       return out;
     },
     others: () => opsOf(ai),
+    seatTrees: () => env.trees ?? [],
+    turnDone: () => env.done?.() ?? new Set(),
     contractWorld: () => contractWorld(ai, env, op),
     diplomacy: ai.diplomacy,
     requestDiplomacy: (action, enemy, value) => {

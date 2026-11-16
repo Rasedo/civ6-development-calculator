@@ -288,9 +288,10 @@ class SimMinorOps:
         # the units each team has taken in (its join's second list, team +0x58)
         self.mops_join = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
         # the members Operation Defend Units released (0x73d1f0: their
-        # assignment, unit +0x7d0, to -1, the teams untouched), over the
-        # holder's pool: still members until the next team update drops
-        # them, in no job of the operation (`Operation.released`)
+        # assignment, unit +0x7d0, to -1) or an offer took for another job
+        # (0x60a8c0 -> 0x1e60f0), the teams untouched, over the holder's
+        # pool: still members until the next team update drops them, in no
+        # job of the operation (`Operation.released`)
         self.mops_rel = torch.zeros(B, S, NO, P, dtype=torch.bool, device=device)
         # beside each listed member (`mops_mem`'s places): its pool slot as
         # the team's last keep saw it (`OpTeam.slots`, -1 none) and the times
@@ -1861,8 +1862,15 @@ class SimMinorOps:
                 if bool(take.any()):
                     rows = take.nonzero(as_tuple=True)
                     held[rows[0], mem[rows]] = True
-                gone = (mem >= 0) & held.gather(1, mc)
-                self._mops_compact(s, k, ti, ~gone, low)
+            # a unit the offer takes has its assignment set (0x60a8c0 ->
+            # 0x1e60f0): it stays in its team's list, in no job of the
+            # operation, until the team update (`mops_rel`)
+            for ti in range(N_TEAMS):
+                mem = self.mops_mem[:, s, k, ti]
+                gone = (mem >= 0) & held.gather(1, mem.clamp(min=0)) & low.unsqueeze(1)
+                if bool(gone.any()):
+                    rows = gone.nonzero(as_tuple=True)
+                    self.mops_rel[rows[0], s, k, mem[rows]] = True
         some = held.any(dim=1)
         # Find Unit Targets: the city centre; a ship's a coastal centre, else
         # the city's Harbor
@@ -2247,6 +2255,8 @@ class SimMinorOps:
             gone = (offer.unsqueeze(2) == t.unsqueeze(1)).any(dim=2) & (offer >= 0)
             o = gone.to(torch.int8).argsort(dim=1, stable=True)
             offer = torch.where(gone, torch.full_like(offer, -1), offer).gather(1, o)
+        # a member released and still listed takes the operation's job again
+        self.mops_rel[:, s, k, :P] &= ~got[:, :P]
         return got[:, :P]
 
     # -- the contracts ------------------------------------------------------------
@@ -2712,6 +2722,18 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
             mem = sim.mops_mem[:, s, kk, ti]
             ok = (mem >= 0) & u["own"].gather(1, mem.clamp(min=0)) & low.unsqueeze(1)
             parts.append(torch.where(ok, mem, torch.full_like(mem, -1)))
+    # ...and those of its marked "Upgrade Units" trees whose priority the
+    # request's passes, in tree slot then the player's unit order; the second
+    # offer keeps the units whose turn is not done (0x60ac91..0x60aca1)
+    upg = sim.mops_upg_of[:, s, :u["own"].shape[1]] if s != sim.FR else None
+    if upg is not None:
+        up = at & (Tm.upgrade_priority < prio)
+        for t in range(N_UPG):
+            mine = (upg == t) & u["own"] & up.unsqueeze(1)
+            if bool(mine.any()):
+                parts.append(sim._mops_in_order(mine, u["key"])[0])
+    done_u = c.view["done"]
+    parts = [torch.where((p >= 0) & ~done_u.gather(1, p.clamp(min=0)), p, torch.full_like(p, -1)) for p in parts]
     if parts:
         freed = torch.cat(parts, dim=1)
         o = (freed < 0).to(torch.int8).argsort(dim=1, stable=True)
@@ -2730,6 +2752,9 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
                 # tick (`robbedOps`)
                 left = (sim.mops_mem[:, s, kk] >= 0).flatten(1).any(dim=1)
                 view["robbed"][:, kk] |= at & held & ~left
+            if upg is not None:
+                P = upg.shape[1]
+                sim.mops_upg_of[:, s, :P] = torch.where(got[:, :P] & at.unsqueeze(1), -1, sim.mops_upg_of[:, s, :P])
     # the operation's units (the player's walk 0x6092c0) each take their
     # type's own AI type (unit +0x168, 0x79b9c0): a DEFENDER turns COMBAT
     dfd = sim._mops_u(s, "defender")

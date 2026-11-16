@@ -99,8 +99,9 @@ export interface Operation {
   /** the members killed that left its teams (the barbarians' operations) */
   killed?: number;
   /** the members Operation Defend Units released (0x73d1f0: their
-   *  assignment, unit +0x7d0, to -1, the teams untouched): still its teams'
-   *  members until the next team update drops them, but in no job of it */
+   *  assignment, unit +0x7d0, to -1) or an offer took for another job
+   *  (0x60a8c0 -> 0x1e60f0), the teams untouched: still its teams' members
+   *  until the next team update drops them, but in no job of it */
   released?: number[];
 }
 

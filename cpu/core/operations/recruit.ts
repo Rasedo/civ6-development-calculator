@@ -189,6 +189,8 @@ export function recruitOperation(view: AiView, seat: number, op: Operation, offe
     }
     for (const u of taken) {
       if (all.includes(u)) continue;
+      // a member released and still listed takes the operation's job again
+      if (op.released?.includes(u.id)) op.released = op.released.filter((id) => id !== u.id);
       addMember(team, u);
       all.push(u);
       const k = offer.indexOf(u);

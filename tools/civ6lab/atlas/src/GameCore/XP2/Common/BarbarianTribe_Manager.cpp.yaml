@@ -42,12 +42,19 @@
   name: campStep
   semantics: "the camp step: target = max camps (+0x110) x the land plots no major sees (0x50b2d0) / all land plots, less the standing camps (+0x170); the first step that adds adds BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33)% of it, every later one 1. Over the regions (+0x620, 0x153290) each keeps its best-scored plots (the job Barbarian Camp Evaluation per region, 0x14fd6f, waited at 0x14fe72); Barbarian camp region placement weighs the regions at the global top score by their plot counts, Barbarian camp location is uniform over the region's plots, the region's weight then 0; adding more than one, a plot within 7 of a tribe is passed over."
   status: PARTLY
+  cases:
+    - recording: h1_duels1189
+      turn: 33
+      value: "the step runs as the barbarians' turn opens, before their battles: player 0's Warrior 327683 on 31:14 and player 1's Warrior 393219 on 9:8, killed by their units that turn, still see for it (Barbarians.csv no_visibility 231; t34 242, no camp added)"
   impl:
     - cpu/core/barbarians.ts:campStep
+    - cpu/harness/replay.ts:barbarianTurn
     - cpu/data/barbarians.ts:BARB_CAMPS_PER_MAJOR
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_barb.py:_barb_camp_step
-  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b..."

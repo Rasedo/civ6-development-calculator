@@ -18217,3 +18217,53 @@ GPU `_walls_tier_at`, `_walls_tier_all`, `city_urban_kept`, `_transfer_city`.
 - OPEN: the effect's writer (whether the flag sits on the city or its
   centre district) and a conquest by a captor without Steel of a city that
   had it.
+
+## C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins
+
+- A WALKED UNIT'S LOOK (0x58f3f0 at each step): the look a step stores is
+  the map's as the step found it, and it stands until the unit looks again.
+  The replay places each unit on record t+1's plot (`syncUnits`); a unit whose
+  last logged step ends there now takes its look there with the map as the
+  step found it — each feature the log takes off later in the turn
+  (FeatureRemovedFromMap at a later place) standing, one taken off earlier
+  gone. A barbarian's look is its own turn's steps'. Confirmed:
+  runs/h1_duels1181 t49 city-state 3's Warrior 196610 steps onto 18:13
+  (12434) before city-state 4's Builder clears the Rainforest on 17:13
+  (12465); it stands there to t126, and the game's records of city-state 4's
+  Builder on 16:13 age from t102 to 21 and drop at t123 (knowledge.army 42
+  rows to 3 on 1181).
+- THE TREES WITH NO OPERATION ANSWER THE RECRUIT (0x7d1e40, bound to every
+  behaviour tree by 0x7cbb40): a city-state's Upgrade Units trees (priority
+  3, m_allowRecruiting 1 at every aimem read) answer a recruit whose request
+  priority is above 3 with their units, which leave them; the second offer
+  keeps the answered units whose turn is not done (0x60ac91..0x60aca1), for
+  the operations' units as for the trees'. Ported: `recruitUnits`
+  (`OpsContext.seatTrees`, `turnDone`; `SeatTree.units` / `release` from
+  `cityStateMilitary`), `_u_recruit` (`mops_upg_of`). Confirmed:
+  runs/h1_duels1135 city-state 3 t141: City Defense, started at its city's
+  threat, logs its "No recruits" pair, then recruits the three Swordsmen and
+  the Trebuchet its Upgrade Units tree holds; runs/h1_duels1143 city-state 4
+  t232-243 City Defense's Ironclad alike.
+- THE OFFER'S TAKE LEAVES THE MEMBER LISTED (0x60a8c0 -> 0x1e60f0): a unit
+  the offer takes has its assignment set; no team list changes until the
+  team update (0x73fba0 -> 0x732cd0) drops the members no longer assigned.
+  Upgrade Units' Find Available Unit taking a lower operation's member marks
+  it released (`Operation.released`, `mops_rel`), still in its team's list
+  and counts; a recruit taking it back clears the mark (`recruitOperation`,
+  `_mops_recruit`). Confirmed: runs/h1_duels1132 city-state 2 t172-188: its
+  Caravel 1441798, taken by an Upgrade Units tree from Naval Superiority and
+  let go after the tick (no target), is recruited back each turn ("Recruiting
+  strength ... UNIT_CARAVEL", "1 units, Recruited 1") — its team's Naval
+  requirement (MaxPercentage 1.0) full of the listed Caravel admits it.
+- THE CAMP STEP BEFORE THE BATTLES (0x14fcc0 as the barbarians' turn
+  opens): the units the barbarians' battles kill in that turn still see for
+  the step. The replay stands each unit of another player the log removes
+  inside the barbarians' turn for their rules (`barbarianTurn`). Confirmed:
+  runs/h1_duels1189 t33: player 0's Warrior 327683 on 31:14 and player 1's
+  Warrior 393219 on 9:8, killed by the barbarians' units in their turn, leave
+  231 plots unseen (Barbarians.csv) where the engines counted 240; at t34
+  the engines counted 255 (6 x 255 / 370 over the 3 standing) for the
+  game's 242 and raised the camp on 39:9 it never had; with the units
+  standing, no camp and none of its units (barb.unit, knowledge.camps).
+- Open: the game logs both Recruit Units nodes in the tick a recruit takes
+  its unit back (runs/h1_duels1132 t170 / t173), the engines the first.

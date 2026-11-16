@@ -7,6 +7,7 @@
  * rows through the context's `act`, the view then read anew.
  */
 import type { OpsSettle } from './types';
+import type { SeatTree } from './manager';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
 import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opJobUnits, opUnit, opUnits, robbedOps, targetGone, teamDef, teamList, teamReqs, unitsById, xy,
@@ -132,6 +133,10 @@ export interface OpsContext {
   assigned(): ReadonlySet<number>;
   /** the seat's other operations */
   others(): readonly Operation[];
+  /** the seat's triggered trees with no operation */
+  seatTrees(): readonly SeatTree[];
+  /** the units whose turn is done in the pass */
+  turnDone(): ReadonlySet<number>;
   /** what the shared contract nodes read of the operation's tree */
   contractWorld(): ContractNodeWorld;
   /** the seat's diplomatic requests standing, their ids their places */
@@ -357,14 +362,24 @@ const recruitUnits: BtHandler<OpsContext> = {
     // Recruited 0" over four Catapults)
     const members = new Map([...view.unitsDying(ctx.seat).map((u) => [u.id, u] as const), ...units]);
     recruitOperation(view, ctx.seat, op, offer, inProgress, range, members, (l) => ctx.log(l));
+    // ...and those of its marked trees with no operation (a city-state's
+    // "Upgrade Units", m_allowRecruiting) whose priority the request's
+    // passes (runs/h1_duels1135 city-state 3 t141: City Defense, started at
+    // its city's threat, takes the three Swordsmen and the Trebuchet its
+    // Upgrade Units tree holds); the second offer keeps the units whose turn
+    // is not done (0x60ac91..0x60aca1)
     const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < asked);
-    const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
+    const trees = ctx.seatTrees().filter((t) => t.units && t.priority < asked);
+    const done = ctx.turnDone();
+    const freed = [...lower.flatMap(opUnits), ...trees.flatMap((t) => t.units!())]
+      .filter((id) => !done.has(id)).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
     if (freed.length) {
       const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, members, (l) => ctx.log(l));
       const held = lower.filter((o) => opUnits(o).length > 0);
       for (const u of taken) {
         for (const o of lower) for (const t of o.teams) t.members = t.members.filter((id) => id !== u.id);
       }
+      for (const t of trees) t.release?.(taken.map((u) => u.id));
       // an operation the recruit leaves with no unit ends at its tick
       // (runs/h1_duely1128 t32: city-state 4's City Defense takes Attack Barb
       // Camp's Archer, which logs "Operation complete" alone, its recruit's

@@ -72,7 +72,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunde
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
-import { cityStateSight, initFog, revealAround, unitLook, unitSeesThrough, unitSight } from '../core/fog';
+import { cityStateSight, initFog, revealAround, takeLook, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setBorderTurnsFrom, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
@@ -97,7 +97,7 @@ import { AI_STRATEGIES } from '../core/aiWeights';
 import { holdMinorOrders, holdMinorRoutePick, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
-import { num, bool, revealedPlots } from './record';
+import { num, bool, revealedPlots, P } from './record';
 import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, traceMinorUpgrade, unupgradedDeleted, upgradeMayGo, upgradeTreesStart } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
@@ -106,7 +106,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, bindPerson, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, bindPerson, engineFeature, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -1191,7 +1191,24 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const opened = ctx.barbOpened ?? barbMovesNow(state);
   ctx.barbOpened = undefined;
   const campsWas = [...state.barbSeat.camps];
+  // ...and every other player's unit their turn's battles killed stands, as
+  // it stood when their turn opened (runs/h1_duels1189 t33: player 0's
+  // Warrior 327683 on 31:14 and player 1's 393219 on 9:8, killed by the
+  // barbarians' units after the camp step, still see for it: 231 plots
+  // unseen, not 240, and no camp raised at t34)
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  const barbP = ctx.playerOfSeat.get(BARB_SEAT);
+  const opens = acts.findIndex((x) => x[2] === 'PlayerTurnActivated' && x[3] === barbP && x[1] === closing);
+  const struck: Unit[] = [];
+  for (const x of opens < 0 ? [] : acts.slice(opens + 1)) {
+    if (x[2] === 'PlayerTurnDeactivated' && x[3] === barbP) break;
+    if (x[2] !== 'UnitRemovedFromMap') continue;
+    const u = ctx.gone.get(`${x[3]}:${x[4]}`);
+    if (u && !isBarbSeat(u.seat) && !state.units.includes(u) && !struck.includes(u)) struck.push(u);
+  }
+  state.units.push(...struck);
   barbarianRules(state, closing);
+  state.units = state.units.filter((u) => !struck.includes(u));
   for (const land of ctx.barbBattles.splice(0)) land();
   // where the pair's first record holds each unit its moves took off
   const from = new Map([...moved.keys()].map((u) => [u, u.tileIndex] as const));
@@ -5290,6 +5307,15 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): v
   // h1_duely1124 t72 China's Heavy Chariot leaves 43:9 before its Catapult
   // looks at 41:9 from 39:9)
   const first = (r: TurnRecord['units'][number]) => ctx.steps.get(`${r.owner}:${r.id}`)?.[0]?.ord ?? Infinity;
+  // the turn's features taken off, by plot: the log's place and the feature
+  // record t held there
+  const cleared = new Map<number, { ord: number; was: Tile['feature'] }>();
+  for (const x of (b as { extra?: unknown[][] }).extra ?? []) {
+    if (x[2] !== 'FeatureRemovedFromMap' || x[1] !== ctx.prev.turn) continue;
+    const p = (x[4] as number) * ctx.W + (x[3] as number);
+    const row = ctx.prev.map[x[4] as number]?.[x[3] as number];
+    if (row && !cleared.has(p)) cleared.set(p, { ord: x[0] as number, was: engineFeature(ctx.cat, row[P.feature] as number) });
+  }
   for (const r of [...b.units].sort((x, y) => (first(x) === first(y) ? 0 : first(x) < first(y) ? -1 : 1))) {
     if (only !== undefined && r.owner !== only) continue;
     const u = unitOf(ctx, `${r.owner}:${r.id}`);
@@ -5321,6 +5347,26 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): v
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
     u.tileIndex = at;
+    // a unit that walked holds the look its last step took (0x58f3f0), on
+    // the map as the step found it: a feature the log takes off after the
+    // step still in the way (runs/h1_duels1181 t49: city-state 3's Warrior
+    // 196610 steps onto 18:13 before city-state 4's Builder clears the
+    // Rainforest on 17:13, and sees 16:13 no more through t126); a
+    // barbarian's look is its own turn's steps'
+    const lastStep = ctx.steps.get(key)?.at(-1);
+    if (lastStep && lastStep.plot === at && !isBarbSeat(u.seat)) {
+      const last = lastStep.ord;
+      const tiles = ctx.state.map.tiles;
+      const swapped: [number, Tile['feature']][] = [];
+      for (const [p, c] of cleared) {
+        const then = c.ord > last ? c.was : null;
+        if (tiles[p].feature === then) continue;
+        swapped.push([p, tiles[p].feature]);
+        tiles[p].feature = then;
+      }
+      takeLook(ctx.state, u);
+      for (const [p, f] of swapped) tiles[p].feature = f;
+    }
     arrive(ctx.state, u);
     if (!keepMoves || moved) u.movesLeft = num(r.moves) * MP_SCALE;
     u.embarked = bool(r.embarked) || undefined;

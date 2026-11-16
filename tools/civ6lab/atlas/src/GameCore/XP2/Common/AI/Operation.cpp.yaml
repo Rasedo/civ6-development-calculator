@@ -64,6 +64,7 @@
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
     - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   review: reviewed
 - addr: 0x732db0
   kind: function
@@ -804,5 +805,6 @@
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

@@ -255,7 +255,12 @@
     - recording: h1_duels1155
       turn: 72
       value: "the homeland's offer takes city-state 2's Settler 786439, its Warrior 393220 in City Defense's job: the Settler leaves the formation (UnitExitFormation after the tactical pass); City Defense's own recruit of the Warrior left it whole (aiunits tacpass: members 393220, 786439)"
+    - recording: h1_duels1132
+      turn: 172
+      value: "the take sets the unit's assignment and leaves its team's list: city-state 2's Caravel 1441798, taken from Naval Superiority by an Upgrade Units tree and let go after the tick, is recruited back by Naval Superiority's strength (\"1 units, Recruited 1\") with its team's Naval MaxPercentage 1.0 full of the listed Caravel, t172-188"
   impl:
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - cpu/core/operations/recruit.ts:recruitOperation
     - cpu/core/minorOps.ts:cityStateMilitary
     - cpu/core/freeOps.ts:freeCitiesMilitary
     - gpu/core/sim_minorops.py:_u_recruit
@@ -271,6 +276,11 @@
     - cpu/core/operations/nodes.ts:update
     - cpu/core/tactical.ts:homelandTake
     - gpu/core/sim_tactics.py:_tac_homeland_take
+    - cpu/core/minorOps.ts:ops
+    - cpu/core/operations/nodes.ts:lower
+    - cpu/core/operations/operation.ts:Operation
+    - gpu/core/sim_minorops.py:_init_minor_ops
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
@@ -290,6 +300,7 @@
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
+    - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
   context:
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."
