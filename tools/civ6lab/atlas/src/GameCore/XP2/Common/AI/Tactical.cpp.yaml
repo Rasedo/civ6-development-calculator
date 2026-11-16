@@ -1122,6 +1122,7 @@
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-95: Wander Near Camp's orders carry no attack flag — READ (0x77b9a0 at 0x77bce4 / 0x77be0b -> 0x962030, 0x2720a0 at 0x272434..0x272544), both twins; the replay's copies"
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ngine's candidate count on the   rows the records pin (below). - THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with   a group (+0x11d0 >= 0) whose camp the player's signals answer (0x77..."
   context:

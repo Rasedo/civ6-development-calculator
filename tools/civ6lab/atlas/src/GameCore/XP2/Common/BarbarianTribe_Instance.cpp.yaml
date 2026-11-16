@@ -40,10 +40,20 @@
 - addr: 0x144260
   final: 0xd98c0
   kind: function
-  status: PARTLY
-  impl: [cpu/core/barbarians.ts:raise]
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  name: raisePlotTest
+  semantics: "a tribe's raise, per ring plot (0x149c60 over 0x144fb0's plots): skips a plot once the count wanted is placed, an impassable one (+0x3a bit 3), one with any district (GetDistrictType -1 wanted, 0x144295), one whose count +0x4c (the units of map layer 0) is above 0 (0x1442a3), and one whose IsWater differs from the context's land flag (+0x14 == 0, 0x1442b0..0x1442c2); else makes the unit (0x9406e0's vfunc +0x50) and runs the location test 0x586360 (flags 0x10): passing, the placement 0x586d40 and the unit counted; failing, the unit killed (0x144484)."
+  status: READ
+  cases:
+    - recording: h1_duels1150
+      turn: 149
+      value: "tribe 5's camp 15:20, its three land ring plots held by its Battering Ram, Skirmisher and Line Infantry: the ranged roll drawn, nothing raised t149 / t156 / t163"
+  impl:
+    - cpu/core/barbarians.ts:raise
+    - gpu/core/sim_barb.py:_barb_raise
+    - gpu/core/sim_tactics.py:_tac_units_layer
+  readings:
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
+  review: reviewed
 - addr: 0x144610
   final: 0xd9c80
   kind: function
@@ -130,6 +140,7 @@
   readings:
     - "H-1: the raids — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x147470

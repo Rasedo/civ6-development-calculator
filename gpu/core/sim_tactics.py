@@ -4957,15 +4957,20 @@ class SimTactics:
 
     # ------------------------------------------------------- Explore Land
 
-    def _tac_units_layer(self) -> torch.Tensor:
+    def _tac_units_layer(self, but: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] bool — `unitsLayerAt`: a unit of the units' layer (neither a
         Trader nor a religious unit) on the plot, the plot's count +0x4c the
         plot list's move 0x75280 and the placement 0x586d40 step for layer 0
-        alone."""
-        occ = (self.military_at >= 0) | (self.support_at >= 0)
-        for pl in (self.civilian_at, self.embarked_at):
-            t = self.unit_type.gather(1, pl.clamp(min=0)).clamp(min=0)
-            occ |= (pl >= 0) & (self._rel_strength.take(t) <= 0)
+        alone; with `but` [B], a unit other than that global slot."""
+        occ = torch.zeros_like(self.military_at, dtype=torch.bool)
+        for pl, rel in ((self.military_at, False), (self.support_at, False), (self.civilian_at, True), (self.embarked_at, True)):
+            on = pl >= 0
+            if rel:
+                t = self.unit_type.gather(1, pl.clamp(min=0)).clamp(min=0)
+                on = on & (self._rel_strength.take(t) <= 0)
+            if but is not None:
+                on = on & (pl != but.unsqueeze(1))
+            occ = occ | on
         return occ
 
     def _tac_explore_ok(self, tile: torch.Tensor, ut: torch.Tensor, seat: int, revealed: torch.Tensor) -> torch.Tensor:

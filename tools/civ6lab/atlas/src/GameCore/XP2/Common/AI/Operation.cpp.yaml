@@ -225,7 +225,7 @@
 - addr: 0x738f20
   kind: function
   name: teamUpdate
-  semantics: "the team update (from 0x73f7d0; goals at team +0xe8 + 8 x slot): per member its axial column and row summed; per tactical target (kb +0x370) within twice its base Movement (0x56d9f0): the team's attack strength (+0x98) once per member that can strike it (0x791300), the damage the target would deal it (0x51a240 / 0x519370 under the danger map), the target into the team's list (+0xb8) and the enemy strength (+0x94); a member the expected damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre; slot 5 (+0x110) the march point — the enemy not at war: from the target back toward the rally in single-precision axial steps (0x38070), the first plot P may enter (its own, no one's, open borders / alliance 0x3dab70, or an owner not enforcing its borders, diplomacy +0x6c0), the rally where reached; no enemy or at war: the target; with targets slot 4 (+0x108) the battle line, halfway between the centre and the targets' average, the team engaged (+0x90). Logged \"Battle line, %d:%d, %d endangered\". The endangered list (+0xa0, cleared each tick): a unit entry that fights adds its blow where no unit of the member's player stands on its ring (0x6b1b0 over 0x737610) and the member's plot holds danger or the entry is HIGH; a district entry (kind COMBAT or PASSIVE DISTRICT, component type 3) is the district (0x408770), its strike 0x249ee0 with no flag (0 unless its perimeter stands, no damage term) above 0, the member within its reach 0x249e40 of the district's own plot (+0x158 / +0x15c), 0x519370's blow; a member joins where the sum is above 0 and it does not fight (a lone unit on land: 0x739659), else where its damage plus the sum passes its hit points — a captive in its escort's formation is never listed."
+  semantics: "the team update (from 0x73f7d0; goals at team +0xe8 + 8 x slot): per member its axial column and row summed; per tactical target (kb +0x370) within twice its base Movement (0x56d9f0): the team's attack strength (+0x98) once per member that can strike it (0x791300), the damage the target would deal it (0x51a240 / 0x519370 under the danger map), the target into the team's list (+0xb8) and the enemy strength (+0x94); a member the expected damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre; slot 5 (+0x110) the march point — the enemy not at war: from the target back toward the rally in single-precision axial steps (0x38070), the first plot P may enter (its own, no one's, open borders / alliance 0x3dab70, or an owner not enforcing its borders, diplomacy +0x6c0), the rally where reached; no enemy or at war: the target; with targets slot 4 (+0x108) the battle line, halfway between the centre and the targets' average, the team engaged (+0x90). Logged \"Battle line, %d:%d, %d endangered\". The endangered list (+0xa0, cleared each tick): a unit entry that fights adds its blow where no unit of the member's player stands on its ring (0x6b1b0 over 0x737610) and the member's plot holds danger or the entry is HIGH; a district entry (kind COMBAT or PASSIVE DISTRICT, component type 3) is the district (0x408770), its strike 0x249ee0 with no flag (0 unless its perimeter stands, no damage term) above 0, the member within its reach 0x249e40 of the district's own plot (+0x158 / +0x15c), 0x519370's blow; a member joins where the sum is above 0 and it does not fight (a lone unit on land: its formation of one unit, +0x1fb8 -> +0x738 at 1, and its plot's count +0x4c at 1, 0x739659..0x739675), else where its damage plus the sum passes its hit points — a captive in its escort's formation is never listed."
   status: PARTLY
   cases:
     - recording: h1_duely1128
@@ -243,6 +243,9 @@
     - recording: h1_duelq1128
       turn: 130
       value: "Hong Kong's City Defense at its end look: team +0x94 45 (the barbarian Man-At-Arms on 9:5), +0x98 90 (its two Man-At-Arms beside it; the Warriors on 9:7 reach it not)"
+    - recording: h1_duels1168
+      turn: 65
+      value: Barbarian City Assault's Battering Ram 2883607 on 15:8 beside the tribe's Archer 2818070 on its plot holds to Siege City; t66, the Archer gone to 15:10, Protect Units Move 14 10
     - recording: h1_duels1144
       turn: 143
       value: "the weighed target types are CIVILIAN_UNIT (6) to HIGH_PRIORITY_UNIT (11) by value (0x739150..0x739161), RELIGIOUS_CIVILIAN 7 and TRADER 8 among them: city-state 2's City Defense team +0x98 55, +0x94 0, its Musketman 1572870 on 12:13 beside a religious unit's entry on 11:13 (the list's type 7), no Fortify"
@@ -257,6 +260,7 @@
     - cpu/core/opsOrders.ts:endangered
     - gpu/core/sim_minorops.py:_mops_endangered
     - gpu/core/sim_barbops.py:_bop_endangered
+    - gpu/core/sim_barbops.py:_alone_on_plot
     - cpu/core/opsOrders.ts:targetStrength
     - gpu/core/sim_minorops.py:_mops_reaches
     - gpu/core/sim_minorops.py:_mops_district_strikes
@@ -269,6 +273,7 @@
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed

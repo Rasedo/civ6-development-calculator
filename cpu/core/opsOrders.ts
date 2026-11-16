@@ -16,7 +16,7 @@ import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passA
   type Pass, type Target } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
-import { breakEscort, escortRiders, escortUnit, unitDomain } from './units';
+import { breakEscort, escortRiders, escortUnit, mapLayer, unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
 import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isBarbSeat, isCityStateSeat, tileSeat } from './seats';
 import { NO_SEAT, type City } from './types';
@@ -121,8 +121,12 @@ const afloatInDanger = (state: GameState, pass: Pass, u: Unit): boolean =>
  * at 67 damage on 5:16 beside Xi'an's Encampment 5:15, its centre 6:12 four
  * away, goes to safety on 3:16) — and the member
  * the sum would leave with no hit points is endangered; one that does not
- * fight, any blow at all where it stands alone (its formation of one unit,
- * 0x739659: no civilian of `formed`) on land.
+ * fight, any blow at all where it stands alone on land: its formation of one
+ * unit (0x739659: no civilian of `formed`) and no other unit of the units'
+ * layer on its plot (0x73966c..0x739675, the plot's count +0x4c at 1:
+ * runs/h1_duels1168 t65, the Battering Ram 2883607 on 15:8 beside the
+ * tribe's Archer 2818070 holds to Siege City, t66 with the Archer gone to
+ * 15:10 it goes to safety).
  */
 function endangered(state: GameState, pass: Pass, members: readonly Unit[], formed: readonly number[]): Unit[] {
   const out: Unit[] = [];
@@ -154,7 +158,8 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[], form
       }
       if (out.includes(u)) continue;
       if (sum > 0 && !fights) {
-        if (!formed.includes(u.id) && !isWater(state.map.tiles[u.tileIndex])) out.push(u);
+        const alone = !state.units.some((x) => x !== u && x.tileIndex === u.tileIndex && mapLayer(x.type) === 'units');
+        if (!formed.includes(u.id) && alone && !isWater(state.map.tiles[u.tileIndex])) out.push(u);
       } else if (damageOf(u) + sum > COMBAT_MAX_HIT_POINTS) out.push(u);
     }
   }

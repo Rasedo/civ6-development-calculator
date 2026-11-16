@@ -883,7 +883,7 @@ class SimBarbOps:
         reach of the district's own plot, its strike (`_endangered_districts`) — and the member the sum leaves
         with no hit points is endangered; one that does not fight, any blow
         at all where it stands alone on land (in no formation of two,
-        0x739659: `_tac_mate`)"""
+        0x739659: `_tac_mate`, and no other unit on its plot)"""
         B, dev = self.B, self.device
         b = self._bidx
         jc = j.clamp(min=0)
@@ -925,8 +925,14 @@ class SimBarbOps:
         dmg_now = hp_max - self.barb_unit_hp[b, jc].long()
         weak = (total > 0) & ~fights
         land = ~self.water[b, plot]
-        alone = self._tac_mate(b, jc, "barb") < 0
+        alone = (self._tac_mate(b, jc, "barb") < 0) & self._alone_on_plot(b, jc + self.POOL_LO["barb"], plot)
         return on & ((weak & land & alone) | (~weak & (dmg_now + total > hp_max)))
+
+    def _alone_on_plot(self, b: torch.Tensor, g: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
+        """[B] bool — no unit of the units' layer (neither a Trader nor a
+        religious unit) but the unit at global slot `g` on `plot` (the plot's
+        count +0x4c at 1, 0x739671)"""
+        return ~self._tac_units_layer(g)[b, plot]
 
     def _bop_hurt(self, j: torch.Tensor, pct: int) -> torch.Tensor:
         """[B] bool — the barbarians' unit at pool slot `j` hurt to `pct`

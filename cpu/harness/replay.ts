@@ -1185,6 +1185,23 @@ function researchBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState): void {
   }
 }
 
+/** `fn` run with the majors' research as their start of the next turn has
+ *  not yet grown it (`researchBeforeStart` on the state itself, restored
+ *  after): the barbarians' techs their turn takes read it (runs/h1_duels1160
+ *  t55: player 0's Horseback Riding completes at its start of t56, the
+ *  tribe on 3:12 raising a Barbarian Horseman in its t55 turn) */
+function withResearchBeforeStart<T>(ctx: Ctx, b: TurnRecord, fn: () => T): T {
+  const held = ctx.state.seats.map((s) => (s ? [s.research.techs, s.research.civics] as const : undefined));
+  researchBeforeStart(ctx, b, ctx.state);
+  try {
+    return fn();
+  } finally {
+    ctx.state.seats.forEach((s, i) => {
+      if (s && held[i]) [s.research.techs, s.research.civics] = held[i]!;
+    });
+  }
+}
+
 /** the majors' buildings in a copy of the turn t's close: a building the log
  *  completes in the next turn (its CityProductionCompleted row of record
  *  t+1's turn, the active player's start) does not stand yet
@@ -1309,7 +1326,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     if (u && !state.units.includes(u) && !struck.includes(u)) struck.push(u);
   }
   state.units.push(...struck);
-  barbarianRules(state, closing);
+  withResearchBeforeStart(ctx, b, () => barbarianRules(state, closing));
   state.units = state.units.filter((u) => !struck.includes(u));
   for (const land of ctx.barbBattles.splice(0)) land();
   // where the pair's first record holds each unit its moves took off
@@ -5322,7 +5339,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // flanking at theirs)
         if (isBarbSeat(atk.seat)) {
           ctx.barbOpened ??= barbMovesNow(state);
-          barbarianTechs(state);
+          withResearchBeforeStart(ctx, b, () => barbarianTechs(state));
         }
         const restore = standAtBlow(ctx, d.ord, [atk, def]);
         state.rngState = s0;

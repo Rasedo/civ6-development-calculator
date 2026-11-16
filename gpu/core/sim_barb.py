@@ -126,7 +126,7 @@ class SimBarb:
                     scout: bool, track: bool = True, look: bool = False) -> torch.Tensor:
         """`raise`: up to `n` units of each game's class `tag` (its best unit
         now) on the first free plots `radius` round its tribe `k`'s camp in
-        ring order — no city on the plot, the unit's own domain
+        ring order — no district and no unit on the plot, the unit's own domain
         (`tileFreeForUnit`) —, tagged the tribe's units (raised in its turn)
         or its scouts where `track`; with `look` (a tribe's turn, a camp's scouts,
         `placedLook`) each looks from where it is placed. [B] long the units
@@ -145,11 +145,15 @@ class SimBarb:
         L = 1 + 3 * radius * (radius + 1)
         cands = self._barb_ring[plot][:, :L]  # [B, L]
         cc = cands.clamp(min=0)
-        ctr = self._centre_seat_plane().gather(1, cc) >= 0
+        # no district of any kind on the plot (0x144295)
+        ctr = ((self._centre_seat_plane().gather(1, cc) >= 0) | (self.district.gather(1, cc) >= 0)
+               | (self.built_wonder.gather(1, cc) >= 0))
         water = self.water.gather(1, cc)
         for _ in range(n):
+            # no unit of the units' layer on the plot (0x1442a3, the plot's +0x4c)
+            held = self._tac_units_layer().gather(1, cc)
             free = self._spot_free(cands, BARB_SEAT, naval_mask=naval, cart=cart)
-            ok = (cands >= 0) & ~ctr & (water == naval.unsqueeze(1)) & free
+            ok = (cands >= 0) & ~ctr & ~held & (water == naval.unsqueeze(1)) & free
             first = torch.where(ok, torch.arange(L, device=self.device), L).min(dim=1).values
             go = mask & (first < L)
             if not bool(go.count_nonzero()):

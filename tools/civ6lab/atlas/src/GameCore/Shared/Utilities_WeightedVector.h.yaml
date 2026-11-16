@@ -1,0 +1,17 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7154f0
+  kind: function
+  name: weightedVectorAdd
+  semantics: appends an entry (the item's 8 bytes and its weight, 12 bytes) to a weighted vector (+0x20 data, +0x28 capacity, +0x30 count), asserting the weight is not negative; it sorts nothing and sums nothing.
+  status: READ
+  cases:
+    - recording: h1_duels1145
+      turn: 69
+      value: "Wander Near Camp (0x77b9a0) draws Random Direction over the vector's count (range 5 for the Warrior 2818064 on 33:18) and indexes it directly: the weights pick nothing"
+  readings:
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
+  review: reviewed

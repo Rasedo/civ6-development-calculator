@@ -2791,7 +2791,7 @@ class SimMinorOps:
         within its reach of the district's own plot, its strike
         (`_endangered_districts`) — and the member
         the sum leaves with no hit points (one that does not fight, any blow
-        at all on land) is endangered"""
+        at all on land, no other unit on its plot) is endangered"""
         B, dev = self.B, self.device
         b = torch.arange(B, device=dev)
         jc = j.clamp(min=0)
@@ -2836,7 +2836,7 @@ class SimMinorOps:
         hp_max = int(self.rules.combat["unitHp"])
         dmg_now = hp_max - pu("hp")[b, jc].long()
         weak = (total > 0) & ~fights
-        land = ~self.water[b, plot]
+        land = ~self.water[b, plot] & self._alone_on_plot(b, jc + self.POOL_LO[pre], plot)
         return on & ((weak & land) | (~weak & (dmg_now + total > hp_max)))
 
     def _mops_hurt(self, s: int, j: torch.Tensor, pct: int) -> torch.Tensor:

@@ -27,7 +27,7 @@ import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { losDisk, unitLook, unitSight, unitSeesThrough } from './fog';
-import { spawnUnit, tileFreeForUnit, unitDomain } from './units';
+import { mapLayer, spawnUnit, tileFreeForUnit, unitDomain } from './units';
 import { AI_EXPLORE, aiTypeOf } from './tactical';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
@@ -377,8 +377,13 @@ export function barbUnitFor(state: GameState, tag: BarbTag): string | null {
 }
 
 /** up to `n` units of the tag on the first free plots round the camp
- *  (0x144fb0 / 0x144260): no city on the plot, the unit's own domain; the
- *  ids raised */
+ *  (0x144fb0 / 0x144260 at 0x14427f..0x1442c2): a passable plot with no
+ *  district of any kind and no unit of the units' layer on it (the plot's
+ *  count +0x4c: neither a Trader nor a religious unit), of the unit's own
+ *  domain, then the location test (0x586360); the ids raised (runs/
+ *  h1_duels1150 t149: tribe 5's ring round 15:20 holds a Battering Ram, a
+ *  Skirmisher and a Line Infantry on its three land plots and the roll
+ *  raises nothing, t149-163) */
 function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number, n: number): number[] {
   const type = barbUnitFor(state, tag);
   if (!type) return [];
@@ -388,7 +393,8 @@ function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number,
   for (const p of ringPlots(state, tribe.plot, radius)) {
     if (out.length >= n) break;
     const t = state.map.tiles[p];
-    if (isImpassable(t) || t.district === 'CITY_CENTER' || isWater(t) !== naval) continue;
+    if (isImpassable(t) || t.district || t.builtWonder || isWater(t) !== naval) continue;
+    if (state.units.some((u) => u.tileIndex === p && mapLayer(u.type) === 'units')) continue;
     if (!tileFreeForUnit(state, p, BARB_SEAT, probe)) continue;
     const u = spawnUnit(state, type, p, BARB_SEAT);
     if (u) out.push(u.id);

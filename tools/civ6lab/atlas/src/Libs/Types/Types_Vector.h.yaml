@@ -127,6 +127,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn..."
   context:

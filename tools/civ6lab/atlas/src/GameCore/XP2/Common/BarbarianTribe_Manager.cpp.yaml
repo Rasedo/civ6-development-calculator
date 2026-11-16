@@ -23,6 +23,7 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "H-1: a minor's research catch-up — READ"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
   context:
     - "- Techs 0x14f530: the BarbarianFree techs (SAILING, BRONZE_WORKING, SHIPBUILDING) and any tech or civic..."
     - "...city-state or the Free Cities — it counts the players of the game's list +0xb50 (the list 0x14f530 reads for the barbarians' techs: the majors in the game) holding the item, and where at l..."

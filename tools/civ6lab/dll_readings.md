@@ -19795,3 +19795,57 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
 - Open: the unit branch (0x752440) is not ported — a minor's Faith unit
   (runs/h1_duels1170 t239-t243 Lahore's Nihang contracts 1123 / 1142 /
   1158) stays ACCEPTED in ours (C-96).
+
+## C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins
+
+- A TRIBE'S RAISE (0x144fb0 over the ring's plots, the test 0x144260): a plot
+  is taken where it is passable (+0x3a bit 3 clear), holds no district of
+  any kind (GetDistrictType 0x810d0 at 0x144295 is -1: a wonder's plot and
+  a district under construction refused alike), its count +0x4c (the units
+  of map layer 0: neither a Trader nor a religious unit) is 0 (0x1442a3),
+  and it is water exactly where the unit is a hull (0x1442b0..0x1442c2);
+  then the unit is made and the location test 0x586360 (flags 0x10) run,
+  the unit killed where it fails (0x144484). A support unit standing alone
+  on a ring plot keeps the raise off it. The spawn clock resets and the
+  ranged roll is drawn whether a plot is found or not. Ported: `raise`
+  (cpu/core/barbarians.ts); GPU `_barb_raise` over `_tac_units_layer`.
+- CONFIRMED: runs/h1_duels1150 t149 / t156 / t163: tribe 5's camp 15:20,
+  its three land ring plots held by its Battering Ram (14:20), Skirmisher
+  (15:19) and Line Infantry (14:19): "Barbarian Ranged unit roll" drawn,
+  nothing raised (Barbarians_Units.csv silent t143-169); the three barb.unit
+  rows gone in a t144-166 window. runs/h1_duels1168 t100 and
+  runs/h1_duels1188 t131 likewise.
+- THE TEAM UPDATE'S LONE NON-FIGHTER (0x738f20 at 0x739659..0x739675): a
+  member that does not fight joins the endangered with any blow at all
+  only where its formation counts one unit (+0x1fb8 -> +0x738 at 1) and its
+  plot's count +0x4c is 1: a unit of the units' layer beside it on its plot
+  keeps it off the list. Ported: `endangered` (cpu/core/opsOrders.ts); GPU
+  `_bop_endangered` and `_mops_endangered` over `_alone_on_plot`.
+- CONFIRMED: runs/h1_duels1168 t65: Barbarian City Assault's Battering Ram
+  2883607 on 15:8, the tribe's Archer 2818070 on its plot, logs "Operation
+  Siege City, UNIT_BATTERING_RAM 15:8, Move 15:8", no Protect Units; t66,
+  the Archer gone to 15:10, "Operation Protect Units, UNIT_BATTERING_RAM,
+  Move 14 10". Its rows of t65, t77, t84, t115-119 gone in a t1-120 window.
+- THE BARBARIANS' TECHS AT THEIR CLOSE (0x14f530) read the majors' research
+  as it stands in the barbarians' turn: a technology a major completes at
+  its start of the next turn is not yet held. The replay's barbarian turn
+  runs their rules (`barbarianRules`) and a barbarian blow's grant with
+  `researchBeforeStart` on the state (`withResearchBeforeStart`).
+- CONFIRMED: runs/h1_duels1160 t55: player 0's Horseback Riding completes
+  at its start of t56 (ResearchCompleted 0 13 after the barbarians'
+  PlayerTurnDeactivated), the tribe on 3:12 raises a Barbarian Horseman in
+  its t55 turn; both barb.unit rows gone in a t1-58 window.
+- WANDER NEAR CAMP's list (0x77b9a0 at 0x77bc09..0x77bc42) is a weighted
+  vector (0x7154f0 appends the plot and its weight: 2 where the danger map
+  holds 0, else 1, doubled where the plot is unrevealed, 0x2d2220), but the
+  "Random Direction" draw ranges over its count and indexes it directly
+  (0x77bc58..0x77bcc8): the weights pick nothing.
+- OPEN: runs/h1_duels1162 t127-144: tribe 5 (CAVALRY, camp 26:3) raises from
+  its queue at t127, t132, t133, t138, t143 with no ranged roll between t113
+  and t144, where ours raises its one queued class at its own interval
+  (t133); the interval its queue runs on after the Spawn Change back unread.
+  runs/h1_duels1149 t42: the game draws no ranged roll at tribe 0's
+  seventh-turn strike where ours raises a Warrior; its count's books unread.
+- OPEN: runs/h1_duels1171 t5: the game raises a fifth camp on 16:10 with 307
+  land plots unseen by the full civilizations (Barbarians.csv), ours counts
+  304 and raises none (the full civilizations' sight of t5, three plots).
