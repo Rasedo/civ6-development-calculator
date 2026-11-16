@@ -47,6 +47,7 @@ import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, 
 import { modifiersValue } from './aiModifiers';
 import { getModifiers } from './effects';
 import { aiView } from './aiView';
+import { aiTrace } from './aiTrace';
 import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
@@ -244,6 +245,7 @@ export function civicAnalysis(state: GameState, seat: number, culture: number,
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
     const base = turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ??= aiView(state)) + (cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+    aiTrace?.('civic', seat, id, () => ({ turns, next, own: turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ?? aiView(state)), base }));
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);
@@ -251,6 +253,13 @@ export function civicAnalysis(state: GameState, seat: number, culture: number,
   for (const c of contracts) {
     const e = entries.find((x) => x.civic === c.civic);
     if (e && e.score >= 0) e.score += c.value;
+  }
+  if (aiTrace) {
+    for (const e of entries) {
+      aiTrace('civic.row', seat, e.civic, () => ({ turns: e.turns, base: e.base, contracts: contracts.filter((c) => c.civic === e.civic).map((c) => c.value),
+        lineage: e.turns < 0 ? [] : lineage(state, e.civic).map((p) => [p, Math.max(0, entries.find((x) => x.civic === p)?.base ?? 0)]),
+        favored: !!leader && (CIVIC_AI_FAVORED[leader] ?? []).includes(e.civic), score: e.score }));
+    }
   }
   return entries;
 }

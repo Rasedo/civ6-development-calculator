@@ -42,6 +42,7 @@ import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { aiPromotionPick, attacksLeftOf, attacksPerTurn, takePromotion } from './promotions';
 import type { ImprovementId } from './types';
+import { aiTrace } from './aiTrace';
 
 /** the pathfinder's fixed point: one Movement is 256 */
 const FIX = 256;
@@ -2551,6 +2552,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
   // Submarine on 30:7 beside city-state 4's Builder on 31:8, its 85 in
   // player 1's map)
   const seers = [seat, ...state.cityStates.filter((cs) => cs.centerIndex >= 0 && suzerainOf(cs) === seat).map((cs) => cs.seat)];
+  aiTrace?.('danger.open', seat, '', () => ({}));
   for (const u of state.units) {
     if (!onMap(u) && unitDomain(u.type) !== 'air') continue;
     if (unitReligious(u.type) || !atWarWith(state, seat, u.seat) || !seen[u.tileIndex] || !seers.some((s) => unitVisibleTo(state, u, s))) continue;
@@ -2560,6 +2562,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     const R = rangeOf(u);
     if (unitDomain(u.type) === 'air') {
       for (const p of within(u.tileIndex, R)) out[p] += s;
+      aiTrace?.('danger.unit', seat, '', () => ({ unit: u, strengths: st, danger: s, reach: [], range: within(u.tileIndex, R) }));
       continue;
     }
     const reach: number[] = [];
@@ -2620,6 +2623,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     }
     for (const p of reach) out[p] += s;
     for (const p of extra) out[p] += s;
+    aiTrace?.('danger.unit', seat, '', () => ({ unit: u, strengths: st, danger: s, reach, range: extra }));
   }
   const citiesHeld = (h: { seat: number; cities: City[] }) => isCityStateSeat(h.seat)
     ? state.cityStates.filter((cs) => cs.seat === h.seat && cs.centerIndex >= 0).map(minorCity) : h.cities;
@@ -2630,6 +2634,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
         if (!seen[d.plot]) continue;
         if (d.def > 0) out[d.plot] += d.def;
         for (const p of within(d.plot, d.strike > 0 ? CITY_STRIKE_RANGE : 1)) if (p !== d.plot) out[p] += d.strike > 0 ? d.strike : 1;
+        aiTrace?.('danger.district', seat, '', () => ({ ...d, owner: h.seat, around: within(d.plot, d.strike > 0 ? CITY_STRIKE_RANGE : 1) }));
       }
     }
   }
@@ -2637,6 +2642,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
   for (const c of own ? citiesHeld(own) : []) {
     for (const d of dangerDistricts(state, c)) {
       if (d.def > 0) out[d.plot] = 0;
+      aiTrace?.('danger.district', seat, '', () => ({ ...d, owner: seat, own: true, around: d.strike > 0 ? within(d.plot, CITY_STRIKE_RANGE) : [] }));
       if (d.strike <= 0) continue;
       for (const p of within(d.plot, CITY_STRIKE_RANGE)) {
         if (p === d.plot || out[p] <= 0) continue;

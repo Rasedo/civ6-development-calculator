@@ -129,6 +129,7 @@ import { GW_LAYOUT, holderSlots, slotAccepts } from '../data/greatWorks';
 import { gwWorks, removeGreatWork } from '../core/greatWorks';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
+import { tracePassRows, traceWorld } from './aiTrace';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
 import { GameUnits, readPass, readPassAi, readUnitTable, type StateRead } from './aiUnits';
 import { RecordStore, type RecordLight } from './recordStore';
@@ -760,7 +761,9 @@ function scorePass(ctx: Ctx, copy: GameState, pass: Pass, turn: number, twin: Re
     return u ? keyOf.get(u) ?? gone.get(u) : undefined;
   };
   const world = { W: ctx.W, unitNames: ctx.cat.units, keyOf: key, playerOf: (seat: number) => ctx.playerOfSeat.get(seat) ?? seat };
-  scoreState(ctx, turn, opsRan ? readPassAi(ctx.gameUnits, world, copy, pass, turn) : readPass(ctx.gameUnits, world, copy, pass, turn, ctx.stateLeftOut));
+  const rows = opsRan ? readPassAi(ctx.gameUnits, world, copy, pass, turn) : readPass(ctx.gameUnits, world, copy, pass, turn, ctx.stateLeftOut);
+  scoreState(ctx, turn, rows);
+  if (!opsRan) tracePassRows(rows, turn, copy, pass, world);
 }
 
 /** a record unit key's owner (`owner:id`) */
@@ -7118,6 +7121,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceKnowledge(armyLog(ctx));
   // each danger map its tactical pass reads, with the pair's turn
   traceDanger((seat, plane) => ctx.dangerLogged.set(seat, { turn: ctx.turn, plane: plane.slice() }));
+  traceWorld({ W: ctx.W, turn: () => ctx.turn, state: () => ctx.state, seatOf: (p) => seatOfP(ctx, p), playerOf: (s) => ctx.playerOfSeat.get(s) ?? s });
   // the operations each AI party started, against the log's
   operations.onStarts = (turn, player, log, ours) => {
     const seat = ctx.seatOfPlayer.get(player) ?? NO_SEAT;
@@ -8393,6 +8397,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorOps(null);
   traceKnowledge(null);
   traceDanger(null);
+  traceWorld(null);
   traceFreeOps(null);
   holdResearchEra(null);
   holdMinorOrders(false);

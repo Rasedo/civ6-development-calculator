@@ -30,6 +30,7 @@ import {
 } from './aiValue';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn } from './aiCityBuild';
 import { FREE_SEAT } from './seats';
+import { aiTrace } from './aiTrace';
 
 export interface AiRequirement {
   type: string;
@@ -1520,5 +1521,6 @@ export function modifiersValue(t: ValueTerms, mods: readonly AiModifier[]): numb
     const w = modifierValue(t, m);
     v += y ? fmul(w * FX, fxConst(AI_YIELD_DEFAULT[y] ?? 1)) : Math.min(Math.max(w, -0x7fffff), 0x7fffff) * FX;
   }
+  aiTrace?.('modifiers', t.seat, '', () => ({ mods, start: t.start, horizon: t.horizon, values: mods.map((m) => modifierValue(t, m)), sum: v }));
   return v;
 }

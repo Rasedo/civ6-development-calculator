@@ -86,6 +86,11 @@ export function newScores(): DecisionScores {
  *  turn opened (undefined for a player whose memory is not compared) */
 const ROWS = new Set((process.env.AISCORE_ROWS ?? '').split(',').filter(Boolean));
 const MISSES = process.env.AISCORE_MISSES === '1';
+/** `--trace`'s reader of every scored row (`aiTrace.ts`); null without one */
+let rowTrace: ((kind: string, turn: number, subject: string, equal: boolean, ours: unknown, game: unknown) => void) | null = null;
+export function traceScoredRows(fn: typeof rowTrace): void {
+  rowTrace = fn;
+}
 
 export function scoreDecision(s: DecisionScores, kind: string, turn: number, subject: string, equal: boolean,
   ours: unknown, game: unknown, clean?: boolean): void {
@@ -95,6 +100,7 @@ export function scoreDecision(s: DecisionScores, kind: string, turn: number, sub
   if (ROWS.has(kind) || (MISSES && !equal)) {
     console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'}${clean ? 'c' : ''} ${whole(ours)} // ${whole(game)}`);
   }
+  rowTrace?.(kind, turn, subject, equal, ours, game);
   const take = (x: { compared: number; equal: number; first?: KindScore['first'] }) => {
     x.compared += 1;
     if (equal) x.equal += 1;

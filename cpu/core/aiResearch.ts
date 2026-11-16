@@ -55,6 +55,7 @@ import { AI_PSEUDOYIELD_DEFAULT, AI_TECH_MODIFIERS } from '../data/aiTables';
 import { projectChain } from './aiProjectValue';
 import { modifiersValue } from './aiModifiers';
 import { aiView } from './aiView';
+import { aiTrace } from './aiTrace';
 import { pseudoYieldWeights } from './aiWeights';
 import { minorNavalApplied, minorNavalWeighted } from './minorStrategy';
 import type { GameState, ImprovementId, ResearchState } from './types';
@@ -379,11 +380,20 @@ export function researchAnalysis(state: GameState, seat: number, science: number
       if (id === fav) own = fmul(own, fxConst(1.5));
     }
     const base = own + v.mods;
+    aiTrace?.('research', seat, id, () => ({ turns, next, own: v.own, withCityAndFavTech: own, favTech: id === fav, modifiers: v.mods, base }));
     return { tech: id, next, turns, owned: false, leaf, base, score: base, logged: 0 };
   });
   addContracts(entries, contracts);
   propagate(state, r, entries, favoredRows(state, seat, false));
   for (const e of entries) e.logged = e.score;
+  if (aiTrace) {
+    const favored = favoredRows(state, seat, false);
+    for (const e of entries) {
+      aiTrace('research.row', seat, e.tech, () => ({ turns: e.turns, base: e.base, contracts: contracts.filter((c) => c.tech === e.tech).map((c) => c.value),
+        prerequisites: e.turns < 0 ? [] : upstream(state, r, e.tech).map((p) => [p, Math.max(0, entries.find((x) => x.tech === p)?.base ?? 0)]),
+        favored: favored.has(e.tech), score: e.logged }));
+    }
+  }
   return entries;
 }
 

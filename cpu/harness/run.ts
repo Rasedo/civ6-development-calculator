@@ -5,7 +5,7 @@
  *
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> [--out <report.json>] [--from T] [--to T]
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --replay <replay.json> [--from T] [--to T]
- *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log|aimem] [--from T] [--to T]
+ *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log|aimem] [--from T] [--to T] [--trace <kind>:<turn>[:<text>]]...
  *
  * Writes `<dump>.report.json` (or `--out`) and its Markdown digest
  * (`.report.md`): per check the counts (pass, fail, skip by reason, and how
@@ -27,6 +27,8 @@
  * compared against that (`readGameMemory`), else against its logs; one with
  * the game's unit stream beside it (`<stem>.aiunits.jsonl`) has the game's
  * intermediate state compared too, in a table of its own (`aiUnits.ts`).
+ * `--trace` (any number) prints the named rows' terms beside them
+ * (`aiTrace.ts`).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
@@ -39,6 +41,7 @@ import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
 import { EventPicks } from './eventPick';
 import { aiScoreMarkdown, memoryTable, scoreTable, stateTable } from './aiScore';
+import { traceSpecs } from './aiTrace';
 
 interface Tally {
   pass: number;
@@ -64,7 +67,8 @@ function args(argv: string[]) {
   const opt: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--') continue;
-    if (argv[i].startsWith('--')) opt[argv[i].slice(2)] = argv[++i];
+    if (argv[i] === '--trace') opt.trace = [opt.trace, argv[++i]].filter(Boolean).join('\n');
+    else if (argv[i].startsWith('--')) opt[argv[i].slice(2)] = argv[++i];
     else pos.push(argv[i]);
   }
   return { pos, opt };
@@ -214,6 +218,7 @@ function main() {
   const dump = pos[0];
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
   if (opt.aiscore) {
+    if (opt.trace) traceSpecs(opt.trace.split('\n'));
     const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined, aiScore: true,
       memoryFromLog: opt.memory === 'log', memoryFromAimem: opt.memory === 'aimem' });
     const stem = opt.aiscore.replace(/\.(json|md)$/, '');
