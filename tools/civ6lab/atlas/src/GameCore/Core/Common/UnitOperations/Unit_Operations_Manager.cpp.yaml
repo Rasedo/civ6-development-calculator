@@ -27,6 +27,7 @@
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "...order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; Upd..."
     - ...its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
@@ -68,6 +69,9 @@
   semantics: "Unit_Operations_Manager vtable 0xcff8c0 +0x38: the unit's front operation runs (its vt +0x20, the result +0x10 done, +0x11 waits, +0x12 moved, +0 the steps) while it moved, neither done nor waiting, the formation test 0x265d70 holding and the steps under 100; done, the operation leaves the queue (vt +0x48, 0x585440); else UnitOperationSegmentComplete (event 0xcb0345f1) with the operation kept, run again where the unit has Movement (0x56c690). Each run clears the formation's kept path at its entry (0x265fd0 at 0x52f9e) and holds the formation's kept-path flag (the tracked bool +0x580, value +0x5d8, 0x42eb20) from 0x52fce to 0x53394, the loop going back to 0x52fba after the clear: the run's first step searches, its later steps take that search's path (0x272aa0)."
   status: READ
   cases:
+    - recording: h1_duels1157
+      turn: 152
+      value: "city-state 4's Pike and Shot 1114114 for 39:10 steps 36:7, 37:8, 38:8, 38:9 in one run on one search (AStar_GC.log #29542), one UnitOperationSegmentComplete at its end"
     - recording: h1_duelp1121
       turn: 88
       value: "city-state 4's Man-At-Arms 1048577, its moves ended by Wander Near City, runs its Wander Back to City order twice with no step (two UnitOperationSegmentComplete, no UnitMoved): no Movement (0x56c690) and none in its formation (0x265d70), no execution"
@@ -84,6 +88,7 @@
     - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:orderRun
     - cpu/core/tactical.ts:mine
+    - cpu/core/tactical.ts:RestPlot
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
@@ -97,6 +102,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   review: reviewed
 - addr: 0x53e20
   final: 0x408f0
@@ -139,6 +145,9 @@
   semantics: "Unit_Operations_Manager vtable 0xcff8c0 +0x60: appends the operation at the back of the unit's queue (+0x2040: the list +0xd0, 0x30 entries, its count +0xe0, asserted under 10), signals 0x15c35863, and starts it at once (vt +0x170) only where it is the queue's one entry and the caller's flag (r9b) is set: an operation pushed behind one that stays queued does not run until the front leaves (0x52f50 runs the front alone)."
   status: READ
   cases:
+    - recording: h1_duels1162
+      turn: 225
+      value: "city-state 2's AT Crew 2883591 (Wander for 28:15): the push's own run walks 30:14, 29:15 on one search (AStar_GC.log #49969)"
     - recording: h1_duelq1121
       turn: 160
       value: "the camp's Spearman 1376265 on 3:18, its move to the spot 3:17 its Line Infantry holds kept, strikes nothing: the strike pushed behind it never starts; h1_duelq1128 t31 the Spearman 589832 walks 30:6 -> 31:7 for 32:8 with no strike"
@@ -148,6 +157,7 @@
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "H-1: the recorder's reads against a running game"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - ...b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins
     - "- THE CAMP STRIKE'S QUEUE (0x772940's two pushes through the manager's vt +0x60, 0x546f0): the operation is appended at the back of the unit's queue (+0x2040: the list +0xd0, i..."
@@ -163,6 +173,23 @@
     - "...s ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk..."
     - ...5280 its +0x130, the queue run 0x52f50 its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
   review: reviewed
+- addr: 0x55230
+  final: 0x41930
+  kind: function
+  semantics: "the operations manager's vt +0xc8 (manager, unit, count): sets the unit's busy count (the tracked +0xe18, value +0xe70); 0 at the unit's turn start (0x55460) and as its queue empties (0x53480), the run's count after a move that stops (vt +0x148 from 0x52f50)."
+  status: PARTLY
+  cases:
+    - recording: h1_duels1157
+      turn: 122
+      value: "the Line Infantry 1900550's run ends waiting on 3:8 after two steps: its busy count set (vt +0x148)"
+  impl: [cpu/core/tactical.ts:walk, gpu/core/sim_tactics.py:_tac_move_to]
+  readings:
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...a, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins
+    - ...ent) on a plot 0x50b0b0 answers for sets the unit's busy count (vt +0x148 -> vt +0xc8 = 0x55230 on the tracked +0xe18, value +0xe70; 0x531b1..0x53289); the queue's turn 0x523e0 runs...
+  review: imported
 - addr: 0x55460
   final: 0x41a90
   kind: function

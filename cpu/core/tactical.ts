@@ -1345,7 +1345,7 @@ function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boole
 /** a move order carried out (the unit's mission 0x962030): the unit walks
  *  its path as far as its Movement carries it this turn (a zone of control
  *  ends it), the engine's step paying each; it walks through its own units
- *  but stops short of a plot of its own unit that stacks with it, and short
+ *  and stands where its path's turn or its Movement ends (`walk`), short
  *  of a unit at war with it its path passed out of its sight. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
  *  the unit strikes it there. A destination its own stacking unit or
@@ -1469,13 +1469,45 @@ function withShortOrders(fn: () => void): void {
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
   let goal = dest;
+  const rest: RestPlot = { tile: unit.tileIndex };
   for (;;) {
-    const r = orderRun(state, unit, goal, strike, laterTurns, explore, danger, mates, scout);
+    const r = orderRun(state, unit, goal, strike, laterTurns, explore, danger, mates, scout, rest);
     if (typeof r === 'boolean') return r;
     if (r === 'none' || r === 'there') {
-      if (goal === dest) return false;
+      if (goal === dest) {
+        putBack(state, unit, mates, rest);
+        return false;
+      }
       goal = dest;
     } else goal = r.search;
+  }
+}
+
+/** the plot a queue run's unit may rest on (the run's result +8): the plot it
+ *  set out from (the formation's, 0x52f50 at 0x52fa3), then each plot a step
+ *  left it on where no unit keeps it out (0x962380 at 0x962880..0x9628c9: the
+ *  stacking count 0x585d90 within the limit +0x58c and the location test
+ *  0x586360) */
+interface RestPlot { tile: number }
+
+/** a unit kept out of the plot it stands on (`crowded`), any member of its
+ *  formation there */
+function restless(state: GameState, unit: Unit, mates: readonly Unit[]): boolean {
+  return [unit, ...mates].some((m) => m.tileIndex === unit.tileIndex && crowded(state, m));
+}
+
+/** an order that ends (done: no path, a step refused, its plot reached) with
+ *  its unit on a plot it may not rest on puts the unit back on the run's
+ *  resting plot (0x962380 at 0x9628cd..0x9628fa: the placement 0x586d40 on
+ *  the result's +8); an order that waits leaves it where it stands, the
+ *  turn's stacking check moving one off (`unstackUnits`) */
+function putBack(state: GameState, unit: Unit, mates: readonly Unit[], rest: RestPlot): void {
+  if (!state.units.includes(unit) || rest.tile === unit.tileIndex || !restless(state, unit, mates)) return;
+  const from = unit.tileIndex;
+  for (const m of [unit, ...mates]) {
+    if (m.tileIndex !== from) continue;
+    m.tileIndex = rest.tile;
+    arrive(state, m);
   }
 }
 
@@ -1484,7 +1516,8 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
  *  `search` the plot the kept path's rule searches next (`walk`'s
  *  `kept.again`) */
 function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
-  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean | 'none' | 'there' | { search: number } {
+  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean,
+  rest: RestPlot): boolean | 'none' | 'there' | { search: number } {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || movesEnded?.has(unit.id)) return false;
   // the move order's start (0x55280) with Movement left: OPERATION, AWAKE
   // once its queue empties (0x52f50)
@@ -1503,11 +1536,7 @@ function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
   if (into) path = path.slice(0, -1);
   if (zocMoved?.has(unit) && path.length) return false;
   const from = unit.tileIndex;
-  // a plot of civilians alone the order's strike takes this turn: the walk
-  // passes the plot beside it (`walk`'s `onto`)
-  const capture = into && strike && nodes[nodes.length - 1].turns === 1 && attacksLeftOf(unit) > 0 && !unit.embarked
-    && (UNITS[unit.type]?.combat ?? 0) > 0 && civiliansAlone(state, unit, last);
-  const refused = walk(state, unit, path, dest, mates, capture ? last : -1, kept);
+  const refused = walk(state, unit, into ? nodes.slice(0, -1) : nodes, dest, mates, kept, rest);
   if (zocMoved && unit.tileIndex !== from) {
     // the zone test on the plot it stands on, no destination (0x270800:
     // 0x26f980's fourth argument null), so no exerter's plot is waived
@@ -1517,6 +1546,7 @@ function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
       else zocMoved.delete(m);
     }
   }
+  if (refused) putBack(state, unit, mates, rest);
   if (refused || !state.units.includes(unit)) return false;
   if (kept.again >= 0) {
     // the goal seen now: searched afresh; else the kept path's last node of
@@ -1566,31 +1596,25 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   return encampmentBlocks(state, t, unit);
 }
 
-/** an attack plot (`attackPlot`) no fighter of a player at war holds and no
- *  district at war guards: the order's step onto it is a move that takes
- *  its civilians */
-function civiliansAlone(state: GameState, unit: Unit, p: number): boolean {
-  const t = state.map.tiles[p];
-  const owner = tileSeat(t);
-  if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return false;
-  if (encampmentBlocks(state, t, unit)) return false;
-  return !state.units.some((u) => u.tileIndex === p && onMap(u) && unitDomain(u.type) === 'military' && unitsHostile(state, unit, u));
-}
-
-/** the walk of a path as far as the unit's Movement carries it this turn,
- *  short of a plot it may not end on (but, with `onto`, the plot beside a
- *  plot of civilians its next step takes, and the plot a shore crossing's
- *  carry stops it on), a zone of control ending it
- *  (`inEnemyZoc` on the order's destination `dest`, a plot its own stacking
- *  unit or another player's holds at the limit: the count 0x585eb0, another
- *  player's Trader or unit of another map layer none — runs/h1_duely1128
- *  t104: city-state 2's Man-At-Arms 1638405 wanders onto 6:9 under
- *  city-state 3's Trader, t109 its Crossbowman 1769474 onto 9:8 under
- *  player 1's Missionary); true where a step was
- *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
- *  0x270933). Before a step after its first the kept path's rule (`kept`,
- *  0x272aa0) may ask a search: the walk ends there, `kept.again` set. */
-function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[], onto: number, kept: KeptPath): boolean {
+/** the walk of a path (the formation's step 0x26fe20, one node a call), node
+ *  by node: a node of a later turn than the path's first waits (0x26ff81:
+ *  the turn the search gave it, a turn-end node's wait and the +1e6 of a
+ *  turn's end at the stacking limit in it); a step dearer than the Movement
+ *  left waits where the formation has moved (0x270309 on +0x4b8); a zone of
+ *  control ends it (`inEnemyZoc` on the order's destination `dest`). The
+ *  step itself asks no room of the plot it enters: the walk passes and stands
+ *  on a plot its own stacking unit or another player's holds (runs/h1_duels1157
+ *  t122: city-state 2's Line Infantry 1900550 for 2:9, its path 3:7 / 3:8 /
+ *  2:9 one turn's on the Movement it embarked with, lands on 3:7 at the
+ *  land's 2 and stands on 3:8 under its Field Cannon 1835015 with 0.25, one
+ *  search in AStar_GC.log; h1_duels1180 t189: its Field Cannon 1638405 ends on
+ *  29:9 under the Infantry 1769473, which the turn's check moves to 29:10).
+ *  Each plot a step leaves it on that it may rest on is the run's `rest`.
+ *  True where a step was refused (the placement 0x587ca0 refusing: the order
+ *  done, 0x26fe20 at 0x270933). Before a step after its first the kept path's
+ *  rule (`kept`, 0x272aa0) may ask a search: the walk ends there,
+ *  `kept.again` set. */
+function walk(state: GameState, unit: Unit, path: readonly PNode[], dest: number, mates: readonly Unit[], kept: KeptPath, rest: RestPlot): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn: a formation's,
   // the least its members hold (0x262cd0)
@@ -1612,24 +1636,17 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // the step that spends the rest so, and the Movement it takes past its cost
   let spendAt = -1;
   let spent = 0;
-  let landed = false;
-  for (const p of path) {
+  for (const n of path) {
+    const p = n.tile;
     // a plot a unit at war with it holds, passed out of its sight, or a
     // district of hit points at war its path took out of its sight, ends the
     // walk short of it: the order moves one node at a time on a path found
     // afresh (0x962380 -> 0x26fe20 to the node after its start), its first
     // step ending the order unmoved on a defender at war it sees (0x209e30)
     if (attackPlot(state, unit, p)) break;
+    if (n.turns > 1) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
-    if (mp < cost && mp < full) {
-      // a stop the shore's carry alone makes: the path priced the step as no
-      // crossing, so the walk ends where it landed, a plot its own unit holds
-      // or not, the turn's stacking check moving one off (runs/h1_duels1157
-      // t151: city-state 3's Field Cannon 1835016 lands on 43:23 under its
-      // Line Infantry 1900549, which the check teleports to 42:23)
-      landed = carry > 0 && mp >= cost - carry;
-      break;
-    }
+    if (mp < cost && mp < full) break;
     // a land unit's step across the shore carries, a step off an owned water
     // plot too: the pathfinder prices that step as no crossing, the walk caps
     // the Movement it lands with (`stepUnit`)
@@ -1647,12 +1664,6 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     }
     if (mp <= 0 || zoned) break;
   }
-  // a walk whose next step takes a plot of civilians (`onto`) ends on none of
-  // its own: the capture is that step's (0x26fe20 -> 0x212500), so it passes
-  // the plot beside it whatever stands there
-  const through = onto >= 0 && stop === path.length && mp > 0
-    && !(mp < stepCost(state, unit, tiles[from], tiles[onto], embarks) + carry && mp < full);
-  while (!through && !landed && stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
   // the formation the walk sets out with (unit +0x1fb8): the riders on a
   // plot it passes are another formation's (runs/h1_duely1128 t56: the Scout
   // 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays there
@@ -1676,9 +1687,10 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
       }
     }
     const mover = lead && state.units.includes(lead) && lead.tileIndex === unit.tileIndex ? lead : unit;
-    const r = stepUnit(state, mover, tiles[path[i]], formed);
+    const r = stepUnit(state, mover, tiles[path[i].tile], formed);
     if (r === 'halted') return false;
     if (r !== 'moved') return true;
+    if (state.units.includes(unit) && !restless(state, unit, mates)) rest.tile = unit.tileIndex;
   }
   if (stop === spendAt) {
     for (const m of [unit, ...formed]) if (m.tileIndex === unit.tileIndex) m.movesLeft = Math.max(0, m.movesLeft - spent);

@@ -237,6 +237,18 @@ def what_units(g: Game, a) -> None:
     for r in g.log("AI_Tactical", player=a.player):
         if f"({a.unit})" in str(r.get("unit_info")):
             print("  AI_Tactical: " + cells(r))
+    # the unit's path searches for a plot, in the log's order (AStar_GC.log:
+    # a reach search names no plot), and its own events in the record's order
+    for r in g.log("AStar_GC", "turn = ? AND unit LIKE ? AND to_x >= 0", (g.turn, f"%({a.unit})")):
+        print(f"  search #{r['line']}: {r['from_x']}:{r['from_y']} for {r['to_x']}:{r['to_y']} flags {int(r['info']):#x} checksum {r['checksum']}")
+    lane = []
+    for rec in (g.rec, g.next):
+        for key in ("actions", "extra"):
+            for e in (rec or {}).get(key) or []:
+                if isinstance(e, list) and len(e) > 5 and e[1] == g.turn and e[3] == a.player and e[4] == a.unit and e not in lane:
+                    lane.append(e)
+    for e in sorted(lane, key=lambda e: e[0]):
+        print(f"  event #{e[0]}: {e[2]} {' '.join(str(x) for x in e[5:])}")
 
 
 def entry(g: Game, kind: int, x: int, y: int, word: int, ident: int, types: dict) -> str:

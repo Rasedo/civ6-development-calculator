@@ -9283,6 +9283,22 @@
     - "...ion (0x1fbae0 → 0x5707b0, after 0x205da0); it grows only in the Fortify tick (0x95ebb0, 0x960800, 0x959830) (`spendAttack` / `_spend_one_attack`)."
     - ...starts and once more as its player's turn ends while it runs. The HEAL operation's tick 0x960800 adds +1 the same way (0x56ef30, below the max); its update 0x9606f0 ends it at no damag...
   review: reviewed
+- addr: 0x961ed0
+  final: 0x66cc30
+  kind: function
+  semantics: "MOVE_TO's vt +0x28, asked by the run 0x52f50 after an execution neither done nor waiting: done (the result's +0x10) where the unit stands on the operation's plot."
+  status: READ
+  cases:
+    - recording: h1_duels1143
+      turn: 59
+      value: "city-state 4's Warrior 458757 reaches its Wander's 8:21 with 1 Movement left: no UnitOperationSegmentComplete, the operation off its queue"
+  impl: [cpu/core/tactical.ts:orderRun, gpu/core/sim_tactics.py:_tac_move_to]
+  readings:
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+  context:
+    - ...0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins
+    - "...on neither done nor waiting it asks the handler's vt +0x28 (0x53165..0x531a1; MOVE_TO's 0x961ed0: done where the unit stands on the order's plot), so an arrival is done in the run that..."
+  review: reviewed
 - addr: 0x965fd0
   final: 0x670aa0
   kind: function

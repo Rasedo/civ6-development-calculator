@@ -105,6 +105,9 @@
   semantics: "a request of this turn (+0x20) cancels the formation's other members' operations; the path 0x2726b0 none: done unmoved; the first step (0x266690: the kept path's next node, its turn at +4) of turn 1 (0x96268f: a later turn's skips both tests): under the attack flag 0x10 and CanAttack (0x211f80) the battle (0x1fbae0), done; else a visible defender at war or a defended district there (0x209e30) ends it unmoved; then an aircraft steps; a unit whose formation's last step this turn ended in a zone of control (+0x518, m_bHasMovedIntoZOC) waits (+0x11) unmoved; else the step 0x26fe20: 0 done (+0x10), -1 waits (+0x11: the node after the start a later turn's), above 0 moved (+0x12). The node's turn is the kept path's, as the queue run's first search priced it (0x272aa0): an attack node that search put in a later turn is not struck in the run, though the unit comes to stand beside it with Movement. The queue 0x52f50 keeps an operation not done and runs it again later in the turn."
   status: READ
   cases:
+    - recording: h1_duels1180
+      turn: 189
+      value: "city-state 2's Field Cannon 1638405 for 31:9 waits on 29:9 under its Infantry 1769473 (the order kept, UnitOperationSegmentComplete), no put-back: the turn's check moves the Infantry to 29:10"
     - recording: h1_duelz1117
       turn: 10
       value: "the rampaging Warrior 589832 steps 13:12 -> 13:11 (the destination's exerter waives the zone, 1 Movement left) and holds for city-state 2's Warrior in the Woods of 14:10: the order's run from 13:11 finds the attack node a turn on (2 above 1, the unit moved: no 0x100) and waits"
@@ -142,7 +145,9 @@
     - cpu/core/tactical.ts:spent
     - cpu/core/tactical.ts:orderOnce
     - gpu/core/sim_tactics.py:_tac_move_to
-    - cpu/core/tactical.ts:landed
+    - cpu/core/tactical.ts:RestPlot
+    - cpu/core/tactical.ts:putBack
+    - gpu/core/sim_tactics.py:_tac_put_back
   readings:
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
@@ -152,4 +157,5 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   review: reviewed

@@ -2142,14 +2142,21 @@ class SimTactics:
                      seat: int = BARB_SEAT, strike: bool = True,
                      later_turns: bool = False, explore: bool = True, danger: tuple | None = None,
                      mate: torch.Tensor | None = None, scout: bool = False,
-                     order: torch.Tensor | None = None, under0: tuple | None = None) -> None:
+                     order: torch.Tensor | None = None, under0: tuple | None = None,
+                     rest0: torch.Tensor | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
-        with zones of control, walked as far as its Movement carries it this
-        turn (a zone of control ends it); it walks through its own units and
-        other players' but never ends on another player's unit or its own
-        that stacks with it, and stops short of a unit at war with it its
-        path passed out of its sight. A path ending on a plot it attacks into
+        with zones of control, walked node by node (`walk`, the step
+        0x26fe20): a node of a later turn than the path's first waits, a step
+        dearer than the Movement left waits where the unit has moved, a zone
+        of control ends it; the step asks no room of the plot it enters, so
+        the walk passes and stands on a plot its own stacking unit or another
+        player's holds, and stops short of a unit at war with it its path
+        passed out of its sight. An order that ends (no path, a step refused,
+        its plot reached) with its unit on a plot it may not rest on puts it
+        back on the run's resting plot (`putBack`: `rest0` [B] the plot a
+        run already under way holds, the plot it set out from or the last a
+        step left it on with room). A path ending on a plot it attacks into
         stops at its side, and with `strike` it strikes there
         (`meleeAttack`: `_melee_at`). A destination its own stacking unit or another player's unit
         at peace in its sight holds is no path (within the first turn under
@@ -2204,15 +2211,16 @@ class SimTactics:
         if strike:
             barred = barred & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
 
-        def on_order(m: torch.Tensor, und: tuple | None = under0) -> None:
+        def on_order(m: torch.Tensor, und: tuple | None = under0, rst: torch.Tensor | None = rest0) -> None:
             # a run for a kept path's node that finds no path or stands on
-            # it: the order's plot searched
-            if order is None:
-                return
-            m = m & (dest != order)
-            if bool(m.count_nonzero()):
-                self._tac_move_to(m, us, order, pre, seat, strike, later_turns, explore, danger, mate, scout,
-                                  under0=und)
+            # it: the order's plot searched; the order's own run so ended is
+            # done, its unit put back where it may not rest (`putBack`)
+            om = m & (dest != order) if order is not None else torch.zeros_like(m)
+            if rst is not None:
+                self._tac_put_back(m & ~om, us, pre, seat, rst, mate)
+            if bool(om.count_nonzero()):
+                self._tac_move_to(om, us, order, pre, seat, strike, later_turns, explore, danger, mate, scout,
+                                  under0=und, rest0=rst)
 
         on_order(mask & barred)
         mask = mask & ~barred
@@ -2220,6 +2228,8 @@ class SimTactics:
             return
         dev = self.device
         B = self.B
+        # the run's resting plot (`RestPlot`): where it set out
+        rest_b = at_u.clone() if rest0 is None else rest0.clone()
         rows = mask.nonzero(as_tuple=True)[0]
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
@@ -2314,7 +2324,7 @@ class SimTactics:
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
 
-        # where it may not end: its own unit of its formation's stacking
+        # where it may not rest: its own unit of its formation's stacking
         # classes (`stackedWith`)...
         own_same = self._tac_stacks(rows, seat, (sr + self.POOL_LO[pre],
                                                  torch.where(mr >= 0, mr + self.POOL_LO[pre], torch.full_like(mr, -1))))
@@ -2361,7 +2371,6 @@ class SimTactics:
             fighter = fighter | (m_on & fights_t(ut_pool[rows, mr.clamp(min=0)].clamp(min=0, max=self.NU - 1)))
         spend_at = torch.full((R,), -1, dtype=torch.long, device=dev)
         spent = torch.zeros_like(spend_at)
-        landed = torch.zeros(R, dtype=torch.bool, device=dev)
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
@@ -2372,12 +2381,12 @@ class SimTactics:
             # a district of hit points at war its path took out of its sight,
             # ends the walk short of it (`walk`)
             on = on & ~foe_n[ar, pc] & ~city_in[rows, pc]
+            # a node of a later turn than the path's first waits (0x26ff81)
+            on = on & ~(res["closed"][ar, pc] > 1)
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
-            # a stop the shore's carry alone makes: the path priced the step
-            # as no crossing, so the walk ends where it landed (`walk`'s
-            # landed)
-            landed = landed | (on & (mp < c) & (mp < full) & (carry > 0) & (mp >= c - carry))
+            # a step dearer than the Movement left, the unit moved, waits
+            # (0x270309)
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
             # a land unit's step across the shore carries, a step off an owned
@@ -2394,10 +2403,6 @@ class SimTactics:
             spent = torch.where(zs, mp, spent)
             mp = torch.where(zs, torch.zeros_like(mp), mp)
             on = on & (mp > 0) & ~halts[ar, pc]
-        # a walk whose next step takes a plot of civilians ends on none of its
-        # own (`walk`'s through, `civiliansAlone`): the capture is that
-        # step's, so it passes the plot beside it whatever stands there
-        through = torch.zeros(R, dtype=torch.bool, device=dev)
         # the order's plot holds no fighter at war and no district of hit
         # points at war: a siege unit moves onto it too (`meleeAttackInner`)
         civ_only = torch.zeros(R, dtype=torch.bool, device=dev)
@@ -2409,19 +2414,6 @@ class SimTactics:
                 os_ = torch.where(pl >= 0, self.unit_seat.gather(1, plc), torch.full_like(pl, -1))
                 milh |= (pl >= 0) & self._type_dom_mil.take(ot_) & self._seats_hostile(seat, os_)
             civ_only = ~milh[rows, dr] & ~city_in[rows, dr]
-            cap = (into & ~late & civ_only
-                   & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0)
-                   & (self._type_combat.take(ut) > 0)
-                   & ~getattr(self, f"{pre}_unit_emb")[rows, sr])
-            dcl = (self.neigh[frm] == dr.unsqueeze(1)).long().argmax(dim=1)
-            c_on = self._tac_step(rows, frm, dr, dcl, ut, ign_shore, waive) + carry
-            through = cap & (stop == plen) & (mp > 0) & ~((mp < c_on) & (mp < full))
-        for _ in range(L):
-            back_off = (~through & ~landed & (stop > 0)
-                        & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)])
-            if not bool(back_off.count_nonzero()):
-                break
-            stop = stop - back_off.long()
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
@@ -2497,7 +2489,15 @@ class SimTactics:
                     self.embarked_at[rows[be], here[be]] = under[be]
             under = torch.where(moved, torch.where(occ >= 0, occ, torch.full_like(occ, -1)), under)
             under_emb = torch.where(moved, emb_to, under_emb)
+            # a plot the step left it on with room: the run's resting plot
+            rest_b[rows] = torch.where(moved & ~no_end[ar, nxc], nxc, rest_b[rows])
             going = moved & (mp_p[rows, sr] > 0)
+        # a step refused: the order done, its unit put back where it may not
+        # rest (`putBack`)
+        if bool(refused.count_nonzero()):
+            rf = torch.zeros(B, dtype=torch.bool, device=dev)
+            rf[rows[refused]] = True
+            self._tac_put_back(rf, us, pre, seat, rest_b, mate)
         # the zone's spend, where the walk took its step
         zhit = (spend_at > 0) & (stop == spend_at) & ~refused
         if bool(zhit.count_nonzero()):
@@ -2594,7 +2594,7 @@ class SimTactics:
         there = torch.zeros(B, dtype=torch.bool, device=dev)
         there[rows] = (has_path & ~refused & ~into & ~again & getattr(self, f"{pre}_unit_alive")[rows, sr]
                        & (tile_p[rows, sr] == dr))
-        on_order(there, (ub, ue))
+        on_order(there, (ub, ue), rest_b)
         # the kept path's searches: the goal's own afresh, or its first
         # turn's last node (`orderRun`'s search)
         if bool(again.count_nonzero()):
@@ -2604,7 +2604,47 @@ class SimTactics:
             nx = again & again_next
             goal2[rows[nx]] = turn_end_plot[nx]
             self._tac_move_to(am, us, goal2, pre, seat, strike, later_turns, explore, danger, mate, scout,
-                              order=dest if order is None else order, under0=(ub, ue))
+                              order=dest if order is None else order, under0=(ub, ue), rest0=rest_b)
+
+    def _tac_put_back(self, mask: torch.Tensor, us: torch.Tensor, pre: str, seat: int, rest: torch.Tensor,
+                      mate: torch.Tensor | None) -> None:
+        """`putBack` (0x962380 at 0x9628cd..0x9628fa, the placement 0x586d40
+        on the run's result +8): in the games of `mask` the unit at local slot
+        `us` [B] of pool `pre`, on a plot where another unit keeps it or its
+        formation's other member out — one of its own of its stacking class
+        (`_tac_stacks`), another player's not at war with it on its map layer
+        (`_tac_peaceful`) — goes back, with that member where it stands
+        there, to the run's resting plot `rest` [B]."""
+        if not bool(mask.count_nonzero()):
+            return
+        dev = self.device
+        lo = self.POOL_LO[pre]
+        alive = getattr(self, f"{pre}_unit_alive")
+        tile_p = getattr(self, f"{pre}_unit_tile")
+        rows = mask.nonzero(as_tuple=True)[0]
+        sr = us[rows].clamp(min=0)
+        ar = torch.arange(rows.shape[0], device=dev)
+        here = tile_p[rows, sr]
+        hc = here.clamp(min=0)
+        mr = self._tac_mate(rows, sr, pre) if mate is None else mate[rows]
+        with_m = (mr >= 0) & (tile_p[rows, mr.clamp(min=0)] == here)
+        own = self._tac_stacks(rows, seat, (sr + lo, torch.where(with_m, mr + lo, torch.full_like(mr, -1))))[ar, hc]
+        ut = getattr(self, f"{pre}_unit_type")[rows, sr].clamp(min=0, max=self.NU - 1)
+        rel = self._rel_strength.take(ut) > 0
+        peace = torch.where(rel, self._tac_peaceful(seat, True)[rows, hc], self._tac_peaceful(seat, False)[rows, hc])
+        to = rest[rows]
+        go = alive[rows, sr] & (here >= 0) & (to >= 0) & (to != here) & (own | peace)
+        if not bool(go.count_nonzero()):
+            return
+        for ls, m in ((sr, go), (mr.clamp(min=0), go & with_m)):
+            r, sl, t = rows[m], ls[m], to[m]
+            if not r.numel():
+                continue
+            gs = sl + lo
+            self._occ_clear(r, tile_p[r, sl], gs)
+            tile_p[r, sl] = t
+            self._occ_set(r, t, gs)
+        self._gen_ver += 1
 
     def _tac_zoc_moved_of(self, pre: str) -> torch.Tensor | None:
         """[B, U] bool of pool `pre` — `zocMoved`: the units whose last step

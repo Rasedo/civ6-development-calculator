@@ -20029,3 +20029,71 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
 - Open: what tells the four from the sixteen — the writer that clears the
   old unit's controller or the tree's destroy flag (+0x368) on its death
   signal (game signals +0x1470) — is unread.
+
+## C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins
+
+`walk`, `orderOnce`'s `RestPlot`, `putBack`, `restless` (cpu/core/tactical.ts);
+GPU `_tac_move_to`'s walk loop and `rest0`, `_tac_put_back`
+(gpu/core/sim_tactics.py). `show.py --unit` prints a unit's AStar_GC.log
+searches and its own events (tools/aiport/show.py).
+
+- THE STEP 0x26fe20 reads the formation's kept path (+0x5e0, the goal
+  first). With more than one node, the next node (count - 2) of a turn above
+  1 answers -1, the wait (0x26ff6a..0x26ff89): the turn is the one the
+  search gave the node, so a turn-end node's wait and the +1e6 of a turn's
+  end at the stacking limit are in it. Then the step's cost (0x270be0 for a
+  formation with a fighter, else 0x270980): with the formation's moved flag
+  (+0x4b8, the value of the tracked +0x460 that 0x2660c0 sets) and a cost
+  above the formation's Movement +0x218 it answers -1 after 0x5854c0
+  (0x270309..0x2703d7). Else the placement 0x587ca0: refused, the kept path
+  is cleared and it answers 0 (0x2708fa..0x270945). Neither wait asks
+  anything of the plot the formation stands on: a walk whose real Movement
+  ends short of the path's own turn end stands where it stopped, under a
+  unit of its own or not.
+- THE EXECUTION'S TAIL (0x962380 at 0x9627fc..0x9628fa), after the step: the
+  unit's plot within the stacking limit (0x585d90 against +0x58c) and passed
+  by the location test 0x586360, or the result's +0x13 set, writes the
+  unit's plot to the result's +8. An execution that is done (+0x10) on a
+  plot that failed both, the +8 valid, places the unit on the +8 (0x586d40
+  with 1): an order that ends puts its unit back on the last plot of the run
+  it could rest on; one that waits leaves it, and the turn's stacking check
+  (0x775e50) moves a unit off.
+- THE RUN 0x52f50 sets the result's +8 to the formation's +0x158 as it opens
+  (0x52fa3). After an execution neither done nor waiting it asks the
+  handler's vt +0x28 (0x53165..0x531a1; MOVE_TO's 0x961ed0: done where the
+  unit stands on the order's plot), so an arrival is done in the run that
+  made it and raises no UnitOperationSegmentComplete. A run that moved and
+  stops (done, waiting or out of Movement) on a plot 0x50b0b0 answers for
+  sets the unit's busy count (vt +0x148 -> vt +0xc8 = 0x55230 on the tracked
+  +0xe18, value +0xe70; 0x531b1..0x53289); the queue's turn 0x523e0 runs
+  nothing for a busy unit (0x56eea0).
+- THE PUSH 0x546f0 appends the operation and, the queue holding that one and
+  the start flag set, runs the queue's turn 0x523e0 inline: a tactical
+  order's first run is the push's own.
+- THE RECORD'S ORDER: a unit's events stand in the order the game raised
+  them; two units' events do not. A walk's second step is recorded after
+  other units' first steps while AStar_GC.log holds one search of the order
+  for the turn and the unit's own row runs step, step,
+  UnitOperationSegmentComplete, UnitMovementPointsCleared — one run, then the
+  Wander's 0x56d6f0. A step is recorded as UnitMoved then its cost's
+  UnitMovementPointsChanged; a landing first sets the Movement to the new
+  domain's (UnitEmbarkedStateChanged, UnitMovementPointsChanged), then the
+  step's cost comes off it.
+- Confirmed (windows on the game's memory, each unit one search for the turn
+  in AStar_GC.log): runs/h1_duels1157 t122 city-state 2's Line Infantry
+  1900550 (Wander for 2:9, embarked on its water 4:6 with 3) lands on 3:7 at
+  2, pays 1 and 0.75 and stands on 3:8 under its Field Cannon 1835015 with
+  0.25, 2:9 dearer; t152 city-state 4's Pike and Shot 1114114 for 39:10 ends
+  on 38:9 under its own unit and the turn's check moves it to 38:10
+  (UnitTeleported); runs/h1_duels1180 t189 city-state 2's Field Cannon
+  1638405 for 31:9 ends on 29:9 under its Infantry 1769473, which the check
+  moves to 29:10, t208 the same pair; runs/h1_duels1150 t177 city-state 4's
+  Line Infantry 1572866 ends on 38:16. The barbarians' rows of
+  runs/h1_duels1180 t207-213, 1157 t205-215 and 1150 t161-178 stand as they
+  were.
+- Open (C-133): what lowers the busy count +0xe70 and what runs a unit's
+  queue once it ends is unread; the landing's Movement (the AT Crew 2883591
+  of runs/h1_duels1162 t225 lands with 3 of its 7, the others with 2) is
+  unread beside the engines' cap at the domain's pool; 0x26fe20's branch at
+  0x27009a..0x270212 (the location test 0x586900 of the next plot refusing,
+  the members' 0x586d40) is unread.

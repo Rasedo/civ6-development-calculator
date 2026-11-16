@@ -235,6 +235,16 @@
     - ...y fewer air units (0x929790, none in these engines) or holds strictly fewer promotions (0x55e710 on its experience record +0x1bc0). So the victim is the first candidate, in pool orde...
     - "...bove the per-unit discount (+0x338, 0 for a minor): the first of the fewest promotions (0x55e710), then one on its own ground, then the least Combat (0x56dc90 with 0, `aiStrengths` /..."
   review: reviewed
+- addr: 0x5854c0
+  final: 0x3afd30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...hat 0x2660c0 sets) and a cost above the formation's Movement +0x218 it answers -1 after 0x5854c0 (0x270309..0x2703d7). Else the placement 0x587ca0: refused, the kept path is cleared..."
+  review: imported
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function

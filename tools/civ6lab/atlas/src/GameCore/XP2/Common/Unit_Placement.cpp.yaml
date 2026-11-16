@@ -86,6 +86,7 @@
     - cpu/core/tactical.ts:planningAt
     - cpu/core/tactical.ts:keeps
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:RestPlot
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -106,6 +107,7 @@
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -387,6 +389,7 @@
     - gpu/core/sim_tactics.py:update_parents
     - cpu/core/tactical.ts:foreignOnLayer
     - cpu/core/barbarians.ts:raise
+    - cpu/core/tactical.ts:RestPlot
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -428,6 +431,7 @@
     - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
     - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
     - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -505,6 +509,7 @@
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
     - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
     - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:
@@ -557,6 +562,8 @@
     - cpu/core/units.ts:embarksOn
     - cpu/core/tactical.ts:unitsLayerAt
     - gpu/core/sim_tactics.py:_tac_units_layer
+    - cpu/core/tactical.ts:putBack
+    - gpu/core/sim_tactics.py:_tac_put_back
   readings:
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "H-1: the raids — READ"
@@ -582,6 +589,7 @@
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
     - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
     - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."
@@ -603,4 +611,5 @@
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   review: reviewed

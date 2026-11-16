@@ -105,6 +105,16 @@
   context:
     - "...er clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts excluded) for AdjacentResource, on water for Adjacent..."
   review: reviewed
+- addr: 0x50b0b0
+  final: 0x35bcf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...egmentComplete. A run that moved and stops (done, waiting or out of Movement) on a plot 0x50b0b0 answers for sets the unit's busy count (vt +0x148 -> vt +0xc8 = 0x55230 on the tracked...
+  review: imported
 - addr: 0x50b180
   final: 0x35bdc0
   kind: function

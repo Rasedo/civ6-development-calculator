@@ -500,6 +500,9 @@
   semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. One step a call, its answer: no path (0x2726b0) 0; the node after the start of a later turn than the first (+4 above 1, 0x26ff81) -1; the placement 0x587ca0 refused 0 (0x270933); stepped, the path's turns; after each step the formation's +0x518 takes the zone test 0x26f980 of its plot (0x270800, 0x2675e0). A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds. The engines' melee order onto a religious unit only shares its plot, and their seizure takes no plot the mover cannot stand on without embarking (AUDIT C-94)."
   status: READ
   cases:
+    - recording: h1_duels1157
+      turn: 122
+      value: "city-state 2's Line Infantry 1900550 for 2:9 stands on 3:8 under its Field Cannon 1835015 with 0.25 Movement, the step to 2:9 dearer than that (0x270309): the wait asks no room of the plot it stands on"
     - recording: h1_duelr1121
       turn: 109
       value: "the step's cost by the formation's +0x398 (0x27021b): the Man-At-Arms 3080206 steps 16:14 -> 15:13 beside the Courser 1835015 on 14:13 and strikes it"
@@ -534,7 +537,8 @@
     - cpu/core/tactical.ts:orderRun
     - cpu/core/combat.ts:meleeAttackInner
     - cpu/core/units.ts:stepUnit
-    - cpu/core/tactical.ts:landed
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - gpu/core/sim_tactics.py:fights_t
   readings:
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
@@ -561,6 +565,7 @@
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -592,6 +597,7 @@
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "...nt cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the uni..."
     - "...er, from, to, the path's destination) from the path cost 0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at 0x270800, which stores the answer on the formation +0x518): th..."
@@ -621,6 +627,7 @@
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+    - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
   context:
     - "...river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not..."
   review: reviewed
