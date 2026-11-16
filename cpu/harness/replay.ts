@@ -2300,6 +2300,19 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     const there = copy.units.find((x) => x.seat === s.seat && x.id === s.id);
     if (there) {
       if (s.type !== 'TRADER') there.tileIndex = s.tileIndex;
+      else if (made.has(twin.get(there)!) && !bought.has(twin.get(there)!)) {
+        // a Trader its city made in the turn stands on the centre it was
+        // made on, whole: the planning job acts before its route's dispatch
+        // (runs/h1_duels1117 t44: city-state 4's Trader 393218 plans from its
+        // centre 32:5 on 2 Movement, on 32:6 with none by its pass)
+        const centre = copy.cityStates.find((cs) => cs.seat === s.seat)?.centerIndex ?? -1;
+        if (centre >= 0) {
+          there.tileIndex = centre;
+          there.embarked = undefined;
+          there.movesFull = unitFullMoves(copy, there);
+          there.movesLeft = there.movesFull;
+        }
+      }
       there.charges = s.charges;
       continue;
     }

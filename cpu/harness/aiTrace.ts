@@ -30,6 +30,9 @@
  *     General's aura, the barbarian terms) and the rest in one number, the
  *     damage each way; the same of the blow back from the row's spot; a
  *     district's exchange whole (`predictDistrictExchange`).
+ *   plan.reach, plan.input  our whole reach of the row's unit in the list's
+ *     order (plot / turn / Movement left, `!` an attack's plot) and the
+ *     units of its formation.
  *   contracts*, cityState.build  the city AI's own trace lines of the turn
  *     for the player (`traceMinorAi`: each tree's tick, a cancelled build).
  *
@@ -39,7 +42,7 @@ import { setAiTrace, type AiTraceTerms } from '../core/aiTrace';
 import { aiStrengths, featureDanger, type Pass, type PlanEntry } from '../core/tactical';
 import { barbarianCombatCS, classMatchupCS, damageTakenExpected, defenderBase, generalAuraCS, meleeUnitStrengths, predictDistrictExchange,
   rangedUnitStrengths, terrainDefense, woundPenalty } from '../core/combat';
-import { fortifyBonus, formationCS } from '../core/units';
+import { fortifyBonus, formationCS, formationMates } from '../core/units';
 import { traceMinorAi } from '../core/minorCityAi';
 import type { AiModifier } from '../core/aiModifiers';
 import type { GameState, Unit } from '../core/types';
@@ -215,7 +218,7 @@ function dangerLines(seat: number, turn: number, ours: string): string[] {
 
 /** a scored row, traced where a spec names it (`scoreDecision`) */
 function traceRow(kind: string, turn: number, subject: string, equal: boolean, ours: unknown, game: unknown): void {
-  if (!world || kind === 'plan.blow' || kind === 'plan.kills') return;
+  if (!world || kind === 'plan.blow' || kind === 'plan.kills' || kind === 'plan.reach' || kind === 'plan.input') return;
   if (!specs.some((s) => kindFits(s, kind) && turn >= s.from && turn <= s.to && subject.includes(s.text))) return;
   const text = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v) ?? '');
   say(`${kind} t${turn} ${subject} ${equal ? '=' : 'X'} ${text(ours)} // ${text(game)}`);
@@ -270,9 +273,21 @@ export function tracePassRows(rows: readonly { kind: string; subject: string; eq
   state: GameState, pass: Pass, w: { W: number; keyOf(u: Unit): string | undefined; playerOf(seat: number): number }): void {
   if (!world) return;
   for (const r of rows) {
-    if (r.kind !== 'plan.blow' && r.kind !== 'plan.kills') continue;
+    const reach = r.kind === 'plan.reach' || r.kind === 'plan.input';
+    if (r.kind !== 'plan.blow' && r.kind !== 'plan.kills' && !reach) continue;
     if (!specs.some((s) => kindFits(s, r.kind) && turn >= s.from && turn <= s.to && r.subject.includes(s.text))) continue;
     say(`${r.kind} t${turn} ${r.subject} ${r.equal ? '=' : 'X'} ${r.ours} // ${r.game}`);
+    if (reach) {
+      // our whole reach in the list's order: plot/turn/Movement left, an
+      // attack's plot marked; then the unit's formation
+      const id = /^p(\d+) u(\d+) /.exec(r.subject);
+      const mover = id && state.units.find((u) => u.seat === pass.seat && w.keyOf(u) === `${id[1]}:${id[2]}`);
+      const plan = mover ? pass.plan.get(mover.id) : undefined;
+      say(plan ? `  ours: ${plan.reach.map((x) => `${x.tile % w.W}:${Math.floor(x.tile / w.W)}/${x.turns}/${x.moves}${x.attack ? '!' : ''}`).join(' ')}`
+        : '  the unit holds no planning in the pass');
+      if (mover) say(`  formation: ${formationMates(state, mover).map((m) => `${m.type} ${w.keyOf(m) ?? 'unkeyed'}`).join(', ') || 'none'}`);
+      continue;
+    }
     const m = /^p(\d+) u(\d+) \S+ > ([A-Z_]+)@(\d+):(\d+)\S*(?: from (\d+):(\d+))?/.exec(r.subject);
     const unit = m && state.units.find((u) => u.seat === pass.seat && w.keyOf(u) === `${m[1]}:${m[2]}`);
     const tile = m ? Number(m[4]) + Number(m[5]) * w.W : -1;

@@ -274,6 +274,7 @@
     - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
     - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
     - "C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -424,13 +425,22 @@
   semantics: "the unit's zone of control query from the path cost 0x26e920 (0x26f980 the formation's): none where the finder's +0x1f0 is set, else 0x530f50 on the plot entered (r8 +0x28 / +0x2a, the finder's layer +0x1a4) for the finder's player +0x198, domain +0x1a0 and religion +0x1e8, the path's destination r9 and the plot's stacking count at its limit (0x585eb0 against [0xf28c80]+0x58c, setae at 0x26f907)."
   status: READ
   cases:
+    - recording: h1_duels1167
+      turn: 213
+      value: "city-state 4's Traders 2031617 and 2162688 on 29:13 set out their second turn on the embarked pool beside the zones of units at war (a Trader's layer holds no unit's zone): 34:11, 34:10, 33:9 at (2/256) t213 and (2/512) t214-217, the game's own plannings"
     - recording: h1_duely1124
       turn: 9
       value: "the barbarian Scout 524295 on 30:8, its Explore move to 33:11: 31:8 beside Bologna's centre 32:8 in its zone, the path through 30:9 where it ends as logged"
-  impl: [cpu/core/units.ts:inEnemyZoc, gpu/core/sim_tactics.py:_tac_zoc_path, cpu/core/tactical.ts:sea]
+  impl:
+    - cpu/core/units.ts:inEnemyZoc
+    - gpu/core/sim_tactics.py:_tac_zoc_path
+    - cpu/core/tactical.ts:sea
+    - cpu/core/tactical.ts:v
   readings:
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   review: reviewed
 - addr: 0x26f980
   final: 0x1a7e90
@@ -741,6 +751,9 @@
   semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the least of the formation's units' 0x56d9f0(unit, domain) (0x2717f4..0x27181b: a member's value replaces a pool at or above it), 0 for a domain a member holds no Movement in; +0x194 the least GetMaxMoves. Only the start node reads GetMaxMoves (the planning's 0x26eea0); a later turn starts on the pool of its plot's domain, and the shore crossing's carry reads the same pool. Ported: domainPool (cpu/core/tactical.ts), _tac_pool (gpu/core/sim_tactics.py). +0x1f8 (r14 +0x78, 0x2717cd) the OR over the members of 0x1385c0 (a strength above 0 and unit +0x18ba clear); +0x1a0 (r14 +0x20, 0x271870..0x2718d7) the domain: 0 sea or embarked, 2 land, 1 air, 4 else. GeneratePath's start callback (+0xa0 / +0xa8, 0x77d8b..0x77db0) for every pool search: +0x1bc (r14 +0x3c, 0x271909..0x271910), the Movement the start node takes (0x26e920 at 0x26e98a), set to the formation's Movement +0x218 (the least its members hold, the refresh 0x267650), and the step cost's pair cache +0x1c0 / +0x1c8 (r14 +0x40 / +0x48, 0x2718f1 / 0x2718f5) cleared: a search sets out on its own formation's Movement left; the full-Movement searches' 0x26eea0 calls it, then sets +0x1bc to GetMaxMoves."
   status: READ
   cases:
+    - recording: h1_duels1166
+      turn: 91
+      value: "+0x1f8 clear for the barbarians' Builder 3801100 alone on 10:17 (no member of Combat, Ranged, Bombard or religious strength above 0 with +0x18ba clear): the validity refuses it player 1's Builder's 9:15, its planning nothing past it"
     - recording: h1_duelr1117
       turn: 18
       value: "the barbarian Galley 720906 HL Explore cur area for 27:1: 25:6 -> 25:3 on its own 3 Movement (the move order's start), the last planned barbarian a 2-Movement Warrior"
@@ -758,6 +771,7 @@
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
   impl: [cpu/core/tactical.ts:domainPool, gpu/core/sim_tactics.py:_tac_pool]
   readings:
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -767,6 +781,7 @@
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
     - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   context:
     - ...is of the land domain (finder +0x1f2 = 0x2669d0( formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the plot is water, +1000 (0x3e800) where its player is not human (...
   review: reviewed
@@ -876,6 +891,7 @@
     - "C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
@@ -946,6 +962,12 @@
     - recording: h1_duels1142
       turn: 100
       value: "0x272528..0x272544: a formation with no fighter (+0x1f8 clear) is linked onto no child of +0x51 & 0x34 (a city, district or unit at war seen): the barbarians' Builder 3670047 on 34:8 plans nothing of player 1's centre 32:7 in their sight"
+    - recording: h1_duels1166
+      turn: 91
+      value: "at 0x272528..0x272544 a formation with no fighter (+0x1f8 clear, +0x1a0 not 1) is linked onto no child of +0x51 & 0x34, a seen unit at war that does not fight among them: the barbarians' Builder 3801100 on 10:17 / 8:17 plans nothing past player 1's Builder on 9:15 (t91), 10:16 (t93) and 11:16 (t94), 28 / 18 / 27 plots as the game's own plannings"
+    - recording: h1_duels1124
+      turn: 219
+      value: the barbarians' captive Builder 5111833 on 40:10 lists none of 42:10, 41:11, 42:11, 43:10, 42:9 t219-221, 14 plots as the game's
   impl:
     - cpu/core/tactical.ts:pathTo
     - gpu/core/sim_tactics.py:_tac_move_to
@@ -969,6 +991,8 @@
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:attack
     - cpu/core/tactical.ts:links
+    - cpu/core/tactical.ts:v
+    - gpu/core/sim_tactics.py:borderless
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
@@ -1010,6 +1034,8 @@
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

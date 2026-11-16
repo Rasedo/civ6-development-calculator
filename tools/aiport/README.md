@@ -106,12 +106,13 @@ Always name a subject text for the score kinds: a turn holds hundreds.
 | `danger`, `danger.major` | per differing plot of the row (six at most): each unit laying danger there (type, player, plot, strengths, by reach or range), each district, the player's own districts' cut, the feature; the sum against the row |
 | `plan.blow`, `plan.kills` | the blow's kind; attacker and defender strengths as the composers give them, with base, formation, wound, terrain, fortification, class matchup, general, barbarian terms named and THE REST in one number; damage each way; the same for the blow back from the row's spot; a district's exchange whole |
 | `contracts*`, `cityState.build` | the engine's city AI lines of the turn for that city-state: its item and best values, each tree's tick, a cancelled build |
+| `plan.reach`, `plan.input` | our whole reach of the row's unit in the list's order, `x:y/turn/Movement left` with `!` on an attack's plot, and the units of its formation (the game's list: `show.py --unit`); name the unit, `plan.reach:91:u3801100` |
 
 Not traced (the row prints alone): the unit moves (`*.move.plot`,
 `*.move.family`, `*.fortify`: a move's candidates are scored inside
 tactical.ts's move functions, no list to hand out without rewriting them;
 use `show.py --unit` for the game's planning and AI_Tactical rows);
-`plan.reach*`, `plan.spots`, `targets*`, `kb.*` (the row already holds the
+`plan.reach.moves`, `plan.reach.order`, `plan.spots`, `targets*`, `kb.*` (the row already holds the
 entries one side has); `ops*`, `op.start.*` (REPLAY_TRACE=operations prints
 the engine's operation lines); `unit.table*`; `cityState.build`'s value
 tables (the city AI line holds the best building and unit value alone); a

@@ -205,6 +205,7 @@
       value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   context:
     - "...step leaves a node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin..."
   review: reviewed
@@ -223,6 +224,7 @@
     - cpu/core/tactical.ts:addOpen
     - cpu/core/tactical.ts:fighterOnLayer
     - gpu/core/sim_tactics.py:_tac_safe_plot
+    - cpu/core/tactical.ts:v
   readings:
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -233,6 +235,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eb0) with a unit of its own stacking with it (itself counted), none with a unit at war (0x5861f0); against the best so far, the first taken — of no danger over one of danger; of two..."
@@ -424,6 +427,7 @@
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
     - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
     - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
+    - "C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."

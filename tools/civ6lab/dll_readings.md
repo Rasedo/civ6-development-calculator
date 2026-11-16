@@ -19980,3 +19980,57 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   weight 0).
 - Open: none in the weight. The Free Cities fight every living major, so
   theirs is 0.5 a living major; no recording has them value a weapon.
+
+## C-133: a formation with no fighter and a seen unit at war, the passenger test and a unit of the sea domain, a Trader and the zone a new turn sets out by — READ (0x2720a0 at 0x272528..0x272544, 0x2715a0 at 0x271780..0x2717cd / 0x271851..0x2718d7, 0x5861f0 -> 0x585fc0 -> 0x523520), both twins
+
+- A FORMATION WITH NO FIGHTER IS LINKED ONTO NO PLOT IT SEES HOLDING A UNIT
+  AT WAR. The pathfinder's +0x1f8 (the pool's init 0x2715a0 at
+  0x271793..0x2717cd) is the OR over the formation's members of: a Combat,
+  Ranged or Bombard strength or a religious strength (+0x1ce0) above 0,
+  with the unit's +0x18ba clear. The validity 0x2720a0 reads it at
+  0x2721cd ([rsp + 0xc8]) beside the pool's +0x1a0 ([rsp + 0xd0], set by
+  0x271851..0x2718d7 from the formation's classes 0x2669d0: 0 where its
+  class 0 or an embarked member, else 2, 1 or 4): with +0x1f8 clear and
+  +0x1a0 not 1 the child whose +0x51 holds any of 0x34 is refused
+  (0x272528..0x272544). Bit 0x20 is 0x5861f0's answer on a plot the player
+  sees now (0x271be0 at 0x271f0c..0x271f2e): 0x585fc0 gathers the plot's
+  units of the other players (a hidden one where 0x5032d0 lets it) and
+  0x523520 answers whether any is at war — one that does not fight too,
+  its out flag (bit 0x40) alone asking the strengths. So a civilian or a
+  support unit moving alone steps onto no seen plot of a civilian at war,
+  and reaches nothing past it (`groundOf`'s enter; `_tac_search`'s weak
+  movers). The classes 0x2669d0 names and the unit's +0x18ba are unread.
+- Confirmed, runs/h1_duels1166: t91 the barbarians' Builder 3801100 on
+  10:17 plans 28 plots, none of city-state 4's centre 10:14 past player
+  1's Builder on 9:15; t93 from 8:17 nothing of 9:15 / 10:14 / 10:15 past
+  that Builder on 10:16; t94 no 11:15 past it on 11:16 (the game's own
+  plannings). runs/h1_duels1124 t219-221 the captive Builder 5111833 on
+  40:10, 14 plots; h1_duels1172 t156-159 city-state 3's Builder 1179653 and
+  the barbarians' 3342354; h1_duels1161 t236 / h1_duels1188 t231-235 a
+  Battering Ram alone; h1_duels1121 t175-191 and h1_duels1142 t184-204 the
+  captive Settlers.
+- THE PASSENGER TEST (0x586360 under flag 1 at 0x586542..0x5865a1) reads a
+  unit of the sea domain as no passenger: a Great Admiral on its water
+  closes the plot to no embarked unit (`groundOf`'s boarded, `_tac_boarded`;
+  the engines hold a Great Admiral on water under their embarked flag).
+  Confirmed, runs/h1_duels1171 t177-215: the barbarians' embarked Builder
+  2424850 on 22:14 plans player 1's Harbor 29:9, its Great Admiral on it
+  out of their sight, at (2/0); h1_duels1134 t167 / t168 the Builders
+  3407875, 3473413 and 3735566 the Admiral's 20:9 and 22:14.
+- A TRADER AND THE ZONE A NEW TURN SETS OUT BY. The pool a new turn takes
+  (0x26e920 at 0x26ea88..0x26eaa2 -> 0x26f870 -> 0x530f50) asks the zone on
+  the formation's layer: a Trader's holds no unit's zone, a district's
+  alone (`groundOf`'s zoc, `_tac_search`'s zt). Confirmed, runs/h1_duels1167
+  t213-217: city-state 4's Traders 2031617 and 2162688 on 29:13 embark at
+  their second turn's start on the embarked pool beside units at war,
+  34:11 / 34:10 / 33:9 at (2/256) and (2/512) (the game's own plannings).
+- THE PLANNING JOB BEFORE THE DISPATCH, in the replay's copy: a Trader a
+  city-state's city made in the turn stands on its centre, whole, as its
+  planning runs (runs/h1_duels1117 t44 the Trader 393218 from 32:5;
+  h1_duels1139 t95 / t97, h1_duels1182 t64 / t68 / t71, h1_duels1180 t141).
+  The engines plan as the pass opens; a Trader's planning feeds no move.
+- Open: a support unit a City Assault forms with a fighter on its plot
+  (runs/h1_duels1178 t58: UnitEnterFormation of the Battering Ram 3014683
+  with the Warrior 2293761 in the barbarians' turn, the Ram's t59 / t61
+  plannings holding the Warrior's attack plots 9:19 and 7:19; ours forms
+  none) (C-95).

@@ -398,7 +398,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     if (v === undefined) {
       // the plot list the best defender reads (0x75c50 on the mover's layer)
       const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x));
-      boards.set(i, (v = others.some((x) => !!x.embarked) && others.every((x) => !!x.embarked)));
+      // a unit of the sea domain is no passenger (a Great Admiral; runs/
+      // h1_duels1171 t177-215: the barbarians' embarked Builder 2424850 on
+      // 22:14 plans player 1's Great Admiral's Harbor 29:9 at (2/0), out of
+      // their sight; h1_duels1134 t167 the Builder 3407875 its 20:9)
+      const passenger = (x: Unit) => !!x.embarked && !UNITS[x.type]?.seaDomain;
+      boards.set(i, (v = others.some(passenger) && others.every(passenger)));
     }
     return v;
   };
@@ -527,8 +532,20 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
-        enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks, true, borderless)
-          && !shut(t)));
+        v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks, true, borderless) && !shut(t);
+        // a formation with no fighter (the pathfinder's +0x1f8 clear) is
+        // linked onto no plot it sees now holding a unit at war of its
+        // layer, one that does not fight too (the validity 0x2720a0 at
+        // 0x272528..0x272544: the child's +0x51 & 0x34, bit 0x20 0x5861f0's
+        // answer for any unit at war) (runs/h1_duels1166 t91-94: the
+        // barbarians' Builder 3801100 on 10:17 / 8:17 plans nothing past
+        // player 1's Builder on 9:15, 10:16 and 11:16, the game's own
+        // plannings)
+        if (v && plainCivilians && !melee && !shoots && foes.has(t.index)) {
+          seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+          if (seenNow[t.index] === 1 && state.units.some((x) => x.tileIndex === t.index && x.seat !== unit.seat && onLayer(x) && unitsHostile(state, unit, x))) v = false;
+        }
+        enters.set(t.index, v);
       }
       return v;
     },
@@ -647,7 +664,14 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = zocs.get(t.index);
       if (v === undefined) {
         seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
-        zocs.set(t.index, (v = !zocIgnored && inEnemyZoc(state, t.index, unit, dest, crowded(t.index), seenNow)));
+        // a Trader's: the districts' alone, its layer holding no unit's zone
+        // (`seenZoc`; the pool a new turn sets out on, 0x26f870 -> 0x530f50)
+        // (runs/h1_duels1167 t213-217: city-state 4's Traders 2031617 and
+        // 2162688 on 29:13 embark at their second turn's start on the
+        // embarked pool beside the zones of units at war, 34:11 / 34:10 /
+        // 33:9 at (2/512), the game's own plannings)
+        zocs.set(t.index, (v = !zocIgnored && (layer === 'trade' ? neighbors(state.map, t).some((n) => districtZones(state, n, unit))
+          : inEnemyZoc(state, t.index, unit, dest, crowded(t.index), seenNow))));
       }
       return v;
     },

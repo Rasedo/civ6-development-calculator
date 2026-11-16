@@ -282,11 +282,13 @@ class SimTactics:
         `seat`, on the map layer of a religious mover (`rel`) or of any
         other: another player's passenger holds the plot (a Trader on the
         trade layer none) and no other player's unit stands there unembarked
-        (0x586360 under flag 1, the best defender 0x208b80 under 0x108)."""
+        (0x586360 under flag 1, the best defender 0x208b80 under 0x108); a
+        unit of the sea domain (a Great Admiral) is no passenger."""
         ep = self.embarked_at
         epc = ep.clamp(min=0)
         es = torch.where(ep >= 0, self.unit_seat.gather(1, epc), torch.full_like(ep, seat))
-        out = (es != seat) & self._tac_layer(ep, rel)
+        hull = (ep >= 0) & self._type_sea_domain.take(self.unit_type.gather(1, epc).clamp(min=0, max=self.NU - 1))
+        out = (es != seat) & self._tac_layer(ep, rel) & ~hull
         for pl in (self.military_at, self.civilian_at, self.support_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
             out &= (s == seat) | ~self._tac_layer(pl, rel)
@@ -1075,6 +1077,13 @@ class SimTactics:
                 fu_w = fu & self.wpass & ~(self.ocean_tile & ~cart_v.unsqueeze(1))
                 fu_n = torch.where(naval.unsqueeze(1), fu_w[rows], (fu & self.passable)[rows] | (fu_w[rows] & placed.unsqueeze(1)))
                 atk_n = atk_n | ((weak & ~trader_u).unsqueeze(1) & fu_n & ~ent_n & ~cl_n)
+                if not stand:
+                    # ...and in the planning's search it is linked onto no
+                    # plot it sees now holding a unit at war of its layer,
+                    # one that does not fight too (`groundOf`'s enter: the
+                    # validity 0x2720a0 at 0x272528..0x272544)
+                    seen_h = by_layer(lambda r: self._tac_hostile_on(seat, r)) & ~unseen[rows]
+                    ent_n = ent_n & ~((weak & ~trader_u).unsqueeze(1) & seen_h)
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
             # — but in the breadth-first searches (the valid wrapper 0x26e570
@@ -1195,6 +1204,9 @@ class SimTactics:
         zt = zp if zp is not None else self._tac_zoc_path(
             rows, seat, zsea, zoc_ign, dest,
             crowd_n if crowd_n is not None else torch.zeros(N, T, dtype=torch.bool, device=dev), sn)
+        if not zoc and bool(trader_u.count_nonzero()):
+            # a Trader's: the districts' alone (`groundOf`'s zoc)
+            zt = torch.where(trader_u.unsqueeze(1), self._tac_zoc(seat, sn, units=False)[rows] & ~zoc_ign.unsqueeze(1), zt)
         tseat = self.tile_seat
         # the nodes: one per plot, and in every search but the planning's a
         # second layer of turn-end nodes at T + plot (`search`'s turn-end
