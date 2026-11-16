@@ -1626,14 +1626,9 @@ function fighterOnLayer(state: GameState, unit: Unit, tile: number): boolean {
   });
 }
 
-/** a unit of another player than the unit's on the plot (an aircraft, a
- *  spy or a Trader on the trade layer holds none) */
-function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
-  return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u) && mapLayer(u.type) !== 'trade');
-}
-
-/** `foreignAt` on the unit's map layer (`mapLayer`: a religious unit's its
- *  own, a Trader's the trade layer) */
+/** a unit of another player than the unit's on the plot, of the unit's map
+ *  layer (`mapLayer`: a religious unit's its own, a Trader's the trade
+ *  layer; an aircraft or a spy holds none) */
 function foreignOnLayer(state: GameState, unit: Unit, tile: number): boolean {
   const layer = mapLayer(unit.type);
   return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u) && mapLayer(u.type) === layer);
@@ -2881,6 +2876,8 @@ function campStrike(state: GameState, pass: Pass, u: Unit, camp: number): { unit
  * 0x810d0 — `districtPlot`, a wonder's plot among them: runs/h1_duelq1128
  * t176 the Line Infantry 6553608 on player 1's wonder under construction
  * 15:12, three districts in its reach, goes for none and moves to safety)
+ * and that have Movement left and may stand on the target (0x774380 at
+ * 0x7744af..0x7744f8: else no order, its turn not done)
  * go there, each one's turn done, until one stands
  * on it and pillages it (`hostilePillage`). Both log "Pillage Improvement"
  * (AI_Tactical.csv: 158 of its rows target a PASSIVE_DISTRICT under that
@@ -2917,8 +2914,19 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
         const here = map.tiles[u.tileIndex];
         if (!districts && here.improvement !== null) continue;
         if (districts && districtPlot(state, here)) continue;
-        moveTo(state, u, t.index);
       }
+      // a unit with no Movement left (0x56c690), or one the target's plot
+      // cannot take (0x586900 over its formation, no flag: its domain,
+      // another player's unit of its layer there), takes no order and its
+      // turn is not done: on the target it ends the walk (runs/h1_duels1187
+      // t175: the Frigate 3801101, listed for city-state 3's Fishing Boats
+      // on 32:18 under its embarked unit 1638404, goes on to Attack Units,
+      // as logged)
+      if (u.movesLeft <= 0 || !placedOn(state, [u, ...formationMates(state, u)], t) || foreignOnLayer(state, u, t.index)) {
+        if (u.tileIndex === t.index) break;
+        continue;
+      }
+      if (u.tileIndex !== t.index) moveTo(state, u, t.index);
       const there = u.tileIndex === t.index;
       if (there && hostilePillage(state, u)) {
         dropHeldCosts();
@@ -4872,11 +4880,14 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
  *  to every unit —, an Encampment that bars it), or one of its own that
  *  stacks with it or with a member of its formation (`mates`: 0x585eb0
  *  takes the most 0x585d90 counts over the formation's members, +0x728 /
- *  +0x738) */
+ *  +0x738), or another player's of its map layer (runs/h1_duels1154
+ *  t182-224: city-state 2's Naval Superiority Ironclad 1572864 goes for its
+ *  target 40:18 under player 1's embarked Missionary 4063245 and ends there,
+ *  AI_Operation.csv) */
 function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<number>, mates: readonly Unit[]): boolean {
   if (!paths.has(goal)) return true;
   if (attackPlot(state, u, goal)) return true;
-  return [u, ...mates].some((m) => stackedAt(state, m, goal)) || foreignAt(state, u, goal);
+  return [u, ...mates].some((m) => stackedAt(state, m, goal)) || foreignOnLayer(state, u, goal);
 }
 
 /**
@@ -4972,9 +4983,15 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
         // off its own plot no unit of its own there (0x265ac0 refuses each:
         // none stands on the leader's plot), then the location test
         // (0x586360 with no flag: the ground, its domain, closed borders, a
-        // hostile unit, city centre or Encampment there); no path test
+        // hostile unit, city centre or Encampment there; and any other
+        // player's unit of its map layer, at war or not, seen or not — its
+        // defender 0x208b80 under flags 0x108, no war test, no combat test,
+        // refusing the plot with flag 1 clear: runs/h1_duels1162 t69-t76
+        // city-state 4's Attack Barb Camp Warriors and Swordsman for the camp
+        // 16:15 pass 15:15 under player 0's unit 458756 and go for the coast
+        // 16:14, as logged); no path test
         if (q !== u.tileIndex && state.units.some((x) => x !== u && x.tileIndex === q && x.seat === u.seat)) continue;
-        if (!ground.enter(state.map.tiles[q])) continue;
+        if (!ground.enter(state.map.tiles[q]) || foreignOnLayer(state, u, q)) continue;
         best = q;
         bestD = d;
         bestIn = inRegion;

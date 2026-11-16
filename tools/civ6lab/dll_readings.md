@@ -18151,3 +18151,50 @@ rules' `unitFormationAi`.
 - Open: a class a trait bars (Mana's Writers, Religious Convert's Prophets)
   or one past its maximum earned fails 0x2f1ed0 too: the engines zero its
   points and pay no Faith of them, unchecked against a record.
+
+## C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins
+
+`moveBarred`, `passMoveExec`'s ring walk, `pillage` (cpu/core/tactical.ts);
+GPU `_op_move_exec`'s `barred` and the ring's `ent`, the barbarians'
+`_bop_move_exec` through it, `_tac_pass`'s Pillage walk
+(gpu/core/sim_tactics.py).
+
+- THE LOCATION TEST'S DEFENDER: 0x586360 calls the best defender 0x208b80
+  (plot, defending player -1, the mover's owner, the mover) under flags
+  0x108 plus bit 1 where the test's own flag 8 is set (0x5863cf..0x5863dd
+  -> [rbp - 0x59], 0x586542..0x58655c). 0x208b80 walks the plot's units of
+  the mover's map layer (0x901e0 -> 0x75c50); with bit 1 clear no war test
+  (0x208c64..0x208c80), with 8 no combat test (0x208c86), with 0x100 no
+  look (0x20a2a0's flag). Any defender found refuses the plot where the
+  test's flag 1 is clear (0x58656e..0x58657e); with flag 1 only where both
+  it and the mover are embarked.
+- THE RING TEST 0x815d50 runs 0x586360 with flags 0 on every ring plot: any
+  other player's unit of the mover's layer there refuses it, at war or not,
+  seen or not. A plot of no region (Plot +0x18 null) is outside the goal's
+  region (r15b 0 at 0x815d7a): the region rule as before.
+- THE BARRED GOAL (flag 0x40): the same defender test, so another player's
+  unit on the goal bars it only on the mover's layer — a religious unit
+  stands on a layer of its own.
+- PILLAGE'S MOVES (0x774380, per listed unit for one target): past the
+  stand test (a unit on an improvement / a district skipped), a unit with no
+  Movement left (0x56c690) or whose formation the target's plot refuses
+  (0x586900, flags 0: its domain, another player's unit of its layer)
+  takes no order and its turn is not done; a unit on the target ends the
+  walk. Else it moves there (0x773fb0), pillages and its turn is done.
+- CONFIRMED (aimem traces): runs/h1_duels1187 t175 the Frigate 3801101,
+  listed for city-state 3's Fishing Boats on 32:18 under its embarked unit
+  1638404, goes on to Attack Units (Move 30 7), as logged (1187 to t185: 12
+  barb.move rows gone, none new); runs/h1_duels1121 t133 the Quadrireme
+  2228245 on 16:9 for player 1's Fishing Boats on 13:10 under its embarked
+  Great Scientist Wanders to 17:5, as logged.
+- CONFIRMED (aimem traces): runs/h1_duels1154 t182-t224 city-state 2's Naval
+  Superiority Ironclad 1572864 goes for its target 40:18 under player 1's
+  embarked Missionary 4063245 and ends there on every even turn, as
+  AI_Operation.csv logs ("1:20, 40:18, 40:18"; 1154 to t190: 27 move rows
+  to 10); runs/h1_duels1162 t69-t76 city-state 4's Attack Barb Camp Warriors
+  and Swordsman for the camp 16:15 pass 15:15 under player 0's unit 458756
+  and go for the coast 16:14, as logged (the four units' 27 plot rows and
+  the Wander draw t73 they shifted).
+- Open: runs/h1_duels1162 t62 / t64 the same team, every ring plot refused,
+  goes for the camp with the attack flag (ours "10:9, 16:15, 11:9"), the
+  game's stands ("10:9, 16:15, 10:9"); the camp's Spearman in our sight there.

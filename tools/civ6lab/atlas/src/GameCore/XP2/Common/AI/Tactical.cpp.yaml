@@ -456,6 +456,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
   review: reviewed
@@ -481,17 +482,24 @@
 - addr: 0x774380
   final: 0x5063d0
   kind: function
-  semantics: the unit stands on a plot of the target's kind.
-  status: PARTLY
+  semantics: "PILLAGE's moves over the listed units (the list +0x270, 0x30-byte entries) for one target (rdx: type, x, y): a unit dead, of no hit points or off the map skipped; off the target, one standing on an improvement for an IMPROVEMENT target or on a district (GetDistrictType 0x810d0) for a PASSIVE_DISTRICT one skipped (0x77446a..0x7744a9); one with no Movement left (0x56c690) or whose formation the target's plot refuses (0x586900, flags 0, 0x7fffffff: the domain, another player's unit of its layer) takes no order and its turn is not done (0x7744af..0x7744f8); else off the target moveOrFortify (0x773fb0, flag 1), then the orders 0x963190 and 0x9686d0 (the sleep) pushed, the job cleared (0x77d180) and its turn done (0x570b40); any unit on the target ends the walk (0x774630..0x774646)."
+  status: READ
   cases:
     - recording: h1_duelq1128
       turn: 176
       value: "the Line Infantry 6553608 on player 1's wonder under construction 15:12 (a district type), three PASSIVE_DISTRICT rows naming it available: it goes for none and moves to safety"
+    - recording: h1_duels1187
+      turn: 175
+      value: the Frigate 3801101 listed for city-state 3's Fishing Boats on 32:18 under its embarked unit 1638404 takes no order and goes on to Attack Units (Move 30 7), as logged; 1187 to t185 12 barb.move rows gone, none new
+    - recording: h1_duels1121
+      turn: 133
+      value: the Quadrireme 2228245 on 16:9 listed for player 1's Fishing Boats on 13:10 under its embarked Great Scientist 2162698 Wanders to 17:5, as logged
   impl:
     - cpu/core/tactical.ts:pillage
     - cpu/harness/replay.ts:Tactical
     - cpu/core/tactical.ts:districtPlot
     - gpu/core/sim_tactics.py:_tac_pass
+    - gpu/core/sim_tactics.py:live
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
@@ -499,6 +507,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+    - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
   context:
     - ...is turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it.
   review: reviewed

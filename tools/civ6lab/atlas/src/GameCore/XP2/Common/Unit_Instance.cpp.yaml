@@ -63,6 +63,7 @@
     - cpu/core/tactical.ts:orderOnce
     - cpu/core/tactical.ts:strike
     - cpu/core/tactical.ts:coastalRaids
+    - cpu/core/tactical.ts:held
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -80,6 +81,7 @@
     - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+    - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."

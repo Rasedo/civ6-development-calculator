@@ -43,7 +43,7 @@
     - cpu/core/tactical.ts:planUnit
     - gpu/core/sim_tactics.py:_tac_spot_link
     - gpu/core/sim_tactics.py:_tac_plan
-    - cpu/core/tactical.ts:foreignAt
+    - cpu/core/tactical.ts:foreignOnLayer
     - cpu/core/tactical.ts:Spot
     - cpu/core/tactical.ts:shoots
     - cpu/core/tactical.ts:foreign

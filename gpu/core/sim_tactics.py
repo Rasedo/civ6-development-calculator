@@ -4448,7 +4448,8 @@ class SimTactics:
         a unit of `zero` [B, P] or one in a formation (`_tac_mate`); at least
         1 where the goal is barred to a member off it — one of its own
         stacking with it or, in a formation, with the formation's other
-        member —, and with a Leader Tag named), its plot (its planning's at
+        member, or another player's of its map layer —, and with a Leader
+        Tag named), its plot (its planning's at
         the radius in the goal's region or where it or the goal holds none, else
         the ring walk's), its turn
         done, its move order — over the pass's danger map `danger` [B, T] its
@@ -4478,7 +4479,9 @@ class SimTactics:
         nm = can.sum(dim=1)
         region = self.tile_region.gather(1, goal.clamp(min=0).unsqueeze(1)).squeeze(1)
         hostile = self._tac_hostile(seat)
-        foreign = self._tac_foreign(seat)
+        # another player's unit of the mover's map layer (`foreignOnLayer`)
+        foreign_u = self._tac_foreign_on(seat, False)
+        foreign_r = self._tac_foreign_on(seat, True)
         # the plots it would attack into (`attackPlot`): a unit at war, a
         # hostile city centre, an Encampment that bars it
         atk = hostile | (self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat))
@@ -4519,8 +4522,10 @@ class SimTactics:
             civ_t = self._type_civilian.take(mtt) & ~sup_t
             stacks = (torch.where(sup_m, o_s, torch.where(civ_m, o_c, o_m))
                       | (fm & torch.where(sup_t, o_s, torch.where(civ_t, o_c, o_m))))
+            rel_m = self._rel_strength.take(ut) > 0
+            foreign = torch.where(rel_m, foreign_r[rows, gr], foreign_u[rows, gr])
             barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | stacks
-                      | foreign[rows, gr]) & (here != gr)
+                      | foreign) & (here != gr)
             r = torch.where(barred, r.clamp(min=1), r)
             if leader:
                 r = torch.where(~barred & (rng > 0) & ~z, r.clamp(min=1), r)
@@ -4546,12 +4551,16 @@ class SimTactics:
                 # own there (0x265ac0 refuses each: none on the leader's
                 # plot), then the location test (0x586360 with no flag: the
                 # ground, its domain, closed borders, a hostile unit, city
-                # centre or Encampment there); no path test — the unit's own
+                # centre or Encampment there, another player's unit of its
+                # layer); no path test — the unit's own
                 # test, water where it may embark, whatever its formation's
                 # other member
                 o_of = getattr(self, f"{pre}_unit_orig_owner")
                 placed = self._tac_embarks(rows, ut, seat, o_of[rows, ur])
                 ent = torch.where(naval.unsqueeze(1), ent_w[rows], ent_l[rows] | (ent_w[rows] & placed.unsqueeze(1)))
+                # the location test's defender (0x208b80 under flags 0x108):
+                # any other player's unit of the mover's map layer refuses
+                ent = ent & ~torch.where(rel_m.unsqueeze(1), foreign_r[rows], foreign_u[rows])
                 best = torch.full_like(gr, -1)
                 best_d = torch.full_like(gr, -1)
                 best_in = torch.zeros_like(walk)
@@ -4852,15 +4861,28 @@ class SimTactics:
                     if not bool(has.count_nonzero()):
                         break
                     last = torch.where(has, slotno[bidx, u_b], last)
-                    away = has & ~at_t[bidx, u_b]
+                    # Movement left, the target's plot placed for its
+                    # formation and no other player's unit of its layer there
+                    # (0x774380 at 0x7744af..0x7744f8): else no order, its
+                    # turn not done, and on the target the walk ends
+                    fit = torch.zeros_like(has)
+                    rws = has.nonzero(as_tuple=True)[0]
+                    if rws.numel():
+                        ub = u_b[rws]
+                        tr_ = t[rws].clamp(min=0)
+                        placed = self._tac_placed(rws, ub, self._tac_mate(rws, ub, "barb"), "barb", BARB_SEAT, tr_)
+                        fo = self._tac_foreign_on(BARB_SEAT, False)[rws, tr_]
+                        fit[rws] = (self.barb_unit_mp[rws, ub] > 0) & placed & ~fo
+                    go = has & fit
+                    away = go & ~at_t[bidx, u_b]
                     self._tac_move_to(away, u_b, t)
-                    there = has & (self.barb_unit_tile[bidx, u_b] == t)
+                    there = go & (self.barb_unit_tile[bidx, u_b] == t)
                     hit = self._barb_pillage_here(there, u_b)
                     # the pillager's turn is left to the homeland's End
                     # Turn, which skips it (`skipTurn`: HOLD)
                     self.barb_unit_activity[bidx[hit], u_b[hit]] = ACT_HOLD
-                    done[bidx[has], u_b[has]] = True
-                    active = has & ~there
+                    done[bidx[go], u_b[go]] = True
+                    active = has & ~there & ~(~fit & at_t[bidx, u_b])
 
         if rows.numel():
             self._tac_attack_units(live, done, ai, order, rowof, res, tg, 2, peers)

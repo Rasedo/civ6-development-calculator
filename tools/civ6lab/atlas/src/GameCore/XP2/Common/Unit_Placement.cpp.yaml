@@ -326,6 +326,9 @@
     - recording: h1_duels1149
       turn: 25
       value: "the danger map's list (0x26dab0 -> 0x586900 under flag 1): the barbarian Scout on 6:12 lists city-state 102's centre 4:12, never revealed, its 10 in player 0's map; its planning 4:12 (1/0), AI_Planning.csv"
+    - recording: h1_duels1154
+      turn: 182
+      value: "the defender call 0x208b80 at 0x586560 (defending player -1, flags 0x108 + flag 8's bit 1): the plot's units of the mover's layer alone, so player 1's embarked Missionary 4063245 on 40:18 bars no city-state Ironclad's Operation Move goal (t182-224 city-state 2's Ironclad 1572864 goes for 40:18 and ends there, AI_Operation.csv); with flag 1 clear (0x58656e) any defender found refuses the plot, at war or not"
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -351,7 +354,6 @@
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:owner
     - cpu/core/combat.ts:seizable
-    - cpu/core/tactical.ts:foreignAt
     - cpu/core/tactical.ts:fought
     - cpu/core/units.ts:mapLayer
     - gpu/core/sim_init.py:__init__
@@ -375,6 +377,7 @@
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:hazard
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:foreignOnLayer
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -412,6 +415,7 @@
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
+    - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -460,6 +464,7 @@
     - cpu/core/tactical.ts:naval
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:hazard
+    - cpu/core/tactical.ts:held
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -483,6 +488,7 @@
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
+    - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

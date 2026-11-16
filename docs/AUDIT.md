@@ -252,7 +252,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (builder capture): 1121 t160 the capture pair's Musketman 3538967 for 3:19 walks 6:18 -> 6:16, the game's 5:17 (our danger map's 4:16 / 5:16 at 20, the game's none, close 5:17's children to the first-turn danger flag)
   - LAB (builder capture): 1121 t161 the second and third pairs' goals 4:18 for the game's 4:19
   - LAB (builder capture): duels1178 t102 the Crossbowman's capture of city-state 3's Builder on 9:19 starts Barbarian Builder Capture in a freed tree slot below the raid's in the game (tree 917505 = 14:1 after Raid City's 786434 = 12:2, control 1048579 after 917508), first ticked at t103 (Change Target INVALID, Changing to backup); ours ticks it in the raid's walk at t102 (no backup, complete): its slot follows from the t44 capture the replay refuses (below: the game's took slot 4, ours none) (ops t102-t109, about 30 rows)
-  - LAB (pillage): duelq1121 t133 the Quadrireme 2228245 on 16:9 takes Pillage Improvement for player 1's Fishing Boats on 13:10, under player 1's embarked Great Scientist 2162698, and ends there; the game's logs its Pillage Improvement row (Available Units: 1), pillages nothing and Wanders to 17:5 (plot 453 // 237)
 - **C-123. BARBARIANS' RAIDS AND SCOUT REPORTS.** Weight 2.
   - LAB (raids and assaults): 1110 t42 City Assault (a member lost to combat drift)
   - LAB (raids and assaults): 1130 t43 raid (a member lost to combat drift)
@@ -267,6 +266,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (scouts): 1121 t78-80 Scout 131073: ours reports player 1's Holy Site 7:15 at t78 (the Scout beside it on 8:16 in record 79) and walks home (9:18 at t80), the game's explores to 8:15 at t80 and its tree stands from t81; the district's pillaged flag clears in record 80 (DistrictPillaged 23086 of t79); the report 0x153ef0 reads no pillage (the plot's improvement +0x44 or its district's type 0x810d0): the owner's throttle +0x3d8 and the plot's first sight (0x508d50) untraced
   - LAB (scouts): duels1162 t113 tribe 5's Skirmisher 3473426, raised on 39:4 beside its camp 38:3 (the Spearman 1048580 on it), reports and its tree runs in the game (Move Unit RUNNING for 38:3, the raid on 37:7 at t114); ours starts the tree and Move Unit fails (`turnsToPlot` 0: the crowded camp linked in the first turn), no raid
   - LAB (scouts): duels1136 t97-t108 the barbarian Scout 3473424 on 12:14 holds no tree in the game's memory (Raid City alone) and its HL: End Turn keeps 12:14; ours ticks its tribe's homing tree (Barbarian Found City), which walks it to 11:12 each turn and lets it go (16 plot rows); duels1172 t75-t101 the Scout 2490372 alike (31 rows): ours' tree starts on the Scout's report of player 1's city on 37:8 the turn before its first row, the game's memory holding no barbarian tree t40-t102
+  - LAB (scouts): duels1172 t75-t109 the barbarian Scout 2490372 logs HL: End Turn in both and stands in the game's, ours walks it two plots a turn outside the pass, its tribe's homing tree held (plot 608 // 521 t75, 31 rows); duels1136 t97-t112 Scout 3473424 (539 // 628) and duels1177 t179-t189 Scout 1769473 (659 // 747) alike
 - **C-124. BARBARIANS' CAMPS AND SIGHT.** Weight 1.
   - BUILD (sight): the alliances' outgoing visibility (0x2ab4f0 -> 0x508330; no recorded duel holds an alliance)
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
@@ -487,6 +487,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (nodes): EXPLORE in an operation
   - LAB (nodes): Naval Pillage's +0x18 (0x803250)
   - LAB (nodes): fit, unread: the eruption turns' rows (the volcano's +0x60 list read by 0xa1d480, its writer unread; 31.29 turns beside one volcano)
+  - LAB (nodes): duels1176 t116-t130 city-state 4's City Defense Privateer 1245191 on 1:14, team 1: the game's Operation Move "1:14, 1:14, 1:14" each turn, ours none, the Privateer ending on 0:14 (616 // 617, 28 rows; duels1181 Privateer 1835011 alike, 8 rows)
+  - LAB (nodes): duels1143 t109 city-state 4's Naval Superiority logs Op Attack Units Targets (the barbarian Builder on 42:1) and its Caravel 983042 strikes from 43:1, ours lists no target (plot 311 // 86)
   - BUILD (other): the 1127 t46 savings edge (114.96 vs 115)
   - LAB (other): experience cumulative (+0x1bc0 +8)
   - LAB (other): the religious AI's contract test past PurchaseYield (0x5f6920), its faith buys
@@ -509,6 +511,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (planning): duels1146 t155 player 1's Trader 2097169 lays the road of 38:12 in its turn, before the city-states plan: the game's city-state 2 Builder 1376259 reaches 38:12 at (1/128) and its Trader 524293 at (1/384), ours (1/0) and (1/256) on the copy's first-record roads (t158 35:13 alike; aiscore kind `plan.reach.moves`)
   - LAB (planning): duels1146 t232-248 city-state 2's embarked Machine Gun 1835015 plans on 6 Movement, the game's 7 (aiscore kind `plan.input`), its Wander plots t235 / t243 / t247 (566 // 610, 479 // 522, 522 // 523)
   - LAB (planning): duels1136 t103 city-state 2's Naval Superiority takes player 1's embarked Missionary 2490390 on 25:13, where it spread from in player 1's turn (UnitMoved 25:13, then its charge spent), as its target; the copy holds the Missionary on 25:14 (the replay's spread puts the unit back on its plot before the order), so ours keeps 25:14 and its Caravels end on 24:15 / 23:13 for the game's 24:14 / 24:13 (t103-t113, 9 plot rows)
+  - LAB (planning): duels1162 t62 / t64 city-state 4's Attack Barb Camp Warriors, every ring plot of the camp 16:15 refused, go for the camp with the attack flag (the camp's Spearman 589829 in our sight) and step on (ours "10:9, 16:15, 11:9"), the game's stand ("10:9, 16:15, 10:9"; 8 plot rows)
   - LAB (claims and strikes): 1124 t32 the Warrior 786433 made that turn on Granada's centre acts as hasMoved (0x56e760) where ours holds full Movement, its turn-1 claim on 41:11 kept (the game's 40:11, no attack)
   - LAB (claims and strikes): 1124 t94 city-state 4's Man-At-Arms 1310728 and Trebuchet 1245189, recruited by Attack Barb Camp that turn (Op Attack Units Targets: the barbarian Swordsman on 31:9), swap 33:8 / 32:8 in ours; the game's stand at t94 and hold the swapped plots from t95
   - LAB (claims and strikes): the strikers' garrison clause (0x775340 at 0x77541f, not HIGH) ported with no confirming case
