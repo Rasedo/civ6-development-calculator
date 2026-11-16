@@ -512,6 +512,11 @@ class SimInit:
         # table its city's purchases read: the counts and each record's slot,
         # type and owner (`CityState.armyTabled`)
         self._cv_tabled: dict[int, dict[str, torch.Tensor]] = {}
+        # per city-state seat and the Free Cities' to the end of its army's
+        # turn, its own district plots [B, T] as its knowledge step found
+        # them, the ones its tactical target list holds
+        # (`Seat.targetDistricts`)
+        self._tac_friendly: dict[int, torch.Tensor] = {}
         # per minor in its AI turn, its city's yields (the total [B, 6], the
         # attribute base [B, 6]) as its City Analysis read them as the turn
         # opened: its analysis' reads take both, its government values the

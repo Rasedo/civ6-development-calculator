@@ -2110,6 +2110,7 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: the city under threat and a pillaged district's repair"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   context:
     - "...NEMY AT THE GATES (READ): the value of a watched bool at CityBuildAI +0x1c0 (its setter 0x29fdf0 writes +0x1c0 + 0x58). Its one writer is the threat 0x5cbd10 itself: cleared as the wal..."
     - "- +0x218 (a watched bool at +0x1c0, setter 0x29fdf0): written only by 0x5cbd10 — cleared at 0x5cbd9e; per player past the skips, 0x5eadb0 a..."

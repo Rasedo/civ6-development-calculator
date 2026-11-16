@@ -57,7 +57,7 @@ import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSe
 import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, formationBanned, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
-import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
+import { dangerPlane, knowledgeLook, ownDistrictPlots, seatPoolSlots } from './tactical';
 import { plotsSeenNow } from './barbarians';
 import { cityStateMilitary, minorCampsLook, minorCitiesLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
@@ -295,6 +295,7 @@ export function minorPhase(state: GameState): void {
     if (!ordersHeld) {
       cityStateMilitary(state, cityState);
       delete cityState.armyTabled;
+      delete cityState.targetDistricts;
     }
     // its Traders step on their routes after its units' turn, their route
     // operation after the tactical moves (runs/h1_duelp1117 t225: city-state
@@ -1711,8 +1712,12 @@ export function minorOwnedUnits(state: GameState, cityState: CityState): Record<
 
 /** A city-state's knowledge base's look: its army records (`knowledgeLook`)
  *  over the plots it sees (`cityStateSight`), its camps and its cities
- *  (`minorCampsLook`, `minorCitiesLook`) over the plots it has revealed. */
+ *  (`minorCampsLook`, `minorCitiesLook`) over the plots it has revealed.
+ *  With the ageing (its knowledge step) its tactical target list is built:
+ *  its own districts as they stand now are the list's
+ *  (`Seat.targetDistricts`). */
 export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
+  if (age) cityState.targetDistricts = ownDistrictPlots(state, cityState.seat);
   knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
   minorCampsLook(state, cityState, age);
   minorCitiesLook(state, cityState);
@@ -1779,6 +1784,7 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
  *  units, their cities' centres two round, their plots with their ring),
  *  then its cities over the plots they have revealed (`freeCitiesLook`) */
 export function freeKnowledge(state: GameState, age: boolean): void {
+  if (age) freeSeatOf(state).targetDistricts = ownDistrictPlots(state, FREE_SEAT);
   const seen = plotsSeenNow(state, new Set([FREE_SEAT]));
   knowledgeLook(state, freeSeatOf(state), FREE_SEAT, seen, age);
   freeCitiesLook(state, seen);

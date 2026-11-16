@@ -1025,6 +1025,12 @@ export interface Seat {
    *  production table copied to its city, which its purchases read after
    *  the turn's look (`purchaseEntries`); absent once its army's turn ends */
   armyTabled?: { type: string; owner: number }[];
+  /** a city-state's or the Free Cities' own district plots as its knowledge
+   *  step found them (`minorKnowledge`, `freeKnowledge` with the ageing):
+   *  its tactical target list is built there, before the turn's production
+   *  choice places a district, and holds these alone as its own
+   *  (`tacticalTargets`); absent once its army's turn ends */
+  targetDistricts?: number[];
   /** a city-state's city yields (the total and the attribute base) and its
    *  growth as its City Analysis read them as its AI turn opened, before
    *  its Economic AI's purchases and free Trader's dispatch and its

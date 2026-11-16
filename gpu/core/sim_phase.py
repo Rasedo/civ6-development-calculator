@@ -911,6 +911,7 @@ class SimPhase:
             government()
             self._free_military_turn(ones)
             del self._cv_counted[self.FK]
+            self._tac_friendly.pop(FREE_SEAT, None)
             self._free_knowledge(ones, False)
             self._research_unit_turns(self.FR, ones)
             return
@@ -995,6 +996,7 @@ class SimPhase:
             self._place_citizens(row, jc, act, None, full=True, fav_food=self.city_fav_food[:, row, j])
         del self._cv_counted[self.FK]
         self._free_tactics(acting)
+        self._tac_friendly.pop(FREE_SEAT, None)
         # its knowledge base's look and its research AI's turns per unit at
         # its turn's end, in every game
         self._free_knowledge(ones, False)

@@ -2542,6 +2542,34 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       else if (!here && i >= 0) copy.units.splice(i, 1);
     }
   };
+  // ...and a barbarian camp a minor's unit took in its own turn of the pair
+  // (`campsTaken` has it gone) stands through the passes of the minors up to
+  // its taker's: each one's target list and operations read it as their turn
+  // opened (runs/h1_duels1117 t83: city-state 4's Man-At-Arms 851972 steps
+  // onto the camp 35:6 in its turn, its t83 target list holding the camp;
+  // h1_duels1124 t57: city-state 4's unit takes 41:7, city-state 3's list
+  // and its own both holding it)
+  const campsTook: { plot: number; taker: number }[] = [];
+  {
+    const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);
+    let acting = -1;
+    for (const x of acts) {
+      if (x[1] !== turn) continue;
+      if (x[2] === 'PlayerTurnActivated') acting = x[3] as number;
+      else if (x[2] === 'PlayerTurnDeactivated') acting = -1;
+      else if (x[2] === 'ImprovementRemovedFromMap' && x[5] === barbPlayer && acting >= 0 && minorAiSeat(seatOfP(ctx, acting))) {
+        const plot = (x[4] as number) * ctx.W + (x[3] as number);
+        if (!copy.barbSeat.camps.includes(plot)) campsTook.push({ plot, taker: acting });
+      }
+    }
+  }
+  const standCamps = (player: number): void => {
+    for (const g of campsTook) {
+      const i = copy.barbSeat.camps.indexOf(g.plot);
+      if (player <= g.taker && i < 0) copy.barbSeat.camps.push(g.plot);
+      else if (player > g.taker && i >= 0) copy.barbSeat.camps.splice(i, 1);
+    }
+  };
   // a city-state's shots of the pair land in its pass, after its units'
   // planning: the unit struck as the shot left it
   holdCityStrikes(true, (st, city) => {
@@ -2559,6 +2587,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standLevied(playerOf(cs.seat));
       standLeaving(playerOf(cs.seat));
+      standCamps(playerOf(cs.seat));
       standGame(playerOf(cs.seat));
       popAtTurn(ctx, b, copy, turn, playerOf(cs.seat));
       passPlayer = playerOf(cs.seat);
@@ -2567,6 +2596,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     }
     standLevied(playerOf(FREE_SEAT));
     standLeaving(playerOf(FREE_SEAT));
+    standCamps(playerOf(FREE_SEAT));
     standGame(playerOf(FREE_SEAT));
     popAtTurn(ctx, b, copy, turn, playerOf(FREE_SEAT));
     passPlayer = playerOf(FREE_SEAT);
@@ -2574,6 +2604,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   } finally {
     standLevied(Infinity);
     standLeaving(Infinity);
+    standCamps(Infinity);
     for (const [c, p] of ownEnd) c.tileIndex = p;
     copy.turn = clock;
     traceTactics(null);
@@ -7259,6 +7290,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // eruption's, a storm's), and the flags the turn's own decisions left on
     // it before the change (`turn`)
     const eventWrecks = new Map<number, { was: PillageFlags; now: PillageFlags; turn?: PillageFlags }>();
+    // ...each improvement it took off the map (a storm's, a flood's, the
+    // rising sea's), with its pillage flag (runs/h1_duels1117 t133: the storm
+    // takes city-state 4's improvements on 31:6, 32:6 and 33:6 after the
+    // barbarians' turn, whose t133 target list holds the three; h1_duels1124
+    // t182 player 1's Seaside Resort on 17:12)
+    const eventTaken = new Map<number, { improvement: Tile['improvement']; pillaged: Tile['pillaged'] }>();
     // ...each meteor site its Meteor Shower laid, by the flag it took (runs/
     // h1_duels1165 t38: the shower on 29:19 at the t39 change, out of the
     // barbarians' t38 target list)
@@ -7860,6 +7897,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       turnChange(state);
       for (const t of state.map.tiles) if (!!t.meteor !== sitePre[t.index]) eventSites.set(t.index, !!t.meteor);
       for (const t of state.map.tiles) if ((t.improvement ?? null) !== preChange[t.index]) eventPlots.add(t.index);
+      for (const t of state.map.tiles) {
+        if (preChange[t.index] !== null && t.improvement === null) eventTaken.set(t.index, { improvement: preChange[t.index], pillaged: wreckPre[t.index].pillaged });
+      }
       for (const t of state.map.tiles) if (t.feature !== featurePre[t.index]) eventFeatures.set(t.index, { was: featurePre[t.index], now: t.feature });
       for (const t of state.map.tiles) {
         const now = pillageFlags(t);
@@ -8095,6 +8135,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [p, f] of eventFeatures) if (tiles[p].feature === f.now) tiles[p].feature = f.was;
     const wrecked = new Map([...eventWrecks.keys()].map((p) => [p, pillageFlags(tiles[p])] as const));
     for (const [p, w] of eventWrecks) if (w.turn) setPillage(state, p, w.turn);
+    for (const [p, w] of eventTaken) {
+      if (tiles[p].improvement !== null || tiles[p].district !== null) continue;
+      tiles[p].improvement = w.improvement;
+      tiles[p].pillaged = w.pillaged;
+    }
     for (const [p, now] of eventSites) if (!!tiles[p].meteor === now) tiles[p].meteor = !now;
     for (const [u, h] of eventHp) if (u.hp === h.now) u.hp = h.was;
     for (const [u, snap] of [...ctx.barbBlows, ...[...ctx.minorBlows].map(([v, x]) => [v, x.snap] as const)]) {
@@ -8121,6 +8166,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       state.congress = congressNow;
       for (const [p, f] of eventFeatures) if (tiles[p].feature === f.was) tiles[p].feature = f.now;
       for (const [p, w] of wrecked) setPillage(state, p, w);
+      for (const [p, w] of eventTaken) {
+        if (tiles[p].improvement !== w.improvement) continue;
+        tiles[p].improvement = null;
+        tiles[p].pillaged = false;
+      }
       for (const [p, now] of eventSites) if (!!tiles[p].meteor !== now) tiles[p].meteor = now;
       for (const [u, h] of eventHp) if (u.hp === h.was) u.hp = h.now;
       const dead = new Set(revived.map(({ u }) => u));

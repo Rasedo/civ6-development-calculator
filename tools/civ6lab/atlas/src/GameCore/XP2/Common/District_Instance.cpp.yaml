@@ -615,6 +615,7 @@
     - cpu/core/tactical.ts:tacticalTargets
     - gpu/core/sim_tactics.py:_tac_targets
     - cpu/core/tactical.ts:camps
+    - cpu/core/tactical.ts:own
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

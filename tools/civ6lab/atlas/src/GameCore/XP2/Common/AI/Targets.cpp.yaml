@@ -79,6 +79,8 @@
     - cpu/core/tactical.ts:rel
     - gpu/core/sim_tactics.py:seat_of
     - cpu/core/minorStrategy.ts:minorAreaKnown
+    - cpu/core/tactical.ts:held
+    - cpu/core/tactical.ts:own
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -96,6 +98,7 @@
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...m absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), proje..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ATION, f2e1d0 GOODY_HUT, f2e1d4   ALLY_SUPPORT, f2e1d8 AIR_UNIT. The list's entries per plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT..."
@@ -107,9 +110,15 @@
 - addr: 0x785ec0
   final: 0x514670
   kind: function
-  semantics: a job of the second list (before the tactical pass).
-  status: PARTLY
+  semantics: "a job of the second list (before the tactical pass): where the Targets' dirty flag (+0x188, the member at +0x130) is set, the target list anew (0x783980), 0x728010 and the planning manager's targets pass 0x7925d0, then the flag cleared; nothing otherwise, the list of the knowledge step standing."
+  status: READ
+  cases:
+    - recording: h1_duels1145
+      turn: 15
+      value: city-state 4's Holy Site 33:11 placed at its turn start is no FRIENDLY_CITY of its t15 list (t16 city-state 2's 16:14, t46 city-state 3's 43:14)
+  impl: [cpu/core/tactical.ts:tacticalTargets, gpu/core/sim_tactics.py:_tac_targets]
   readings:
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -146,6 +155,7 @@
     - cpu/core/minorBuild.ts:prev
     - cpu/core/tactical.ts:tacticalPass
     - cpu/core/aiView.ts:targetLists
+    - cpu/core/tactical.ts:held
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -162,6 +172,7 @@
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -354,4 +365,11 @@
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
+  review: reviewed
+- addr: 0x787de0
+  kind: function
+  semantics: "the Targets' handler of a war or peace between two players: where one is its player, the other's id to the knowledge base (0x5ef460) and the dirty flag (the member at +0x130) set, so 0x785ec0 builds the list and the plannings anew before the pass."
+  status: PARTLY
+  readings:
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   review: reviewed

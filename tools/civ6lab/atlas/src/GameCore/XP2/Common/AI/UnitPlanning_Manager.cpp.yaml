@@ -243,9 +243,14 @@
 - addr: 0x791b20
   final: 0x51ca20
   kind: function
-  semantics: the planning's turn job (the units' plannings the trees and the tactical pass read).
+  semantics: "the planning's turn job (the units' plannings the trees and the tactical pass read): acts in the turn start's pass 3 (its +0x100, written at 0x79026e), a planning node per unit of the player's list, then AI Unit Planning 0x792c90."
   status: PARTLY
+  cases:
+    - recording: h1_duels1117
+      turn: 44
+      value: city-state 4's Trader 393218, trained at its turn start on 32:5 and dispatched to 32:6 in the same pass after the job, plans from 32:5
   readings:
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
@@ -360,6 +365,7 @@
       value: "the list read at Targets +0x248: 42,439 of 42,439 district entries are that owner's district on that plot"
   readings:
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   context:
     - "...entries, 0x28 bytes each, +0x258 their count (the planning manager's pass FinalRelease 0x51d2b0 hands the Targets to planTargets 0x51da80, which reads them there). An entry: +0 the ki..."
   review: reviewed
@@ -387,6 +393,7 @@
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- \"AI Unit Planning\" (0x792c90) is a fork-join: N = min(units, the path finder pool's count) chunks; N <= 1 plans each..."
@@ -408,6 +415,7 @@
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE PLANNING'S TARGETS (0x792f90): every target within its Movement x 2 + its range of the unit; the spots (0x790c60 on..."

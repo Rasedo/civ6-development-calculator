@@ -1125,6 +1125,7 @@ export function freeCitiesPhase(state: GameState): void {
     government();
     freeMilitaryTurn(state);
     delete free.armyCounted;
+    delete free.targetDistricts;
     freeKnowledge(state, false);
     researchUnitTurns(free.research);
     return;
@@ -1186,7 +1187,10 @@ export function freeCitiesPhase(state: GameState): void {
   });
   delete free.armyCounted;
   // (a replay runs their units' turn on a copy beside the record's)
-  if (!minorOrdersHeld()) freeCitiesMilitary(state);
+  if (!minorOrdersHeld()) {
+    freeCitiesMilitary(state);
+    delete free.targetDistricts;
+  }
   // its knowledge base's look and its research AI's turns per unit
   // (`researchUnitTurns`) at its turn's end
   freeKnowledge(state, false);

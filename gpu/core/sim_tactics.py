@@ -2721,7 +2721,13 @@ class SimTactics:
             # HIGH where it threatens a district of `seat`'s it sees: a ranged
             # or bombard unit within its range, any other nearer than twice
             # its Movement
-            own = seen & (ts == seat) & ((dd >= 0) | ctr)
+            # ...as its knowledge step found them: the list is built there
+            # and stands to its tactical pass, a district the turn's
+            # production choice placed since none of it (`_tac_friendly`)
+            own = seen & self._tac_own_districts(seat)
+            held = self._tac_friendly.get(seat)
+            if held is not None:
+                own = own & held
             if bool((own.any(dim=1) & efight.any(dim=1)).count_nonzero()):
                 b_i, q_i = own.nonzero(as_tuple=True)
                 dmin = torch.full((self.B, self.T), 1 << 20, dtype=torch.long, device=self.device)
@@ -2741,12 +2747,18 @@ class SimTactics:
         uk = torch.where(efight, lowk, uk)
         return {"dk": dk, "ds": ds, "ok": okk, "os": oss, "unit": unit, "uk": uk, "uu": uu, "us": us, "uo": uo}
 
+    def _tac_own_districts(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — the plots of `seat`'s own districts as they stand
+        (`ownDistrictPlots`), its centres among them"""
+        return (self.tile_seat == seat) & ((self.district >= 0) | self._centre_plane())
+
     def _tac_known_entries(self, seat: int, kb: int, seen: torch.Tensor, uk: torch.Tensor, uu: torch.Tensor,
                    us: torch.Tensor, uo: torch.Tensor):
         """the knowledge base's entries of `seat`'s target list (`knowledgeEntries`,
         0x5eb8b0 at age 1, distance 2) onto the unit entries' planes: each
         record of row `kb` of age exactly 1 of a player at war with `seat`,
-        in the game's player order, then the units' table order, then the
+        in the game's player order, then the install's Units table order
+        (the rules' `engineUnitsIndex`), then the
         records' order (`citystate_kb_seq`), whose unit (its pool slot, its
         type and owner still the record's) stands within 2 of the plot
         recorded on a plot `seat` does not see: a LOW entry there for a unit
@@ -2773,7 +2785,10 @@ class SimTactics:
             return uk, uu, us, uo
         porder = torch.where(own < 100, own, torch.where(own < FREE_SEAT, 1000 + own,
                                                           torch.where(own == FREE_SEAT, 5000, 6000)))
-        key = torch.where(ok, (porder * (self.NU + 1) + typ) * (1 << 24) + sq, torch.full_like(sq, 1 << 62))
+        # each type's row of the install's Units table (`unitsIndex`), -1 none
+        er = torch.tensor(self.rules.ai_city_build["engineUnitsIndex"], dtype=torch.long, device=dev)
+        urow = er.take(typ.clamp(min=0, max=er.numel() - 1)) + 1
+        key = torch.where(ok, (porder * (int(er.max()) + 2) + urow) * (1 << 24) + sq, torch.full_like(sq, 1 << 62))
         srt = key.argsort(dim=1, stable=True)
         ok_s = ok.gather(1, srt)
         at_s = at.gather(1, srt)

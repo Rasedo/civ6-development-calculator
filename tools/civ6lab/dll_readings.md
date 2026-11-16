@@ -19531,3 +19531,43 @@ after their turn (cpu/harness/replay.ts). GPU `_tac_search`'s and
   unit holds; the game's ends there on runs/h1_duels1180 t189 (the Field
   Cannon 1638405's second run onto 29:9 under the Infantry 1769473) and
   1157 t152 / t180.
+
+## C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins
+
+`tacticalTargets` with `Seat.targetDistricts` (set by `minorKnowledge` /
+`freeKnowledge` with the ageing, cpu/core/minorBuild.ts), `knowledgeEntries`
+on `unitsIndex` (cpu/core/tactical.ts); GPU `_tac_targets` with
+`_tac_friendly` / `_tac_own_districts`, `_tac_known_entries` on the rules'
+`engineUnitsIndex` (gpu/core/sim_tactics.py, set in `_minor_knowledge`,
+gpu/core/sim_minors.py, and `_free_knowledge`, gpu/core/sim_minorai.py).
+
+- WHEN THE LIST IS BUILT: the knowledge step 0x785f30 acts in the turn
+  start's pass 4 (its +0x1e8 against the pass): the ageing, the look, the
+  dirty flag (the member at Targets +0x130, read at +0x188) cleared through
+  0x29fdf0, then the list 0x783980. The planning's job 0x791b20 acts in pass
+  3 (the manager's +0x100, written 3 at 0x79026e), before the Economic AI's
+  purchases and route dispatch of the same pass, and the cities' update in
+  pass 2. Before the tactical pass 0x785ec0 builds the list anew, and
+  0x7925d0 every planning (each node's reach count +0x40 zeroed, 0x792f90,
+  then 0x792c90), only where the dirty flag is set; its one setter after the
+  step is 0x787de0, the handler of a war or peace between the player and
+  another (it writes the knowledge base through 0x5ef460 first). So a
+  district the city update places is none of the turn's FRIENDLY_CITY
+  entries, and the priorities read the districts of the turn's start.
+- THE KNOWLEDGE ENTRIES (0x783980 at 0x7856f6 -> 0x5eb8b0) walk a player's
+  records by unit type in the Units table's order.
+- Confirmed (aimem windows): runs/h1_duels1145 t15 city-state 4's Holy Site
+  33:11, t16 city-state 2's 16:14 and t46 city-state 3's 43:14, each placed
+  at its turn start and out of that turn's list; runs/h1_duels1166 t74 the
+  barbarians' list ends player 1's Great Writer, Warrior, Galley, Archer
+  (Units rows 15, 21, 26, 28), t94 Settler before Builder (0, 1).
+- The replay holds for the minors' and the barbarians' turns what the game's
+  turn held: an improvement the turn's change took after the barbarians'
+  turn (runs/h1_duels1117 t133, the storm on 31:6, 32:6 and 33:6) and a camp
+  a minor's unit took in its own turn (1117 t83 35:6, runs/h1_duels1124 t57
+  41:7).
+- Open: the planning itself still runs as the pass opens, so a Trader the
+  turn dispatches plans from its first step (runs/h1_duels1117 t44:
+  city-state 4's Trader 393218 plans from 32:5 in the game, ours from 32:6);
+  the rebuild at a war declared inside the turn; two Traders on one plot
+  enter the list in another order (1117 t79, 32:11).

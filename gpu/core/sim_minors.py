@@ -147,6 +147,7 @@ class SimMinors:
             self._detect_minor_boosts(s, alive)
             self._minor_tactics(s)
             del self._cv_tabled[s]
+            self._tac_friendly.pop(100 + s, None)
             # its Traders step on their routes after its units' turn
             # (`minorPhase`)
             self._minor_trade(s)
@@ -442,6 +443,8 @@ class SimMinors:
         records over the plots it sees (`_minor_sight`), its camps and its
         cities over the plots it has revealed."""
         alive = self.citystate_alive[:, s]
+        if age:
+            self._tac_friendly[100 + s] = self._tac_own_districts(100 + s)
         if not bool(alive.count_nonzero()):
             return
         sight = self._minor_sight(s)

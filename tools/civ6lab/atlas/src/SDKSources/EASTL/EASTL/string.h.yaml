@@ -341,6 +341,16 @@
   context:
     - ...(0x4ba1f0), +0x680 the military AI (0x4c88d0), +0x688 Research, +0x690 the tactical AI (0x501e80), +0x698 Targets.
   review: reviewed
+- addr: 0x78ffa0
+  final: 0x51b330
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-134 / C-129: the target list stands from the knowledge step to the pass, its knowledge entries in the Units table's order — READ (0x785f30, 0x785ec0, 0x7925d0, 0x791b20, 0x787de0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...x783980. The planning's job 0x791b20 acts in pass 3 (the manager's +0x100, written 3 at 0x79026e), before the Economic AI's purchases and route dispatch of the same pass, and the citie...
+  review: imported
 - addr: 0x7c8960
   kind: function
   status: PARTLY

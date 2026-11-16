@@ -5263,6 +5263,10 @@
         "why": "a city-state's records as its last turn left them, for the unit production table its city's purchases read (`purchaseEntries`): written by minorPhase beside armyCounted and deleted after its army's turn, so it is never live at a turn boundary; the records it copies are compared as minorArmyKnown; the GPU twin holds them at the same points (`_cv_tabled`, transient)."
       },
       {
+        "path": "Seat.targetDistricts",
+        "why": "a city-state's or the Free Cities' own district plots as its knowledge step found them, the ones its tactical target list holds (`tacticalTargets`): written by minorKnowledge / freeKnowledge with the ageing and deleted after its army's turn, so it is never live at a turn boundary; the districts are compared as the map's; the GPU twin holds them at the same points (`_tac_friendly`, transient)."
+      },
+      {
         "path": "Seat.aiYields",
         "why": "a city-state's city yields and growth as its AI read them before its free Trader's dispatch: written by minorPhase before minorTradePick and deleted after its military AI's upgrade, so it is never live at a turn boundary; the GPU twin holds them at the same points (`_cv_yields_seen`, `_cv_growth_seen`, transient)."
       },

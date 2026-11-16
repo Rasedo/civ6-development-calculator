@@ -1976,19 +1976,20 @@ function playerOrder(seat: number): number {
  * THE KNOWLEDGE BASE'S ENTRIES of the target list (0x783980 after its plot
  * walk; the query 0x5eb8b0 at age 1, distance 2): for each player the
  * player `seat` is at war with, in the game's order, its records by unit
- * type (in the units' table order) then in their order — each record of
+ * type (in the install's Units table order, `unitsIndex`) then in their
+ * order — each record of
  * age exactly 1 (seen at the last look, not at this turn's) whose unit
  * still stands within 2 of the plot recorded: the unit's own plot now,
  * where `seen` does not hold it, a LOW entry for a unit with Combat, else
- * a CIVILIAN one.
+ * a CIVILIAN one (runs/h1_duels1166 t74: the barbarians' list ends player
+ * 1's Great Writer, Warrior, Galley, Archer — Units rows 15, 21, 26, 28).
  */
 function knowledgeEntries(state: GameState, seat: number, seen: ArrayLike<number>, known: readonly ArmyRecord[]): Target[] {
   const me = { seat };
-  const order = Object.keys(UNITS);
   const recs = known.map((r, i) => ({ r, i }))
     .filter(({ r }) => state.turn - r.seen === 1 && unitsHostile(state, me, { seat: r.owner }))
     .sort((a, b) => playerOrder(a.r.owner) - playerOrder(b.r.owner)
-      || order.indexOf(a.r.type) - order.indexOf(b.r.type) || a.i - b.i);
+      || unitsIndex(a.r.type) - unitsIndex(b.r.type) || a.i - b.i);
   const out: Target[] = [];
   for (const { r } of recs) {
     const u = state.units.find((x) => x.id === r.id && x.seat === r.owner && x.type === r.type);
@@ -2001,6 +2002,19 @@ function knowledgeEntries(state: GameState, seat: number, seen: ArrayLike<number
 /** the knowledge base's query's distance (0x5eb8b0's fifth argument) */
 const KNOWN_UNIT_RANGE = 2;
 
+/** a chassis' row of the install's Units table (`AI_UNITS`' order): its own
+ *  type's where the table holds one, else its catalog tag's (PROPHET is
+ *  UNIT_GREAT_PROPHET, LEGION UNIT_ROMAN_LEGION); -1 for neither */
+let unitsRows: ReadonlyMap<string, number> | null = null;
+export function unitsIndex(type: string): number {
+  unitsRows ??= new Map(Object.values(UNITS).map((d) => {
+    const row = (t: string) => AI_UNITS.findIndex((r) => r.type === t);
+    const own = row(`UNIT_${d.id}`);
+    return [d.id, own >= 0 ? own : row(gameTypeOf('unit', d.id, 'UNIT_'))] as const;
+  }));
+  return unitsRows.get(type) ?? -1;
+}
+
 /** the plots a seat has revealed, as its target list reads them beside the
  *  plots it sees (the player's +0x2f0, 0x783980 at 0x785271): a city-state's
  *  revealed plots, any other seat's explored ones; null for a seat that
@@ -2008,6 +2022,12 @@ const KNOWN_UNIT_RANGE = 2;
 export function revealedPlots(state: GameState, seat: number): ArrayLike<number> | null {
   const ex = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat)?.revealed : seatOf(state, seat)?.explored;
   return ex && ex.length ? ex : null;
+}
+
+/** the plots of a seat's own districts as they stand (`Seat.targetDistricts`
+ *  at its knowledge step) */
+export function ownDistrictPlots(state: GameState, seat: number): number[] {
+  return state.map.tiles.filter((t) => t.district !== null && tileSeat(t) === seat).map((t) => t.index);
 }
 
 /** the plot holds a goody (0x82d90: its improvement's Improvements.Goody,
@@ -2031,12 +2051,19 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
   const me = { seat };
   const hostile = (s: number) => s !== seat && s !== NO_SEAT && unitsHostile(state, me, { seat: s });
   const camps = new Set(state.barbSeat.camps);
+  // its own districts as its knowledge step found them: the list is built
+  // there (0x785f30 -> 0x783980, the turn start's pass 4) and stands to its
+  // tactical pass, so a district the turn's production choice placed since
+  // (the city update, pass 2) is none of it (runs/h1_duels1157 t47:
+  // city-state 4's district placed at its turn start, out of its t47 list)
+  const held = seatOf(state, seat)?.targetDistricts;
+  const own = held ? new Set(held) : null;
   for (const t of map.tiles) {
     const vis = seen[t.index] === 1;
     if (!vis && !(revealed && revealed[t.index] === 1)) continue;
     const owner = tileSeat(t);
     let combat = false;
-    if (owner === seat && t.district !== null) {
+    if (owner === seat && t.district !== null && (!own || own.has(t.index))) {
       out.push({ type: 'FRIENDLY_CITY', tile: t.index, seat, unit: null });
     }
     if (t.district !== null) {

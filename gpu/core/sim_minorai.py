@@ -1005,7 +1005,11 @@ class SimMinorAi:
         """`freeKnowledge` — the Free Cities' knowledge base's look (row
         `FK`) over the plots they see (`_barb_seen` of their seat), then
         its cities over the plots they have revealed (`free_revealed`,
-        `_minor_cities_look` on the row `FR`)."""
+        `_minor_cities_look` on the row `FR`). With the ageing their
+        tactical target list is built: their own districts as they stand
+        now are the list's (`_tac_friendly`)."""
+        if age:
+            self._tac_friendly[FREE_SEAT] = self._tac_own_districts(FREE_SEAT)
         if not bool(act.count_nonzero()):
             return
         seen = self._barb_seen(FREE_SEAT)
