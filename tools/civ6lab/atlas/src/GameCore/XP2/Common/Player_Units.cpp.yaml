@@ -301,6 +301,16 @@
   context:
     - ...E_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms, unread); the odds min(0.9, ((ours - theirs) / min(best ours, best theirs) + 1) x...
   review: imported
+- addr: 0x4f2bb0
+  final: 0x10ccb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...its NumSupported (0x179ea0) -1 or above the player's units of the type from the city (0x4f2bb0); none, CanTrain refuses (0x172c90). The Warrior Monk's rows are the Temple, the Stave...
+  review: imported
 - addr: 0x4f2c90
   final: 0x34f6b0
   kind: function

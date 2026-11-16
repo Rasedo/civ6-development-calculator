@@ -30,6 +30,9 @@
     - recording: h1_duels1170
       turn: 239
       value: Lahore's FAITH PURCHASE of the Nihang, contract 1123
+    - recording: h1_duels1163
+      turn: 80
+      value: "Brussels' Warrior Monk contract 240 ACCEPTED t79-t150 and never bought, its Faith over the price: the request's test (0xa53980) is CanTrain's refusal"
   impl:
     - cpu/core/aiEconomic.ts:religiousPurchases
     - cpu/core/minorCityAi.ts:minorFaithUnit
@@ -37,6 +40,7 @@
   readings:
     - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
     - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   context:
     - ...171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported
     - "...BuyBuilding` in Faith at the cost times FAITH_PURCHASE_MULT). A unit's (+0x408) through 0x752440: per city, a threatened city (CityBuildAI +0x1b8 above -1) takes no unit of Combat 0;..."

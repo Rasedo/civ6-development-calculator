@@ -20486,3 +20486,55 @@ GPU `_mops_run`'s per-priority `_mops_free_trees` (gpu/core/sim_minorops.py),
   its Fortify order of the turn digs it in by the engine's own count
   (runs/h1_duels1178 t38); a building a major's city completes inside its
   turn on a harvest's production stands a turn late (runs/h1_duels1140 t80).
+
+## C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins
+
+`minorCanTrain`, `minorBeliefEnables` (cpu/core/minorBuild.ts),
+`minorFaithUnit` (cpu/core/minorCityAi.ts), the Warrior Monk's
+`requiresBuilding` (cpu/data/units.ts); GPU `_minor_can_train`,
+`_minor_belief_enables` (gpu/core/sim_minors.py).
+
+- THE REQUEST'S TEST: the Religious AI's unit purchase (0x752440) tests
+  nothing of the unit past its threat and ReligiousStrength lines; it
+  builds the purchase request (0x977570) and asks the command's test
+  (vt +0x48), the city purchase's test 0xa53980. Its unit branch
+  (0xa53c38) calls CanTrain (0x172820) with the request's formation, the
+  sixth argument 0 (the prerequisites asked) and the seventh 1, and refuses
+  where it refuses (0xa53c84); the stack test (0x1b12e0) and the strategic
+  amount follow.
+- THE BUILDING PREREQUISITES (0x172b43..0x172c92, skipped under the sixth
+  argument): a unit with Unit_BuildingPrereqs rows (Units +0x258) asks one
+  of them held by the city (0x18e9f0) and not pillaged (0x18fe60), its
+  NumSupported (0x179ea0) -1 or above the player's units of the type from
+  the city (0x4f2bb0); none, CanTrain refuses (0x172c90). The Warrior
+  Monk's rows are the Temple, the Stave Church and the Prasat; the Military
+  Engineer's the Armory.
+- ENABLED BY RELIGION (0x172cdf..0x172f33): a unit with EnabledByReligion
+  (Units +0x1b8 bit 0x40), where the player religion's byte +0x5b0
+  (0x496970) is clear, asks the city to follow a religion (city +0x1910 not
+  -1) whose record lists the unit among its enabled units (0x340880: the
+  religion's entry +0x60..+0x68); where the byte is set, at least one
+  religion listing the unit and each such religion holding a follower in
+  the city (0x1f3320 on the city's +0x1908, at least 1). The byte is
+  written in PlayerReligion's constructor (0x490180 at 0x49149c), its one
+  writer by displacement. The Warrior Monk is the one EnabledByReligion
+  unit, listed by the Warrior Monks follower belief (ALLOW_WARRIOR_MONKS,
+  MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_UNIT).
+- THE RELIGIOUS AI'S LIST: the listener's test (0x5f6920) takes a unit
+  contract whose PurchaseYield is YIELD_FAITH (Units +0x2c), or, for a unit
+  without BuildCharges and without Units +0x1b9 bit 0x40, one a city of the
+  player has Faith-enabled (0x1b2930); a building's alike (0x1b2880). A
+  Warrior Monk contract is on the list in a city that may never buy it.
+- CONFIRMED: runs/h1_duels1163 Brussels (city-state 4) t79-t150: its Simple
+  Operation Attack's contract 240 for UNIT_WARRIOR_MONK ACCEPTED turn after
+  turn with no city, its Faith 113.7 after t80's income, over the unit's
+  100, the city following Taoism (beliefs 23, 31, 52, no Warrior Monks) and
+  holding no Temple, nothing bought, the record's purchase list of the city
+  without the Warrior Monk; runs/h1_duels1170 Lahore t238-t240: the Nihang
+  (no EnabledByReligion, no prerequisite building) in the record's purchase
+  list at 345 Faith and bought at t239. No recorded religion of the 65
+  games holds the Warrior Monks belief and no city-state's purchase list
+  ever holds the Warrior Monk.
+- OPEN: no recording tells the belief's refusal from the Temple's (both
+  hold in every case); the player religion's byte +0x5b0 is read at
+  CanTrain alone, its setter unread.

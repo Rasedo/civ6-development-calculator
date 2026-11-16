@@ -28,6 +28,17 @@
   context:
     - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP..."
   review: reviewed
+- addr: 0x1f3320
+  final: 0x149e00
+  kind: function
+  semantics: "(city religion, religion): the value of the city's entry of that religion (0x14 an entry from +0xb0, +0xc0 of them, the religion at +0), 0 with none; CanTrain asks at least 1 of it."
+  status: PARTLY
+  readings:
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...one religion listing the unit and each such religion holding a follower in the city (0x1f3320 on the city's +0x1908, at least 1). The byte is written in PlayerReligion's constructor...
+  review: imported
 - addr: 0x1f33e0
   final: 0x149e50
   kind: function

@@ -2272,6 +2272,19 @@ class SimMinors:
         held_c = (c >= 0) & have_c.gather(1, c.clamp(min=0))
         return held_t.any(dim=1) | held_c.any(dim=1)
 
+    def _minor_belief_enables(self, s: int, u0: torch.Tensor) -> torch.Tensor:
+        """[B] — `minorBeliefEnables` of chassis `u0` ([B], clamped): minor
+        `s`'s city follows a religion whose enabled units hold the unit, the
+        Warrior Monks follower belief's Warrior Monk"""
+        if self._monk_idx < 0 or self._monk_follower < 0:
+            return torch.zeros_like(u0, dtype=torch.bool)
+        fol = self._minor_followed()[:, s]
+        n = self.civ_follower.shape[1]
+        belief = torch.where((fol >= 0) & (fol < n),
+                             self.civ_follower.gather(1, fol.clamp(min=0, max=n - 1).unsqueeze(1)).squeeze(1),
+                             torch.full_like(fol, -1))
+        return (u0 == self._monk_idx) & (belief == self._monk_follower)
+
     def _minor_can_train(self, s: int, ui: torch.Tensor, faith: bool = False) -> torch.Tensor:
         """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none), its
         prerequisites asked (0x172820, sixth argument clear): the minor's
@@ -2280,31 +2293,44 @@ class SimMinors:
         purchase request in Faith, `faith`), spawned or a
         spy, a naval unit at a coastal centre, an air unit beside a complete
         Aerodrome, a Trader below the trade capacity, the Archaeologist with
-        an Archaeological Museum, a unit with its prerequisite building (the
-        Military Engineer's Armory); a city-state ignores the strategic
-        resources"""
+        an Archaeological Museum, a unit with its prerequisite building
+        standing unpillaged (the Military Engineer's Armory, the Warrior
+        Monk's Temple; 0x172b43..0x172c92), an EnabledByReligion unit with a
+        belief of the city's majority religion that enables it
+        (0x172cdf..0x172f33, `_minor_belief_enables`); a city-state ignores
+        the strategic resources"""
         row = self._CITY_MINOR0 + s
         u0 = ui.clamp(min=0, max=self.NU - 1)
         major_only = getattr(self, "_type_major_only", None)
         if major_only is None:
             T = self._cv_tables()
             major_only = torch.zeros(self.NU, dtype=torch.bool, device=self.device)
+            by_religion = torch.zeros(self.NU, dtype=torch.bool, device=self.device)
             for k, r in enumerate(T["unit_rows"]):
                 ei = T["engine"]["unit"][k]
                 if r["majorOnly"] and 0 <= ei < self.NU:
                     major_only[ei] = True
+                if r["religion"] and 0 <= ei < self.NU:
+                    by_religion[ei] = True
             self._type_major_only = major_only
+            self._type_by_religion = by_religion
         faith_only = self._type_faith_only.take(u0) & (not faith)
         ok = (ui >= 0) & (self._type_uniq.take(u0) < 0) & ~faith_only & ~self._type_spawn_only.take(u0)
         ok = ok & ~major_only.take(u0)
+        rel = self._type_by_religion.take(u0)
+        if bool((ok & rel).any()):
+            ok = ok & (~rel | self._minor_belief_enables(s, u0))
         if self._spy_idx >= 0:
             ok = ok & (u0 != self._spy_idx)
         if not self._minor_any_res:
             ok = ok & (self._type_resource.take(u0) < 0)
-        # Unit_BuildingPrereqs (the Military Engineer's Armory)
+        # Unit_BuildingPrereqs (the Military Engineer's Armory, the Warrior
+        # Monk's Temple), standing unpillaged
         rb = self._type_req_bldg.take(u0)
         if bool((ok & (rb >= 0)).any()):
-            ok = ok & ((rb < 0) | self.city_bldg[:, row, 0].gather(1, rb.clamp(min=0).unsqueeze(1)).squeeze(1))
+            rbc = rb.clamp(min=0).unsqueeze(1)
+            stands = (self.city_bldg[:, row, 0].gather(1, rbc) & ~self.city_bldg_pillaged[:, row, 0].gather(1, rbc)).squeeze(1)
+            ok = ok & ((rb < 0) | stands)
         tt, tc = self._type_tech.take(u0), self._type_civic.take(u0)
         ok = ok & ((tt < 0) | self.citystate_techs[:, s].gather(1, tt.clamp(min=0).unsqueeze(1)).squeeze(1))
         ok = ok & ((tc < 0) | self.citystate_civics[:, s].gather(1, tc.clamp(min=0).unsqueeze(1)).squeeze(1))

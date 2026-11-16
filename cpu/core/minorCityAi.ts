@@ -1245,9 +1245,12 @@ function minorBuySpotBlocked(state: GameState, cs: CityState, id: string): boole
  *  threatened city takes no unit of Combat 0; a unit with ReligiousStrength
  *  asks the AI's religion (+0x1c0) to be the city's, which a city-state,
  *  founding none, never holds; then the purchase request in Faith (0x977570
- *  on YIELD_FAITH): the city may train it, the centre takes it, the Faith
- *  covers the price (runs/h1_duels1170 t239: Lahore's Nihang of contract
- *  1123 bought for 345 Faith, "FAITH PURCHASE") */
+ *  on YIELD_FAITH), whose test (0xa53980 at 0xa53c7d) is CanTrain with its
+ *  prerequisites asked: the city may train it (`minorCanTrain`: the Warrior
+ *  Monk only with its belief in the city's religion and its Temple), the
+ *  centre takes it, the Faith covers the price (runs/h1_duels1170 t239:
+ *  Lahore's Nihang of contract 1123 bought for 345 Faith, "FAITH PURCHASE";
+ *  runs/h1_duels1163 Brussels: its Warrior Monk contract 240 never bought) */
 function minorFaithUnit(state: GameState, cs: CityState, u: string): boolean {
   const id = engineId('unit', u, 'UNIT_', UNITS);
   if (!id) return false;

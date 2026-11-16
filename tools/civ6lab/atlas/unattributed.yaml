@@ -1417,6 +1417,16 @@
     - "- 0x7a51f0: T past H FX(−9999); an unowned plot pays its price 0x1b1cb0 (+0x1688; −1 beyond gp +0x124 or with no owned neighbour) at the yield value, discoun..."
     - "...it; PV; Housing / TilesRequired at 0x7a3d70; the claims (+0x1380, 0x39de20; 0x7a10c0: 0x1b1cb0 × 0.5, 0x79f0c0); the modifiers 0x7a4b20. The Farm's second Housing: \"C-127: the improv..."
   review: reviewed
+- addr: 0x1b2880
+  final: 0x121b20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...b9 bit 0x40, one a city of the player has Faith-enabled (0x1b2930); a building's alike (0x1b2880). A Warrior Monk contract is on the list in a city that may never buy it.
+  review: imported
 - addr: 0x1b2930
   final: 0x121bd0
   kind: function
@@ -1424,6 +1434,7 @@
   readings:
     - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
     - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...nit of Combat 0; a unit with ReligiousStrength (+0x78) not Faith-enabled in the city (0x1b2930) needs the AI's religion (+0x1c0) to be the city's; then the purchase request 0x977570...
@@ -2568,9 +2579,13 @@
 - addr: 0x340880
   final: 0x243660
   kind: function
+  name: a religion enables a unit
+  semantics: "(religions, religion, unit): the religion's entry (0x90 a record from +0x108, its type at +0) lists the unit among its enabled units (+0x60..+0x68)."
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorBeliefEnables]
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0, 0x496970) or, without one, in the city's majority religion (city religion +0x1910, 0x340880): `beliefEnables` / `belief_enables` (the Warrior Monks follower belief, the only such..."
@@ -4684,10 +4699,13 @@
 - addr: 0x5f6920
   final: 0x3fb1b0
   kind: function
+  name: the contract's Faith test
+  semantics: "the Religious AI's listener test (the contract's vt +0x78): a unit (+0x408) whose PurchaseYield hash (Units +0x2c) is YIELD_FAITH's, or, without BuildCharges (+0x44) and without Units +0x1b9 bit 0x40, one a city of the player has Faith-enabled (0x1b2930); a building (+0x468) whose PurchaseYield (Buildings +0x20) is YIELD_FAITH's or one a city has Faith-enabled (0x1b2880)."
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:faithPurchasable]
   readings:
     - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x600800
@@ -10069,10 +10087,16 @@
   final: 0x74ef40
   kind: function
   name: the city purchase's test
-  semantics: "the city purchase's CanStart: the World Congress's Gold / Faith unit bans (LOC_WORLD_CONGRESS_UNIT_ACCESS_BAN_GOLD / _FAITH), the stack test, the strategic amount (LOC_UNIT_TRAIN_REQUIRES_RESOURCE_AMOUNT / _PARTIAL, through 0x17c2e0); only its strings read"
+  semantics: "the city purchase's CanStart: the World Congress's Gold / Faith unit bans (LOC_WORLD_CONGRESS_UNIT_ACCESS_BAN_GOLD / _FAITH), the stack test, the strategic amount (LOC_UNIT_TRAIN_REQUIRES_RESOURCE_AMOUNT / _PARTIAL, through 0x17c2e0). Its unit branch (0xa53c38): CanTrain (0x172820) with the request's formation, the sixth argument 0 (the prerequisites asked) and the seventh 1, refused where it refuses (0xa53c84), then the stack test (0x1b12e0); its building branch (0xa53b85) CanConstruct (0x1714d0) and the building not pillaged; the rest unread"
   status: PARTLY
+  cases:
+    - recording: h1_duels1163
+      turn: 80
+      value: "Brussels' Warrior Monk contract 240 never bought with its Faith over the price: CanTrain's refusal reaches the Faith purchase"
+  impl: [cpu/core/minorCityAi.ts:minorFaithUnit]
   readings:
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   context:
     - "- THE PURCHASE (0xa540c0, the city purchase's execution behind its test 0xa53980, which holds the World Congress's Gold / Faith bans and LOC_UNIT_TRAIN_REQUIRES_RESOURC..."
   review: reviewed

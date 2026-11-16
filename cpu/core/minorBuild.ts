@@ -1476,26 +1476,48 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
  *  Archaeological Museum; a city-state ignores the strategic resources.
  *  `id` the engine's unit; `faith`: the purchase request in Faith, which
  *  takes a unit bought with Faith alone (runs/h1_duels1170 Lahore t239: its
- *  Nihang of contract 1123 bought for 345 Faith) */
+ *  Nihang of contract 1123 bought for 345 Faith). A prerequisite building
+ *  stands unpillaged (0x172b43..0x172c92: one of the unit's
+ *  Unit_BuildingPrereqs held, 0x18e9f0, and not pillaged, 0x18fe60), and an
+ *  EnabledByReligion unit asks a belief of the city's majority religion that
+ *  enables it (0x172cdf..0x172f33, `minorBeliefEnables`): the Warrior Monk
+ *  is refused to a city without the Warrior Monks belief or a Temple
+ *  (runs/h1_duels1163 Brussels t79-t150: its Warrior Monk contract 240
+ *  ACCEPTED, the city following Taoism without the belief and holding no
+ *  Temple, its Faith over the price from t80, nothing bought and the unit
+ *  absent from the record's purchase list) */
 export function minorCanTrain(state: GameState, cityState: CityState, id: string, faith = false): boolean {
   const r = cityState.research;
   const held = cityState.buildings ?? [];
   const d = UNITS[id];
   if (!d || d.uniqueTo || (d.faithOnly && !faith) || d.spawnOnly || d.spy) return false;
-  if (majorCivOnly(installType('unit', id, 'UNIT_'))) return false;
+  const type = installType('unit', id, 'UNIT_');
+  if (majorCivOnly(type)) return false;
+  if (AI_UNITS[AI_UNIT_INDEX.get(type) ?? -1]?.religion && !minorBeliefEnables(state, cityState, type)) return false;
   if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
   if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
-  if (unitObsoleteIn(r, installType('unit', id, 'UNIT_'))) return false;
+  if (unitObsoleteIn(r, type)) return false;
   if (d.requiresResource && !minorAnyResource()) return false;
   // Unit_BuildingPrereqs: the Military Engineer's Armory (runs/h1_duels1142
   // city-state 2: its Fort's tree finds no Military Engineer while the
-  // Armory is building, t187-t188, and holds its contract from t189)
-  if (d.requiresBuilding && !held.includes(d.requiresBuilding)) return false;
+  // Armory is building, t187-t188, and holds its contract from t189), the
+  // Warrior Monk's Temple
+  if (d.requiresBuilding && (!held.includes(d.requiresBuilding) || buildingPillaged(cityState, d.requiresBuilding))) return false;
   if (d.naval && !cityNavalCapable(state, minorCity(cityState))) return false;
   if (d.air && !(cityState.districts ?? []).some((x) => x.type === 'AERODROME' && state.map.tiles[x.tileIndex].districtComplete)) return false;
   if (d.trader && minorTraders(state, cityState) >= tradeCapacity(state, cityState.seat)) return false;
   if (id === 'ARCHAEOLOGIST' && !held.includes('MUSEUM_ARTIFACT')) return false;
   return true;
+}
+
+/** CanTrain's EnabledByReligion test (0x172cdf..0x172f33) in a minor's city:
+ *  the city follows a religion (city +0x1910) whose enabled units hold the
+ *  unit (0x340880) — the Warrior Monks follower belief's Warrior Monk
+ *  (ALLOW_WARRIOR_MONKS, MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_UNIT), the
+ *  one such row. `u` the install's unit type */
+export function minorBeliefEnables(state: GameState, cityState: CityState, u: string): boolean {
+  const rel = majorityReligionOf(state, cityState.seat);
+  return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
 }
 
 /** THE FORMATION A MINOR'S UNIT ORDER TAKES (0x178820, as the city AI's
@@ -2141,10 +2163,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     regionalAmenities: () => [amenity],
     regionalBuildingCities: () => 1,
     unitVersion: (u) => minorUnitVersion(cityState, u),
-    beliefEnables: (u) => {
-      const rel = majorityReligionOf(state, cityState.seat);
-      return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
-    },
+    beliefEnables: (u) => minorBeliefEnables(state, cityState, u),
     followsReligion: majorityReligionOf(state, cityState.seat) >= 0,
     fullCiv: false,
     tribe: false,

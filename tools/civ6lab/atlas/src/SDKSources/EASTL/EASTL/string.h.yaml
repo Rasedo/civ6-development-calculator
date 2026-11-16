@@ -108,6 +108,7 @@
   status: PARTLY
   readings:
     - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...gTech (+0x730, HasTech 0x4cb2f0); the property names from PlayerReligion's constructor (0x490180 at 0x4916b8 / 0x49174f / 0x4917ed). Their one writer in the install is EFFECT_ADJUST_...

@@ -179,7 +179,8 @@ export interface UnitDef {
    *  `progressCost` scales; set by the catalog builder. */
   progressBase?: number;
   /** a building the TRAINING city must already hold (the Military Engineer's
-   *  Armory). Per-CITY, so it is enforced in `trainableUnits`. */
+   *  Armory, the Warrior Monk's Temple). Per-CITY, so it is enforced in
+   *  `trainableUnits` and a minor's `minorCanTrain`. */
   requiresBuilding?: string;
   /** a NAVAL unit lives on water natively (never `embarked`);
    * passability/spawn/combat branch on it. Default false. */
@@ -2464,8 +2465,12 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 3,
       combat: 40,
       faithOnly: true,
+      // Unit_BuildingPrereqs: the Temple (the Stave Church is the Temple's
+      // variant)
+      requiresBuilding: 'TEMPLE',
       description: 'Faith-bought combat unit with its own promotion tree.',
       src: {
+        requiresBuilding: xml('Unit_BuildingPrereqs', 'Unit=UNIT_WARRIOR_MONK&PrereqBuilding=BUILDING_TEMPLE', 'PrereqBuilding', { expect: 'BUILDING_TEMPLE' }),
         cost: xml('Units', 'UnitType=UNIT_WARRIOR_MONK', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_WARRIOR_MONK', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_WARRIOR_MONK', 'BaseMoves'),

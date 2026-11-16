@@ -322,9 +322,12 @@
   final: 0xf86d0
   kind: function
   name: CanTrain
-  semantics: "CanTrain(city, unit, ..., sixth argument): a Units_XP2 MajorCivOnly row (+0x48 bit 0x10, 0x17293b) refused to a player not FULL_CIV (0x172941), before the prerequisites; the sixth argument set (+0xe8, the CityBuildAI's call with the player AI +0x12a0 +0xba8 flag) skips the PrereqTech and PrereqCivic checks (0x172951..0x1729ab), so a locked unit is valued on the research AI's turns. Past them it refuses a unit of ReligiousStrength (+0x78 > 0) in a city whose religion (+0x1910) is -1 (0x172d88..0x172d9d) and a RequiresInquisition unit (+0x1ba bit 1) for a player with no inquisition launched (0x497a30, 0x172da3..0x172dba)."
+  semantics: "CanTrain(city, unit, ..., sixth argument): a Units_XP2 MajorCivOnly row (+0x48 bit 0x10, 0x17293b) refused to a player not FULL_CIV (0x172941), before the prerequisites; the sixth argument set (+0xe8, the CityBuildAI's call with the player AI +0x12a0 +0xba8 flag) skips the PrereqTech and PrereqCivic checks (0x172951..0x1729ab), so a locked unit is valued on the research AI's turns. Past them it refuses a unit of ReligiousStrength (+0x78 > 0) in a city whose religion (+0x1910) is -1 (0x172d88..0x172d9d) and a RequiresInquisition unit (+0x1ba bit 1) for a player with no inquisition launched (0x497a30, 0x172da3..0x172dba). With the prerequisites asked, a unit with Unit_BuildingPrereqs (+0x258) needs one of them held by the city (0x18e9f0), not pillaged (0x18fe60), its NumSupported -1 or above the city's units of the type (0x172b43..0x172c92). An EnabledByReligion unit (+0x1b8 bit 0x40, 0x172cdf..0x172f33): the player religion's byte +0x5b0 clear, the city's religion (+0x1910) set and listing the unit (0x340880); the byte set, a religion listing the unit and each such one with a follower in the city (0x1f3320)."
   status: READ
   cases:
+    - recording: h1_duels1163
+      turn: 80
+      value: "Brussels' Warrior Monk contract 240 ACCEPTED t79-t150, its Faith 113.7 over the unit's 100, the city following Taoism without the Warrior Monks belief and holding no Temple: never bought, the record's purchase list without the unit; h1_duels1170 t239 Lahore's Nihang listed and bought"
     - recording: h1_duelu1117
       turn: 195
       value: Valletta, Gunpowder held, its Warrior contract 680 ACCEPTED in the purchase list unbought t195-t220 with its Gold over the price; the purchase list lists no obsolete unit
@@ -348,6 +351,7 @@
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/minorBuild.ts:majorCivOnly
     - cpu/core/minorBuild.ts:minorFormation
+    - cpu/core/minorBuild.ts:minorBeliefEnables
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
@@ -362,6 +366,7 @@
     - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
     - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["label: CanTrain(unit)"]
   context:
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
@@ -763,6 +768,16 @@
     - "...e (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON. The tail: x (the city's extra copies + 1, 0x179dd0), the promotion class weight, a strategic resource the player lacks and no city of its..."
     - "...MDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288: 1.0 with none; 0 where..."
   review: reviewed
+- addr: 0x179ea0
+  kind: function
+  name: NumSupported
+  status: PARTLY
+  readings:
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ne of them held by the city (0x18e9f0) and not pillaged (0x18fe60), its NumSupported (0x179ea0) -1 or above the player's units of the type from the city (0x4f2bb0); none, CanTrain re...
+  review: imported
 - addr: 0x17a600
   final: 0xfdc70
   kind: function

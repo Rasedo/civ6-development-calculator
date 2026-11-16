@@ -88,9 +88,11 @@
 - addr: 0x496970
   final: 0x314df0
   kind: function
+  semantics: the player religion's byte +0x5b0, which picks the form of CanTrain's EnabledByReligion test; written in PlayerReligion's constructor (0x49149c), its setter unread.
   status: PARTLY
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+    - "C-126: the Faith purchase's CanTrain, its building prerequisites and its EnabledByReligion test — READ (0xa53980 at 0xa53c38..0xa53c84, 0x172820 at 0x172b43..0x172c92 and 0x172cdf..0x172f33, 0x5f6920), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...igion unit (0x172cdf) needs a belief that enables it in the player's religion (+0x1340, 0x496970) or, without one, in the city's majority religion (city religion +0x1910, 0x340880):...
